@@ -1,9 +1,11 @@
 extern crate infer;
 pub mod ape;
 pub mod flac;
-pub mod format;
 pub mod id3;
 pub mod mp4;
+
+pub mod format;
+pub mod picture;
 
 use core::convert::AsRef;
 use eyre::{Result, WrapErr};
@@ -13,6 +15,7 @@ use std::fs::copy;
 use std::path::{Path, PathBuf};
 
 use format::Format;
+use picture::Picture;
 
 #[derive(Clone, Debug)]
 pub struct Track {
@@ -81,16 +84,19 @@ impl Clone for Box<dyn Tag> {
 impl Debug for Box<dyn Tag> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
         let mut str = f.debug_struct("Tag");
-        for (k, v) in self.get_all_tags() {
+        for (k, v) in self.get_all() {
             str.field(&k, &v);
         }
+        str.field("pictures", &self.get_pictures());
         str.finish()
     }
 }
 
 pub trait Tag: TagClone {
-    fn get_raw(&self, key: &str) -> Option<Vec<String>>;
-    fn get_all_tags(&self) -> HashMap<String, Vec<String>>;
+    fn get_str(&self, key: &str) -> Option<Vec<String>>;
+    fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
+    fn get_all(&self) -> HashMap<String, Vec<String>>;
+    fn get_pictures(&self) -> Result<Vec<Picture>>;
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()>;
 }

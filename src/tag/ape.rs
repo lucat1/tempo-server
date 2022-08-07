@@ -1,6 +1,7 @@
 extern crate ape;
 
-use ape::ItemValue;
+use super::picture::{Picture, PictureType};
+use ape::{Item, ItemValue};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use std::collections::HashMap;
@@ -40,12 +41,18 @@ fn value_to_strings(value: &ItemValue, separator: &String) -> Option<Vec<String>
 }
 
 impl crate::tag::Tag for Tag {
-    fn get_raw(&self, tag: &str) -> Option<Vec<String>> {
+    fn get_str(&self, tag: &str) -> Option<Vec<String>> {
         let item = self.tag.item(tag)?;
         value_to_strings(&item.value, &self.separator)
     }
 
-    fn get_all_tags(&self) -> HashMap<String, Vec<String>> {
+    fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()> {
+        self.tag
+            .set_item(Item::from_text(key, values.join(&self.separator))?);
+        Ok(())
+    }
+
+    fn get_all(&self) -> HashMap<String, Vec<String>> {
         let mut out = HashMap::new();
         for item in self.tag.iter() {
             if let Some(vals) = value_to_strings(&item.value, &self.separator) {
@@ -53,6 +60,26 @@ impl crate::tag::Tag for Tag {
             }
         }
         out
+    }
+
+    fn get_pictures(&self) -> Result<Vec<Picture>> {
+        self.tag
+            .iter()
+            .filter_map(|item| match &item.value {
+                ItemValue::Binary(b) => Some((item.key.clone(), b)),
+                _ => None,
+            })
+            .map(|item| -> Result<Picture> {
+                Ok(Picture {
+                    mime_type: infer::get(&item.1.to_vec())
+                        .ok_or(eyre!("Could not infer mime type from binary picture"))?
+                        .to_string(),
+                    picture_type: PictureType::CoverFront,
+                    description: item.0,
+                    data: item.1.to_vec(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()
     }
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {

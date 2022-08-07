@@ -1,9 +1,10 @@
 extern crate mp4ameta;
 
+use super::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use mp4ameta::ident::DataIdent;
-use mp4ameta::Data;
+use mp4ameta::{Data, ImgFmt};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -62,7 +63,7 @@ fn str_to_ident(ident: &str) -> DataIdent {
 }
 
 impl crate::tag::Tag for Tag {
-    fn get_raw(&self, key: &str) -> Option<Vec<String>> {
+    fn get_str(&self, key: &str) -> Option<Vec<String>> {
         let ident = str_to_ident(key);
         let data: Vec<String> = self
             .tag
@@ -83,12 +84,18 @@ impl crate::tag::Tag for Tag {
         Some(
             data.join(&self.separator)
                 .split(&self.separator)
-                .map(String::from)
-                .collect(),
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
         )
     }
 
-    fn get_all_tags(&self) -> HashMap<String, Vec<String>> {
+    fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()> {
+        self.tag
+            .set_data(str_to_ident(key), Data::Utf8(values.join(&self.separator)));
+        Ok(())
+    }
+
+    fn get_all(&self) -> HashMap<String, Vec<String>> {
         let mut out = HashMap::new();
 
         for (ident, data) in self.tag.data() {
@@ -105,6 +112,23 @@ impl crate::tag::Tag for Tag {
         }
 
         out
+    }
+
+    fn get_pictures(&self) -> Result<Vec<Picture>> {
+        Ok(self
+            .tag
+            .images()
+            .map(|img| Picture {
+                mime_type: match img.1.fmt {
+                    ImgFmt::Png => "image/png".to_string(),
+                    ImgFmt::Jpeg => "image/jpeg".to_string(),
+                    ImgFmt::Bmp => "image/bmp".to_string(),
+                },
+                picture_type: PictureType::CoverFront,
+                description: ident_to_string(img.0),
+                data: img.1.data.to_owned(),
+            })
+            .collect::<Vec<_>>())
     }
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
