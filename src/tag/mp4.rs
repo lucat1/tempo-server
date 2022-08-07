@@ -1,27 +1,29 @@
 extern crate mp4ameta;
 
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use core::convert::AsRef;
-use eyre::Result;
-use mp4ameta::Data;
+use eyre::{eyre, Result};
 use mp4ameta::ident::DataIdent;
+use mp4ameta::Data;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 const MAGIC: u8 = 0xa9;
 
 #[derive(Clone)]
 pub struct Tag {
     tag: mp4ameta::Tag,
-    separator: String
+    separator: String,
 }
 
 impl crate::tag::TagFrom for Tag {
     fn from_path<P>(path: P) -> Result<Box<dyn crate::tag::Tag>>
-        where P: AsRef<Path> {
-        Ok(Box::new(Tag{
+    where
+        P: AsRef<Path>,
+    {
+        Ok(Box::new(Tag {
             tag: mp4ameta::Tag::read_from_path(path)?,
             // TODO
-            separator: ",".to_string()
+            separator: ",".to_string(),
         }))
     }
 }
@@ -29,10 +31,9 @@ impl crate::tag::TagFrom for Tag {
 fn ident_to_string(ident: &DataIdent) -> String {
     match ident {
         DataIdent::Fourcc(d) => format!("{}", d),
-        DataIdent::Freeform { mean, name } => format!("{}:{}", mean, name)
+        DataIdent::Freeform { mean, name } => format!("{}:{}", mean, name),
     }
 }
-
 
 fn str_to_ident(ident: &str) -> DataIdent {
     let mut bytes = ident.as_bytes().to_owned();
@@ -63,19 +64,28 @@ fn str_to_ident(ident: &str) -> DataIdent {
 impl crate::tag::Tag for Tag {
     fn get_raw(&self, key: &str) -> Option<Vec<String>> {
         let ident = str_to_ident(key);
-        let data: Vec<String> = self.tag.data_of(&ident).filter_map(|data| {
-            // Save only text values
-            match data {
-                Data::Utf8(d) => Some(d.to_owned()),
-                Data::Utf16(d) => Some(d.to_owned()),
-                _ => None
-            }
-        }).collect();
+        let data: Vec<String> = self
+            .tag
+            .data_of(&ident)
+            .filter_map(|data| {
+                // Save only text values
+                match data {
+                    Data::Utf8(d) => Some(d.to_owned()),
+                    Data::Utf16(d) => Some(d.to_owned()),
+                    _ => None,
+                }
+            })
+            .collect();
         if data.is_empty() {
             return None;
         }
         // Convert multi tag to single with separator
-        Some(data.join(&self.separator).split(&self.separator).map(String::from).collect())
+        Some(
+            data.join(&self.separator)
+                .split(&self.separator)
+                .map(String::from)
+                .collect(),
+        )
     }
 
     fn get_all_tags(&self) -> HashMap<String, Vec<String>> {
@@ -93,12 +103,11 @@ impl crate::tag::Tag for Tag {
                 out.insert(ident_to_string(ident), values);
             }
         }
-        
+
         out
     }
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
-        self.tag.write_to_path(path)?;
-        Ok(())
+        self.tag.write_to_path(path).map_err(|e| eyre!(e))
     }
 }

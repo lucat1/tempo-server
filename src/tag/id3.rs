@@ -1,24 +1,26 @@
 extern crate id3;
 
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use core::convert::AsRef;
+use eyre::{eyre, Result};
 use id3::{Content, TagLike, Version};
-use eyre::Result;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone)]
 pub struct Tag {
     tag: id3::Tag,
-    separator: String
+    separator: String,
 }
 
 impl crate::tag::TagFrom for Tag {
     fn from_path<P>(path: P) -> Result<Box<dyn crate::tag::Tag>>
-        where P: AsRef<Path> {
-        Ok(Box::new(Tag{
+    where
+        P: AsRef<Path>,
+    {
+        Ok(Box::new(Tag {
             tag: id3::Tag::read_from_path(path)?,
             // TODO
-            separator: ",".to_string()
+            separator: ",".to_string(),
         }))
     }
 }
@@ -49,18 +51,29 @@ impl crate::tag::Tag for Tag {
         let mut tags = HashMap::new();
         for frame in self.tag.frames() {
             if let Content::Text(v) = frame.content() {
-                tags.insert(frame.id().to_owned(), v.split(&self.separator).map(String::from).collect());
+                tags.insert(
+                    frame.id().to_owned(),
+                    v.split(&self.separator).map(String::from).collect(),
+                );
             }
         }
         // Add TXXX
         for extended in self.tag.extended_texts() {
-            tags.insert(extended.description.to_string(), extended.value.split(&self.separator).map(String::from).collect());
+            tags.insert(
+                extended.description.to_string(),
+                extended
+                    .value
+                    .split(&self.separator)
+                    .map(String::from)
+                    .collect(),
+            );
         }
         tags
     }
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
-        self.tag.write_to_path(path, Version::Id3v24)?;
-        Ok(())
+        self.tag
+            .write_to_path(path, Version::Id3v24)
+            .map_err(|e| eyre!(e))
     }
 }

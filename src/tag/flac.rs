@@ -1,20 +1,22 @@
 extern crate metaflac;
 
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use core::convert::AsRef;
-use eyre::Result;
+use eyre::{eyre, Result};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone)]
 pub struct Tag {
-    tag: metaflac::Tag
+    tag: metaflac::Tag,
 }
 
 impl crate::tag::TagFrom for Tag {
     fn from_path<P>(path: P) -> Result<Box<dyn crate::tag::Tag>>
-        where P: AsRef<Path> {
-        Ok(Box::new(Tag{
-            tag: metaflac::Tag::read_from_path(path)?
+    where
+        P: AsRef<Path>,
+    {
+        Ok(Box::new(Tag {
+            tag: metaflac::Tag::read_from_path(path)?,
         }))
     }
 }
@@ -36,13 +38,14 @@ impl crate::tag::Tag for Tag {
         let mut out = HashMap::new();
         if let Some(vorbis) = self.tag.vorbis_comments() {
             // Get value of tag with proper separators
-            vorbis.comments.iter().for_each(|(k, _)| { out.insert(k.to_string(), self.get_raw(k).unwrap()); } );
+            vorbis.comments.iter().for_each(|(k, _)| {
+                out.insert(k.to_string(), self.get_raw(k).unwrap());
+            });
         }
         out
     }
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
-        self.tag.write_to_path(path)?;
-        Ok(())
+        self.tag.write_to_path(path).map_err(|e| eyre!(e))
     }
 }

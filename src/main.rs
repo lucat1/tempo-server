@@ -1,10 +1,10 @@
-mod tag;
 mod import;
+mod tag;
 mod util;
 
-use std::path::PathBuf;
-use eyre::{eyre, Result};
 use clap::{arg, Command};
+use eyre::{eyre, Result};
+use std::path::PathBuf;
 
 static CLI_NAME: &str = "tagger";
 
@@ -38,23 +38,25 @@ fn main() -> Result<()> {
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("list", sub_matches)) => {
-            let filter = sub_matches.get_one::<String>("Filter").ok_or(eyre!("Filter argument expected"))?;
-                println!("list: {}", filter);
-                Ok(())
+            let filter = sub_matches
+                .get_one::<String>("Filter")
+                .ok_or(eyre!("Filter argument expected"))?;
+            println!("list: {}", filter);
+            Ok(())
         }
         Some(("fix", sub_matches)) => {
-            let filter = sub_matches.get_one::<String>("Filter").ok_or(eyre!("Filter argument expected"))?;
-                println!("fix: {}", filter);
-                Ok(())
+            let filter = sub_matches
+                .get_one::<String>("Filter")
+                .ok_or(eyre!("Filter argument expected"))?;
+            println!("fix: {}", filter);
+            Ok(())
         }
-        Some(("import", sub_matches)) => {
-            sub_matches
-                .get_many::<PathBuf>("PATH")
-                .ok_or(eyre!("Expected at least one path argument to import"))?
-                .into_iter()
-                .map(|p| import::import(p))
-                .collect()
-        }
+        Some(("import", sub_matches)) => sub_matches
+            .get_many::<PathBuf>("PATH")
+            .ok_or(eyre!("Expected at least one path argument to import"))?
+            .into_iter()
+            .map(|p| import::import(p))
+            .collect(),
         _ => unreachable!(),
     }
 }
