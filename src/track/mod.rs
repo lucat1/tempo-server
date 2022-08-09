@@ -5,8 +5,10 @@ pub mod id3;
 pub mod mp4;
 
 pub mod format;
+pub mod map;
 pub mod picture;
 
+use super::util::{dedup, take_first};
 use core::convert::AsRef;
 use eyre::{Result, WrapErr};
 use std::collections::HashMap;
@@ -17,15 +19,17 @@ use std::path::{Path, PathBuf};
 use format::Format;
 use picture::Picture;
 
+use self::map::TagKey;
+
 #[derive(Clone, Debug)]
-pub struct Track {
+pub struct TrackFile {
     path: PathBuf,
     format: Format,
     tag: Box<dyn Tag>,
 }
 
-impl Track {
-    pub fn open(path: &PathBuf) -> Result<Box<Track>> {
+impl TrackFile {
+    pub fn open(path: &PathBuf) -> Result<TrackFile> {
         let format = Format::from_path(path)
             .wrap_err(format!("Could not identify format for file: {:?}", path))?;
         let tag = match format {
@@ -35,11 +39,11 @@ impl Track {
             Format::APE => ape::Tag::from_path(path),
         }
         .wrap_err(format!("Could not read metadata from file: {:?}", path))?;
-        Ok(Box::new(Track {
+        Ok(TrackFile {
             path: path.to_path_buf(),
             format,
             tag,
-        }))
+        })
     }
 
     fn r#move(&mut self, path: &PathBuf) -> Result<PathBuf> {
@@ -97,6 +101,39 @@ pub trait Tag: TagClone {
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn get_all(&self) -> HashMap<String, Vec<String>>;
     fn get_pictures(&self) -> Result<Vec<Picture>>;
+    fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()>;
+
+    fn str_to_key(&self, str: &str) -> Option<TagKey>;
+    fn key_to_str(&self, key: TagKey) -> Option<&'static str>;
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()>;
+}
+
+pub trait TrackLike {
+    fn artists(&self) -> Result<Vec<String>>;
+    fn album_artist(&self) -> Result<String>;
+    fn title(&self) -> Result<String>;
+    fn album_title(&self) -> Result<String>;
+    fn length(&self) -> Result<u64>;
+}
+
+impl TrackLike for TrackFile {
+    fn artists(&self) -> Result<Vec<String>> {
+        Ok(dedup(self.get_tag(TagKey::AlbumArtist)?))
+    }
+    fn album_artist(&self) -> Result<String> {
+        take_first(
+            self.get_tag(TagKey::AlbumArtist)?,
+            "Track has no album artist",
+        )
+    }
+    fn title(&self) -> Result<String> {
+        take_first(self.get_tag(TagKey::TrackTitle)?, "Track has no title")
+    }
+    fn album_title(&self) -> Result<String> {
+        take_first(self.get_tag(TagKey::Album)?, "Track has no album title")
+    }
+    fn length(&self) -> Result<u64> {
+        unimplemented!();
+    }
 }

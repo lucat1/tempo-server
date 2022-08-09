@@ -1,9 +1,12 @@
+mod album;
+mod fetch;
 mod import;
-mod tag;
+mod track;
 mod util;
 
 use clap::{arg, Command};
 use eyre::{eyre, Result};
+use futures::stream::{self, StreamExt};
 use std::path::PathBuf;
 
 static CLI_NAME: &str = "tagger";
@@ -34,7 +37,8 @@ fn cli() -> Command<'static> {
         )
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("list", sub_matches)) => {
@@ -51,12 +55,21 @@ fn main() -> Result<()> {
             println!("fix: {}", filter);
             Ok(())
         }
-        Some(("import", sub_matches)) => sub_matches
-            .get_many::<PathBuf>("PATH")
-            .ok_or(eyre!("Expected at least one path argument to import"))?
-            .into_iter()
-            .map(|p| import::import(p))
-            .collect(),
+        Some(("import", sub_matches)) => {
+            let stream = stream::iter(
+                sub_matches
+                    .get_many::<PathBuf>("PATH")
+                    .ok_or(eyre!("Expected at least one path argument to import"))?
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+            );
+            let results: Result<()> = stream
+                .map(|p| async { import::import(p).await })
+                .collect()
+                .await;
+            results?;
+            Ok(())
+        }
         _ => unreachable!(),
     }
 }
