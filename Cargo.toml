@@ -8,10 +8,14 @@ edition = "2021"
 [dependencies]
 clap = "3.2"
 eyre = "0.6"
+color-eyre = "0.6"
 scan_dir = "0.3"
 phf = { version = "0.11", features = ["macros"] }
 const_format = "0.2"
 levenshtein = "1.0"
+log = "0.4"
+pretty_env_logger = "0.4"
+inquire = "0.3.0"
 
 infer = "0.9"
 metaflac = "0.2"

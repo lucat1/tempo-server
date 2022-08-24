@@ -40,6 +40,9 @@ fn cli() -> Command<'static> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    pretty_env_logger::init();
+    color_eyre::install()?;
+
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("list", sub_matches)) => {

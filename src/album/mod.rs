@@ -1,60 +1,47 @@
 use super::track::{TrackFile, TrackLike};
-use super::util::dedup;
+use crate::util::dedup;
 use eyre::Result;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 
-#[derive(Clone, Debug)]
-pub struct RoughAlbum {
-    tracks: Vec<TrackFile>,
+pub trait ArtistLike: ArtistLikeBoxed {
+    fn name(&self) -> String;
+    fn mbid(&self) -> Option<String>;
+    fn joinphrase(&self) -> Option<String>;
 }
 
-impl RoughAlbum {
-    pub fn from_tracks(tracks: Vec<TrackFile>) -> Result<RoughAlbum> {
-        Ok(RoughAlbum { tracks })
+pub trait ArtistLikeBoxed {
+    fn clone_box(&self) -> Box<dyn ArtistLike>;
+    fn fmt_box(&self, f: &mut Formatter<'_>) -> FormatResult;
+}
+
+impl<T> ArtistLikeBoxed for T
+where
+    T: 'static + ArtistLike + Clone + Debug,
+{
+    fn clone_box(&self) -> Box<dyn ArtistLike> {
+        Box::new(self.clone())
+    }
+
+    fn fmt_box(&self, f: &mut Formatter<'_>) -> FormatResult {
+        self.fmt(f)
+    }
+}
+
+impl Clone for Box<dyn ArtistLike> {
+    fn clone(&self) -> Box<dyn ArtistLike> {
+        self.clone_box()
+    }
+}
+
+impl Debug for Box<dyn ArtistLike> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
+        self.fmt_box(f)
     }
 }
 
 pub trait ReleaseLike: ReleaseLikeBoxed {
-    fn artist(&self) -> Result<Vec<String>>;
-    fn title(&self) -> Result<Vec<String>>;
-}
-
-pub trait AlbumLike: ReleaseLike {
-    fn tracks(&self) -> Vec<Box<dyn TrackLike>>;
-}
-
-impl ReleaseLike for RoughAlbum {
-    // Having a vector with length > 1 means there isn't consensus on:
-    // - the album artist
-    // - the album title
-    // amongst the tracks.
-
-    fn artist(&self) -> Result<Vec<String>> {
-        Ok(dedup(
-            self.tracks
-                .iter()
-                .map(|t| t.album_artist())
-                .collect::<Result<Vec<_>>>()?,
-        ))
-    }
-
-    fn title(&self) -> Result<Vec<String>> {
-        Ok(dedup(
-            self.tracks
-                .iter()
-                .map(|t| t.album_title())
-                .collect::<Result<Vec<_>>>()?,
-        ))
-    }
-}
-
-impl AlbumLike for RoughAlbum {
-    fn tracks(&self) -> Vec<Box<dyn TrackLike>> {
-        self.tracks
-            .iter()
-            .map(|t| Box::new(t.clone()) as Box<dyn TrackLike>)
-            .collect::<Vec<_>>()
-    }
+    fn artists(&self) -> Vec<Box<dyn ArtistLike>>;
+    fn title(&self) -> String;
 }
 
 pub trait ReleaseLikeBoxed {
@@ -81,8 +68,41 @@ impl Clone for Box<dyn ReleaseLike> {
     }
 }
 
-impl Debug for Box<dyn AlbumLike> {
+impl Debug for Box<dyn ReleaseLike> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
         self.fmt_box(f)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FileAlbum {
+    pub tracks: Vec<TrackFile>,
+}
+
+impl FileAlbum {
+    pub fn from_tracks(tracks: Vec<TrackFile>) -> Result<FileAlbum> {
+        Ok(FileAlbum { tracks })
+    }
+
+    pub fn artists(&self) -> Result<Vec<String>> {
+        let artists = self
+            .tracks
+            .iter()
+            .map(|t| t.album_artists())
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .flatten()
+            .map(|s| s.clone())
+            .collect::<Vec<_>>();
+        Ok(dedup(artists))
+    }
+
+    pub fn titles(&self) -> Result<Vec<String>> {
+        let titles = self
+            .tracks
+            .iter()
+            .map(|t| t.album_title())
+            .collect::<Result<Vec<_>>>()?;
+        Ok(dedup(titles))
     }
 }

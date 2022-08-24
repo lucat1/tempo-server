@@ -4,9 +4,10 @@ use super::Fetch;
 use crate::album::ReleaseLike;
 use async_trait::async_trait;
 use const_format::formatcp;
-use eyre::{eyre, Result};
+use eyre::{bail, Result};
+use log::trace;
 use reqwest::header::USER_AGENT;
-use std::cmp::Ordering;
+use std::time::Instant;
 use structures::ReleaseSearch;
 
 static DEFAULT_COUNT: u32 = 50;
@@ -35,7 +36,8 @@ impl Fetch for MusicBrainz {
         album_title: String,
         track_count: usize,
     ) -> Result<Vec<Box<dyn ReleaseLike>>> {
-        let mut res = self
+        let start = Instant::now();
+        let res = self
             .client
             .get(format!(
                 "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{}&fmt=json&limit={}",
@@ -43,19 +45,23 @@ impl Fetch for MusicBrainz {
             ))
             .header(USER_AGENT, MB_USER_AGENT)
             .send()
-            .await?
-            .json::<ReleaseSearch>()
             .await?;
-        res.releases.sort_unstable_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .ok_or("Could not sort releases")
-                .unwrap()
-        });
-        res.releases.sort_by(|a, b| match a.track_count {
-            track_count => Ordering::Equal,
-            _ => Ordering::Less,
-        });
-        Ok(res.releases.iter().map(|v| Box::new(v)).collect())
+        let req_time = start.elapsed();
+        trace!("MusicBrainz HTTP request took {:?}", req_time);
+        if !res.status().is_success() {
+            bail!(
+                "Musicbrainz request returned non-success error code: {} {}",
+                res.status(),
+                res.text().await?
+            );
+        }
+        let json = res.json::<ReleaseSearch>().await?;
+        let json_time = start.elapsed();
+        trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
+        Ok(json
+            .releases
+            .iter()
+            .map(|v| Box::new(v.clone()) as Box<dyn ReleaseLike>)
+            .collect())
     }
 }

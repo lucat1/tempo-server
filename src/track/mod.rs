@@ -111,7 +111,7 @@ pub trait Tag: TagClone {
 
 pub trait TrackLike {
     fn artists(&self) -> Result<Vec<String>>;
-    fn album_artist(&self) -> Result<String>;
+    fn album_artists(&self) -> Result<Vec<String>>;
     fn title(&self) -> Result<String>;
     fn album_title(&self) -> Result<String>;
     fn length(&self) -> Result<u64>;
@@ -121,11 +121,8 @@ impl TrackLike for TrackFile {
     fn artists(&self) -> Result<Vec<String>> {
         Ok(dedup(self.get_tag(TagKey::AlbumArtist)?))
     }
-    fn album_artist(&self) -> Result<String> {
-        take_first(
-            self.get_tag(TagKey::AlbumArtist)?,
-            "Track has no album artist",
-        )
+    fn album_artists(&self) -> Result<Vec<String>> {
+        self.get_tag(TagKey::AlbumArtist)
     }
     fn title(&self) -> Result<String> {
         take_first(self.get_tag(TagKey::TrackTitle)?, "Track has no title")

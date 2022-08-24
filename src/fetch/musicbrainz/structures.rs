@@ -1,4 +1,4 @@
-use crate::album::ReleaseLike;
+use crate::album::{ArtistLike, ReleaseLike};
 use eyre::Result;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
@@ -16,13 +16,13 @@ pub struct Release {
     pub id: String,
     pub score: i64,
     #[serde(rename = "status-id")]
-    pub status_id: String,
+    pub status_id: Option<String>,
     pub count: i64,
     pub title: String,
-    pub status: String,
+    pub status: Option<String>,
     pub disambiguation: Option<String>,
     #[serde(rename = "text-representation")]
-    pub text_representation: TextRepresentation,
+    pub text_representation: Option<TextRepresentation>,
     #[serde(rename = "artist-credit")]
     pub artist_credit: Vec<ArtistCredit>,
     #[serde(rename = "release-group")]
@@ -49,14 +49,15 @@ pub struct Release {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TextRepresentation {
-    pub language: String,
-    pub script: String,
+    pub language: Option<String>,
+    pub script: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtistCredit {
     pub name: String,
     pub artist: Artist,
+    pub joinphrase: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,17 +72,17 @@ pub struct Artist {
 pub struct ReleaseGroup {
     pub id: String,
     #[serde(rename = "type-id")]
-    pub type_id: String,
+    pub type_id: Option<String>,
     #[serde(rename = "primary-type-id")]
-    pub primary_type_id: String,
+    pub primary_type_id: Option<String>,
     pub title: String,
     #[serde(rename = "primary-type")]
-    pub primary_type: String,
+    pub primary_type: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Medium {
-    pub format: String,
+    pub format: Option<String>,
     #[serde(rename = "disc-count")]
     pub disc_count: i64,
     #[serde(rename = "track-count")]
@@ -123,16 +124,27 @@ pub struct Tag {
     pub name: String,
 }
 
+impl ArtistLike for ArtistCredit {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn mbid(&self) -> Option<String> {
+        Some(self.artist.id.clone())
+    }
+    fn joinphrase(&self) -> Option<String> {
+        self.joinphrase.clone()
+    }
+}
+
 impl ReleaseLike for Release {
-    fn artist(&self) -> Result<Vec<String>> {
-        Ok(self
-            .artist_credit
+    fn artists(&self) -> Vec<Box<dyn ArtistLike>> {
+        self.artist_credit
             .iter()
-            .map(|artist| artist.name.clone())
-            .collect::<Vec<_>>())
+            .map(|a| Box::new(a.clone()) as Box<dyn ArtistLike>)
+            .collect::<Vec<_>>()
     }
 
-    fn title(&self) -> Result<Vec<String>> {
-        Ok(vec![self.title.clone()])
+    fn title(&self) -> String {
+        self.title.clone()
     }
 }
