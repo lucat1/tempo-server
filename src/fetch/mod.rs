@@ -1,14 +1,19 @@
-mod music_brainz;
+mod musicbrainz;
 
-use crate::album::AlbumLike;
+use crate::album::{AlbumLike, ReleaseLike};
 use async_trait::async_trait;
 use eyre::Result;
 
-use self::music_brainz::MusicBrainz;
+use self::musicbrainz::MusicBrainz;
 
 #[async_trait]
 pub trait Fetch {
-    async fn search(&self, artist: String, album_title: String) -> Result<Vec<Box<dyn AlbumLike>>>;
+    async fn search(
+        &self,
+        artist: String,
+        album_title: String,
+        track_count: usize,
+    ) -> Result<Vec<Box<dyn ReleaseLike>>>;
 }
 
 pub fn default_fetchers() -> Vec<Box<dyn Fetch>> {
@@ -18,9 +23,10 @@ pub fn default_fetchers() -> Vec<Box<dyn Fetch>> {
 pub async fn search(
     fetchers: Vec<Box<dyn Fetch>>,
     album: Box<dyn AlbumLike>,
-) -> Result<Vec<Box<dyn AlbumLike>>> {
+) -> Result<Vec<Box<dyn ReleaseLike>>> {
     let titles = album.title()?;
     let artists = album.artist()?;
+    let tracks = album.tracks();
     let combinations = artists
         .iter()
         .map(|artist| {
@@ -34,7 +40,11 @@ pub async fn search(
     let mut result = Vec::new();
     for f in fetchers {
         for (artist, title) in combinations.clone() {
-            result.append(&mut f.search(artist.to_string(), title.to_string()).await?);
+            result.append(
+                &mut f
+                    .search(artist.to_string(), title.to_string(), tracks.len())
+                    .await?,
+            );
         }
     }
     Ok(result)

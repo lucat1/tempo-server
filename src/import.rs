@@ -2,9 +2,8 @@ use eyre::{bail, eyre, Result};
 use scan_dir::ScanDir;
 use std::fs::canonicalize;
 use std::path::PathBuf;
-use tokio::runtime::Handle;
 
-use crate::album::{AlbumLike, RoughAlbum};
+use crate::album::{ReleaseLike, RoughAlbum};
 use crate::fetch::{default_fetchers, search};
 use crate::track::TrackFile;
 use crate::util::path_to_str;
@@ -37,7 +36,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     println!("possible artists {:?}", ralbum.artist());
 
     let res = search(default_fetchers(), Box::new(ralbum)).await?;
-    println!("search results: {:?}", res);
+    for s in res {
+        println!("- {:?} : {:?}", s.title(), s.artist());
+    }
 
     Ok(())
 }

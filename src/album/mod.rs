@@ -14,13 +14,16 @@ impl RoughAlbum {
     }
 }
 
-pub trait AlbumLike: AlbumLikeBoxed {
+pub trait ReleaseLike: ReleaseLikeBoxed {
     fn artist(&self) -> Result<Vec<String>>;
     fn title(&self) -> Result<Vec<String>>;
+}
+
+pub trait AlbumLike: ReleaseLike {
     fn tracks(&self) -> Vec<Box<dyn TrackLike>>;
 }
 
-impl AlbumLike for RoughAlbum {
+impl ReleaseLike for RoughAlbum {
     // Having a vector with length > 1 means there isn't consensus on:
     // - the album artist
     // - the album title
@@ -43,7 +46,9 @@ impl AlbumLike for RoughAlbum {
                 .collect::<Result<Vec<_>>>()?,
         ))
     }
+}
 
+impl AlbumLike for RoughAlbum {
     fn tracks(&self) -> Vec<Box<dyn TrackLike>> {
         self.tracks
             .iter()
@@ -52,16 +57,16 @@ impl AlbumLike for RoughAlbum {
     }
 }
 
-pub trait AlbumLikeBoxed {
-    fn clone_box(&self) -> Box<dyn AlbumLike>;
+pub trait ReleaseLikeBoxed {
+    fn clone_box(&self) -> Box<dyn ReleaseLike>;
     fn fmt_box(&self, f: &mut Formatter<'_>) -> FormatResult;
 }
 
-impl<T> AlbumLikeBoxed for T
+impl<T> ReleaseLikeBoxed for T
 where
-    T: 'static + AlbumLike + Clone + Debug,
+    T: 'static + ReleaseLike + Clone + Debug,
 {
-    fn clone_box(&self) -> Box<dyn AlbumLike> {
+    fn clone_box(&self) -> Box<dyn ReleaseLike> {
         Box::new(self.clone())
     }
 
@@ -70,8 +75,8 @@ where
     }
 }
 
-impl Clone for Box<dyn AlbumLike> {
-    fn clone(&self) -> Box<dyn AlbumLike> {
+impl Clone for Box<dyn ReleaseLike> {
+    fn clone(&self) -> Box<dyn ReleaseLike> {
         self.clone_box()
     }
 }

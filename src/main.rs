@@ -6,10 +6,11 @@ mod util;
 
 use clap::{arg, Command};
 use eyre::{eyre, Result};
-use futures::stream::{self, StreamExt};
 use std::path::PathBuf;
 
-static CLI_NAME: &str = "tagger";
+pub const CLI_NAME: &str = "tagger";
+pub const VERSION: &str = "0.1.0";
+pub const GITHUB: &str = "github.com/lucat1/tagger";
 
 fn cli() -> Command<'static> {
     Command::new(CLI_NAME)
@@ -56,18 +57,14 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(("import", sub_matches)) => {
-            let stream = stream::iter(
-                sub_matches
-                    .get_many::<PathBuf>("PATH")
-                    .ok_or(eyre!("Expected at least one path argument to import"))?
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-            );
-            let results: Result<()> = stream
-                .map(|p| async { import::import(p).await })
-                .collect()
-                .await;
-            results?;
+            let stream = sub_matches
+                .get_many::<PathBuf>("PATH")
+                .ok_or(eyre!("Expected at least one path argument to import"))?
+                .into_iter()
+                .collect::<Vec<_>>();
+            for p in stream.iter() {
+                import::import(p).await?;
+            }
             Ok(())
         }
         _ => unreachable!(),
