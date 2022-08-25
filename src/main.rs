@@ -1,6 +1,7 @@
 mod album;
 mod fetch;
 mod import;
+mod rank;
 mod track;
 mod util;
 
@@ -40,6 +41,9 @@ fn cli() -> Command<'static> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if let Err(_) = std::env::var("RUST_LOG") {
+        std::env::set_var("RUST_LOG", "info");
+    }
     pretty_env_logger::init();
     color_eyre::install()?;
 

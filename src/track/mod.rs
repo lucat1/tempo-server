@@ -66,7 +66,7 @@ pub trait TagFrom {
         P: AsRef<Path>;
 }
 
-pub trait TagClone {
+pub trait TagClone: Send {
     fn clone_box(&self) -> Box<dyn Tag>;
 }
 
@@ -110,27 +110,33 @@ pub trait Tag: TagClone {
 }
 
 pub trait TrackLike {
-    fn artists(&self) -> Result<Vec<String>>;
-    fn album_artists(&self) -> Result<Vec<String>>;
-    fn title(&self) -> Result<String>;
-    fn album_title(&self) -> Result<String>;
-    fn length(&self) -> Result<u64>;
+    // fn artists(&self) -> Result<Vec<String>>;
+    fn title(&self) -> String;
+    fn length(&self) -> u64;
 }
 
-impl TrackLike for TrackFile {
-    fn artists(&self) -> Result<Vec<String>> {
+impl TrackFile {
+    pub fn artists(&self) -> Result<Vec<String>> {
         Ok(dedup(self.get_tag(TagKey::AlbumArtist)?))
     }
-    fn album_artists(&self) -> Result<Vec<String>> {
+    pub fn album_artists(&self) -> Result<Vec<String>> {
         self.get_tag(TagKey::AlbumArtist)
     }
-    fn title(&self) -> Result<String> {
-        take_first(self.get_tag(TagKey::TrackTitle)?, "Track has no title")
-    }
-    fn album_title(&self) -> Result<String> {
+    pub fn album_title(&self) -> Result<String> {
         take_first(self.get_tag(TagKey::Album)?, "Track has no album title")
     }
-    fn length(&self) -> Result<u64> {
+}
+
+// TODO: impl to structs
+impl TrackLike for TrackFile {
+    fn title(&self) -> String {
+        take_first(
+            self.get_tag(TagKey::TrackTitle).unwrap(),
+            "Track has no title",
+        )
+        .unwrap()
+    }
+    fn length(&self) -> u64 {
         unimplemented!();
     }
 }
