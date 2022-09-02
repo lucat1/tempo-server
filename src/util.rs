@@ -16,7 +16,7 @@ pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
     vec
 }
 
-pub fn take_first<T: Clone>(v: Vec<T>, bail_msg: &'static str) -> Result<T> {
+pub fn take_first<T: Clone>(v: Vec<T>, bail_msg: String) -> Result<T> {
     if v.len() < 1 {
         bail!(bail_msg);
     }

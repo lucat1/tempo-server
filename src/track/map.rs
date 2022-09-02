@@ -97,6 +97,9 @@ pub enum TagKey {
     Website,
     WorkTitle,
     Writer,
+
+    // Internal, not mapped from picard
+    Duration,
 }
 
 impl TrackFile {

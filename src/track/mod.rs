@@ -11,6 +11,7 @@ pub mod picture;
 use super::util::{dedup, take_first};
 use core::convert::AsRef;
 use eyre::{Result, WrapErr};
+use log::info;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::fs::copy;
@@ -123,7 +124,10 @@ impl TrackFile {
         self.get_tag(TagKey::AlbumArtist)
     }
     pub fn album_title(&self) -> Result<String> {
-        take_first(self.get_tag(TagKey::Album)?, "Track has no album title")
+        take_first(
+            self.get_tag(TagKey::Album)?,
+            "Track has no album title".to_string(),
+        )
     }
 }
 
@@ -131,12 +135,18 @@ impl TrackFile {
 impl TrackLike for TrackFile {
     fn title(&self) -> String {
         take_first(
-            self.get_tag(TagKey::TrackTitle).unwrap(),
-            "Track has no title",
+            self.get_tag(TagKey::TrackTitle).unwrap_or(vec![]),
+            format!("Track {:?} has no title", self.path),
         )
-        .unwrap()
+        .expect("Could not read the track title")
     }
     fn length(&self) -> u64 {
-        unimplemented!();
+        let raw_duration = take_first(
+            self.get_tag(TagKey::Duration).unwrap_or(vec![]),
+            format!("Track {:?} has no duration", self.path),
+        )
+        .expect("Could not read the track duration");
+        info!("dur {}", raw_duration);
+        0
     }
 }

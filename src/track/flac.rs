@@ -88,6 +88,9 @@ static TAG_MAPPING: phf::Map<&'static str, TagKey> = phf_map! {
     "Weblink"=>               TagKey::Website,
     "WORK"=>               TagKey::WorkTitle,
     "Writer"=>               TagKey::Writer,
+
+    // Internal, not mapped from picard
+    "LENGTH"=>               TagKey::Duration,
 };
 
 #[derive(Clone)]
@@ -293,6 +296,9 @@ impl crate::track::Tag for Tag {
             TagKey::Website => Some("Weblink"),
             TagKey::WorkTitle => Some("WORK"),
             TagKey::Writer => Some("Writer"),
+
+            // Internal, not mapped from picard
+            TagKey::Duration => Some("LENGTH"),
             _ => None,
         }
     }

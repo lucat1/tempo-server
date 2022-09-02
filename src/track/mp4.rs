@@ -237,6 +237,9 @@ impl crate::track::Tag for Tag {
             TagKey::TrackTitle => Some("©nam"),
             TagKey::TrackTitleSortOrder => Some("sonm"),
             TagKey::WorkTitle => Some("©wrk"),
+
+            // Internal, not mapped from picard
+            TagKey::Duration => Some("LENGTH"),
             _ => None,
         }
     }

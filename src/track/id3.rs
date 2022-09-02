@@ -256,6 +256,9 @@ impl crate::track::Tag for Tag {
             TagKey::Website => Some("TSOT"),
             TagKey::WorkTitle => Some("WORK"), // or TIT1
             TagKey::Writer => Some("Writer"),
+
+            // Internal, not mapped from picard
+            TagKey::Duration => Some("TLEN"),
             _ => None,
         }
     }
