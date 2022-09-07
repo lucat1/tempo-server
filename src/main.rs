@@ -4,6 +4,7 @@ mod import;
 mod rank;
 mod track;
 mod util;
+mod models;
 
 use clap::{arg, Command};
 use eyre::{eyre, Result};

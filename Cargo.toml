@@ -15,9 +15,10 @@ const_format = "0.2"
 levenshtein = "1.0"
 log = "0.4"
 pretty_env_logger = "0.4"
-inquire = "0.3.0"
-
 infer = "0.9"
+pathfinding = "0.7"
+
+inquire = "0.3.0"
 metaflac = "0.2"
 mp4ameta = "0.11"
 id3 = "1.3"

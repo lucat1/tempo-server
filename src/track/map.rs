@@ -92,6 +92,7 @@ pub enum TagKey {
     Subtitle,
     TotalDiscs,
     TotalTracks,
+    TrackNumber,
     TrackTitle,
     TrackTitleSortOrder,
     Website,

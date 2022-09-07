@@ -8,14 +8,15 @@ pub mod format;
 pub mod map;
 pub mod picture;
 
+use super::models::{Artist, Track};
 use super::util::{dedup, take_first};
 use core::convert::AsRef;
-use eyre::{Result, WrapErr};
-use log::info;
+use eyre::{eyre, Report, Result, WrapErr};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::fs::copy;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use format::Format;
 use picture::Picture;
@@ -98,6 +99,8 @@ impl Debug for Box<dyn Tag> {
 }
 
 pub trait Tag: TagClone {
+    fn separator(&self) -> Option<String>;
+
     fn get_str(&self, key: &str) -> Option<Vec<String>>;
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn get_all(&self) -> HashMap<String, Vec<String>>;
@@ -108,12 +111,6 @@ pub trait Tag: TagClone {
     fn key_to_str(&self, key: TagKey) -> Option<&'static str>;
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()>;
-}
-
-pub trait TrackLike {
-    // fn artists(&self) -> Result<Vec<String>>;
-    fn title(&self) -> String;
-    fn length(&self) -> u64;
 }
 
 impl TrackFile {
@@ -131,22 +128,51 @@ impl TrackFile {
     }
 }
 
-// TODO: impl to structs
-impl TrackLike for TrackFile {
-    fn title(&self) -> String {
-        take_first(
-            self.get_tag(TagKey::TrackTitle).unwrap_or(vec![]),
-            format!("Track {:?} has no title", self.path),
-        )
-        .expect("Could not read the track title")
-    }
-    fn length(&self) -> u64 {
-        let raw_duration = take_first(
-            self.get_tag(TagKey::Duration).unwrap_or(vec![]),
-            format!("Track {:?} has no duration", self.path),
-        )
-        .expect("Could not read the track duration");
-        info!("dur {}", raw_duration);
-        0
+impl TryFrom<TrackFile> for Track {
+    type Error = Report;
+    fn try_from(file: TrackFile) -> Result<Self> {
+        let titles = file
+            .get_tag(TagKey::TrackTitle)
+            .wrap_err(eyre!("Could not read title tag"))?;
+        let title = take_first(titles, format!("Track {:?} has no title", file.path))?;
+        let mbid = file
+            .get_tag(TagKey::MusicBrainzTrackID)
+            .ok()
+            .map_or(None, |ids| ids.first().map(|f| f.to_string()));
+        let length = file
+            .get_tag(TagKey::Duration)
+            .map_or(None, |d| d.first().map(|d| d.to_string()))
+            .map_or(None, |d| d.parse::<u64>().ok())
+            .map(|d| Duration::from_secs(d));
+        let artists = file.artists().ok().map_or(vec![], |a| {
+            a.iter()
+                .map(|name| Artist {
+                    mbid: None,
+                    name: name.to_string(),
+                    join_phrase: file.tag.separator(),
+                    // TODO: take a look into artist sort order
+                    sort_name: None,
+                })
+                .collect::<Vec<_>>()
+        });
+        let disc = file
+            .get_tag(TagKey::DiscNumber)
+            .ok()
+            .map_or(None, |t| t.first().map(|d| d.to_string()))
+            .map_or(None, |d| d.parse::<u64>().ok());
+        let number = file
+            .get_tag(TagKey::TrackNumber)
+            .ok()
+            .map_or(None, |t| t.first().map(|n| n.to_string()))
+            .map_or(None, |d| d.parse::<u64>().ok());
+        Ok(Track {
+            mbid,
+            title,
+            artists,
+            length,
+            disc,
+            number,
+            album: None,
+        })
     }
 }

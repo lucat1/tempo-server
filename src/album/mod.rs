@@ -1,4 +1,4 @@
-use super::track::{TrackFile, TrackLike};
+use super::track::TrackFile;
 use crate::util::dedup;
 use eyre::Result;
 

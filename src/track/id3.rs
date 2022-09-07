@@ -31,6 +31,9 @@ impl crate::track::TagFrom for Tag {
 }
 
 impl crate::track::Tag for Tag {
+    fn separator(&self) -> Option<String> {
+        Some(self.separator.clone())
+    }
     fn get_str(&self, key: &str) -> Option<Vec<String>> {
         if key.len() != 4 {
             if let Some(t) = self.tag.extended_texts().find(|t| t.description == key) {

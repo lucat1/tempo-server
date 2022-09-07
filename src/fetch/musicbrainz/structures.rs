@@ -1,8 +1,7 @@
-use crate::fetch::{ArtistLike, ReleaseLike};
-use crate::track::TrackLike;
-use eyre::Result;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
+use std::sync::Arc;
+use std::time::Duration;
 
 use super::MusicBrainz;
 
@@ -135,8 +134,8 @@ pub struct Track {
     pub id: String,
     pub recording: Recording,
     pub number: String,
-    pub position: i64,
-    pub length: u64,
+    pub position: u64,
+    pub length: Option<u64>,
     pub title: String,
 }
 
@@ -178,63 +177,47 @@ pub struct Tag {
     pub name: String,
 }
 
-impl ArtistLike for ArtistCredit {
-    fn name(&self) -> String {
-        self.name.clone()
-    }
-    fn mbid(&self) -> Option<String> {
-        Some(self.artist.id.clone())
-    }
-    fn joinphrase(&self) -> Option<String> {
-        self.joinphrase.clone()
-    }
-}
-
-impl TrackLike for Track {
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-    fn length(&self) -> u64 {
-        self.length
+impl From<Track> for crate::models::Track {
+    fn from(track: Track) -> Self {
+        crate::models::Track {
+            mbid: Some(track.id),
+            title: track.title,
+            // TODO: gather these somehow
+            artists: vec![],
+            length: track.length.map(|d| Duration::from_millis(d)),
+            // TODO: gather
+            disc: None,
+            number: Some(track.position),
+            // TODO: track.Recording into album?
+            album: None,
+        }
     }
 }
 
-impl ReleaseLike for Release {
-    fn fetcher(&self) -> Option<Box<dyn crate::fetch::Fetch>> {
-        // TODO: should be recevied from its "parent"
-        Some(Box::new(MusicBrainz::new(None, None)))
-    }
-    fn id(&self) -> Option<String> {
-        Some(self.id.clone())
-    }
-
-    fn artists(&self) -> Vec<Box<dyn ArtistLike>> {
-        self.artist_credit
-            .iter()
-            .map(|a| Box::new(a.clone()) as Box<dyn ArtistLike>)
-            .collect::<Vec<_>>()
-    }
-
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-
-    fn tracks(&self) -> Option<Vec<Box<dyn TrackLike>>> {
-        let tracks = self
-            .media
-            .iter()
-            .filter_map(|media| media.tracks.clone())
-            .flatten()
-            .collect::<Vec<_>>();
-        if tracks.len() <= 0 {
-            None
-        } else {
-            Some(
-                tracks
-                    .iter()
-                    .map(|t| Box::new(t.clone()) as Box<dyn TrackLike>)
-                    .collect(),
-            )
+impl From<Release> for crate::models::Release {
+    fn from(release: Release) -> Self {
+        crate::models::Release {
+            // TODO: no good
+            fetcher: Some(Arc::new(MusicBrainz::new(None, None))),
+            mbid: Some(release.id),
+            title: release.title,
+            artists: release
+                .artist_credit
+                .iter()
+                .map(|a| crate::models::Artist {
+                    mbid: Some(a.artist.id.clone()),
+                    join_phrase: a.joinphrase.clone(),
+                    name: a.name.clone(),
+                    sort_name: Some(a.artist.sort_name.clone()),
+                })
+                .collect::<Vec<_>>(),
+            tracks: release
+                .media
+                .iter()
+                .filter_map(|media| media.tracks.clone())
+                .flatten()
+                .map(|t| t.into())
+                .collect::<Vec<_>>(),
         }
     }
 }

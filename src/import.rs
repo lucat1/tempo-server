@@ -1,51 +1,57 @@
-use eyre::{bail, eyre, Context, Result};
+use eyre::{bail, eyre, Context, Report, Result};
 use inquire::{MultiSelect, Select};
-use log::{debug, info, trace};
+use log::{debug, info};
 use scan_dir::ScanDir;
 use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::album::FileAlbum;
-use crate::fetch::{default_fetchers, get, search, ArtistLike, Fetch, ReleaseLike};
-use crate::rank::rate;
-use crate::track::{TrackFile, TrackLike};
+use crate::fetch::{default_fetchers, get, search};
+use crate::models::{Artist, Release};
+use crate::rank::match_tracks;
+use crate::track::TrackFile;
 use crate::util::path_to_str;
 
 const TRY_RELEASE_COUNT: usize = 5;
 
 #[derive(Clone, Debug)]
+// TODO: make the structure more complex to extract more data from the tags
+// i.e. mbids, join phrase, sort name for artists
+//      mbid for the album *maybe*
 struct ChoiceAlbum {
     artists: Vec<String>,
     title: String,
     tracks: Vec<TrackFile>,
 }
 
-impl ReleaseLike for ChoiceAlbum {
-    fn fetcher(&self) -> Option<Box<dyn Fetch>> {
-        None
-    }
-    fn id(&self) -> Option<String> {
-        None
-    }
-
-    fn artists(&self) -> Vec<Box<dyn ArtistLike>> {
-        self.artists
-            .iter()
-            .map(|a| Box::new(a.clone()) as Box<dyn ArtistLike>)
-            .collect()
-    }
-
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-    fn tracks(&self) -> Option<Vec<Box<dyn TrackLike>>> {
-        Some(
-            self.tracks
+impl TryFrom<ChoiceAlbum> for Release {
+    type Error = Report;
+    fn try_from(album: ChoiceAlbum) -> Result<Self> {
+        Ok(Release {
+            fetcher: None,
+            // TODO: consider reading mbid from files tag?
+            // maybe an optin. Would make tagging really stale :/
+            mbid: None,
+            title: album.title,
+            artists: album
+                .artists
                 .iter()
-                .map(|t| Box::new(t.clone()) as Box<dyn TrackLike>)
-                .collect(),
-        )
+                .map(|a| Artist {
+                    mbid: None,
+                    // TODO
+                    name: a.to_string(),
+                    // TODO
+                    join_phrase: None,
+                    sort_name: None,
+                })
+                .collect::<Vec<_>>(),
+            tracks: album
+                .tracks
+                .iter()
+                .map(|t| t.clone().try_into())
+                .collect::<Result<Vec<_>>>()?,
+        })
     }
 }
 
@@ -110,53 +116,56 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         Select::new("Album title:", titles).prompt()?
     };
 
-    let choice_album = Box::new(ChoiceAlbum {
+    let choice_album = ChoiceAlbum {
         title,
         artists,
         tracks: ralbum.tracks,
-    });
-    let releases = search(default_fetchers(), choice_album.clone())
+    };
+    let choice_release: Release = choice_album
+        .try_into()
+        .wrap_err("Trying to convert local files to internal structures")?;
+    let releases = search(default_fetchers(), choice_release.clone())
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
-    info!("Found {} release candicates, ranking...", releases.len());
+    info!("Found {} release candidates, ranking...", releases.len());
 
-    let mut rated_releases = releases
-        .iter()
-        .map(|r| (rate(choice_album.clone(), r.clone()), r.clone()))
-        .collect::<Vec<_>>();
-    rated_releases.sort_by(|a, b| b.0 .0.partial_cmp(&a.0 .0).unwrap());
-    rated_releases = rated_releases.as_slice()[0..TRY_RELEASE_COUNT].to_vec();
+    // let mut rated_releases = releases
+    //     .iter()
+    //     .map(|r| (rate(choice_album.clone(), r.clone()), r.clone()))
+    //     .collect::<Vec<_>>();
+    // rated_releases.sort_by(|a, b| b.0 .0.partial_cmp(&a.0 .0).unwrap());
+    let rated_releases = releases.as_slice()[0..TRY_RELEASE_COUNT].to_vec();
     for s in rated_releases.clone() {
         info!(
-            "- {}: {:?} - {:?} ({:?})",
-            s.0 .0,
-            s.1.title(),
-            s.1.artists().iter().map(|a| a.name()).collect::<Vec<_>>(),
-            s.1.id()
+            "- {:?} - {:?} ({:?})",
+            s.title,
+            s.artists.iter().map(|a| a.name.clone()).collect::<Vec<_>>(),
+            s.mbid
         );
     }
-    let mut expanded_releases: Vec<Box<dyn ReleaseLike>> = vec![];
+    let mut expanded_releases: Vec<Release> = vec![];
     for release in rated_releases {
-        expanded_releases.push(get(release.1.clone()).await?);
+        expanded_releases.push(get(release.clone()).await?);
     }
     let mut rated_expanded_releases = expanded_releases
         .iter()
-        .map(|r| (rate(choice_album.clone(), r.clone()), r.clone()))
+        .map(|r| (match_tracks(&choice_release.tracks, &r.tracks), r.clone()))
         .collect::<Vec<_>>();
+    rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap());
     for s in rated_expanded_releases.clone() {
         info!(
             "- {}: {:?} - {:?} ({:?}) len {}",
             s.0 .0,
-            s.1.title(),
-            s.1.artists().iter().map(|a| a.name()).collect::<Vec<_>>(),
-            s.1.id(),
-            match s.1.tracks() {
-                None => 0,
-                Some(t) => t.len(),
-            }
+            s.1.title,
+            s.1.artists
+                .iter()
+                .map(|a| a.name.clone())
+                .collect::<Vec<_>>(),
+            s.1.mbid,
+            s.1.tracks.len()
         );
     }
 
-    trace!("Import for {:?} took {:?}", path, start.elapsed());
+    info!("Import for {:?} took {:?}", path, start.elapsed());
     Ok(())
 }

@@ -42,6 +42,9 @@ fn value_to_strings(value: &ItemValue, separator: &String) -> Option<Vec<String>
 }
 
 impl crate::track::Tag for Tag {
+    fn separator(&self) -> Option<String> {
+        Some(self.separator.clone())
+    }
     fn get_str(&self, tag: &str) -> Option<Vec<String>> {
         let item = self.tag.item(tag)?;
         value_to_strings(&item.value, &self.separator)

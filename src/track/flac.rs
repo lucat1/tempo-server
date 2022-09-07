@@ -82,7 +82,9 @@ static TAG_MAPPING: phf::Map<&'static str, TagKey> = phf_map! {
     "SHOWMOVEMENT"=>               TagKey::ShowWorkAndMovement,
     "Subtitle"=>               TagKey::Subtitle,
     "Disc"=>               TagKey::TotalDiscs,
-    "Track"=>               TagKey::TotalTracks,
+    "TRACKTOTAL"=>               TagKey::TotalTracks,
+    "TOTALTRACKS"=>               TagKey::TotalTracks,
+    "TRACKNUMBER"=>               TagKey::TrackNumber,
     "Title"=>               TagKey::TrackTitle,
     "TITLESORT"=>               TagKey::TrackTitleSortOrder,
     "Weblink"=>               TagKey::Website,
@@ -110,6 +112,9 @@ impl crate::track::TagFrom for Tag {
 }
 
 impl crate::track::Tag for Tag {
+    fn separator(&self) -> Option<String> {
+        None
+    }
     fn get_str(&self, key: &str) -> Option<Vec<String>> {
         if let Some(values) = self.tag.get_vorbis(key) {
             let v: Vec<&str> = values.collect();
@@ -290,7 +295,8 @@ impl crate::track::Tag for Tag {
             TagKey::ShowWorkAndMovement => Some("SHOWMOVEMENT"),
             TagKey::Subtitle => Some("Subtitle"),
             TagKey::TotalDiscs => Some("Disc"),
-            TagKey::TotalTracks => Some("Track"),
+            TagKey::TotalTracks => Some("TRACKTOTAL"),
+            TagKey::TrackNumber => Some("TRACKNUMBER"),
             TagKey::TrackTitle => Some("Title"),
             TagKey::TrackTitleSortOrder => Some("TITLESORT"),
             TagKey::Website => Some("Weblink"),

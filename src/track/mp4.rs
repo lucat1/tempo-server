@@ -64,6 +64,9 @@ fn str_to_ident(ident: &str) -> DataIdent {
 }
 
 impl crate::track::Tag for Tag {
+    fn separator(&self) -> Option<String> {
+        Some(self.separator.clone())
+    }
     fn get_str(&self, key: &str) -> Option<Vec<String>> {
         let ident = str_to_ident(key);
         let data: Vec<String> = self

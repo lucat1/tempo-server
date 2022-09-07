@@ -1,7 +1,6 @@
 mod structures;
 
 use super::Fetch;
-use crate::{fetch::ReleaseLike, util::join_artists};
 use async_trait::async_trait;
 use const_format::formatcp;
 use eyre::{bail, eyre, Result};
@@ -14,6 +13,7 @@ static DEFAULT_COUNT: u32 = 50;
 static MB_USER_AGENT: &str =
     formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
 
+#[derive(Clone, Debug)]
 pub struct MusicBrainz {
     count: u32,
     client: reqwest::Client,
@@ -30,18 +30,18 @@ impl MusicBrainz {
 
 #[async_trait]
 impl Fetch for MusicBrainz {
-    async fn search(&self, release: Box<dyn ReleaseLike>) -> Result<Vec<Box<dyn ReleaseLike>>> {
+    async fn search(&self, release: crate::models::Release) -> Result<Vec<crate::models::Release>> {
         let start = Instant::now();
-        let artists = join_artists(release.artists());
-        let res =
-            self.client
-                .get(format!(
+        let artists = release.artists_joined();
+        let res = self
+            .client
+            .get(format!(
                 "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{}&fmt=json&limit={}",
-                release.title(), artists, self.count
+                release.title, artists, self.count
             ))
-                .header(USER_AGENT, MB_USER_AGENT)
-                .send()
-                .await?;
+            .header(USER_AGENT, MB_USER_AGENT)
+            .send()
+            .await?;
         let req_time = start.elapsed();
         trace!("MusicBrainz HTTP request took {:?}", req_time);
         if !res.status().is_success() {
@@ -54,16 +54,12 @@ impl Fetch for MusicBrainz {
         let json = res.json::<ReleaseSearch>().await?;
         let json_time = start.elapsed();
         trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-        Ok(json
-            .releases
-            .iter()
-            .map(|v| Box::new(v.clone()) as Box<dyn ReleaseLike>)
-            .collect())
+        Ok(json.releases.iter().map(|v| v.clone().into()).collect())
     }
 
-    async fn get(&self, release: Box<dyn ReleaseLike>) -> Result<Box<dyn ReleaseLike>> {
+    async fn get(&self, release: crate::models::Release) -> Result<crate::models::Release> {
         let start = Instant::now();
-        let id = match release.id() {
+        let id = match release.mbid {
             Some(i) => Ok(i),
             None => Err(eyre!("The given release doesn't have an ID associated with it, can not fetch specific metadata"))
         }?;
@@ -88,6 +84,6 @@ impl Fetch for MusicBrainz {
         let json = res.json::<Release>().await?;
         let json_time = start.elapsed();
         trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-        Ok(Box::new(json) as Box<dyn ReleaseLike>)
+        Ok(json.into())
     }
 }
