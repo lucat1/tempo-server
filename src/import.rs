@@ -7,13 +7,12 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::album::FileAlbum;
-use crate::fetch::{default_fetchers, get, search};
-use crate::models::{Artist, Release};
+use crate::fetch::{default_fetchers, get, search, UNKNOWN_ARTIST};
+use crate::library::LibraryRelease;
+use crate::models::{Artist, Release, Track};
 use crate::rank::match_tracks;
 use crate::track::TrackFile;
-use crate::util::path_to_str;
-
-const TRY_RELEASE_COUNT: usize = 5;
+use crate::util::{mkdirp, path_to_str};
 
 #[derive(Clone, Debug)]
 // TODO: make the structure more complex to extract more data from the tags
@@ -89,7 +88,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             errors
         )
     }
-    let ralbum = FileAlbum::from_tracks(tracks)?;
+    let ralbum = FileAlbum::from_tracks(tracks.clone())?;
     let rartists = ralbum.artists()?;
     let titles = ralbum.titles()?;
     info!(
@@ -110,8 +109,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let title = if titles.len() <= 1 {
         titles
             .first()
-            .ok_or(eyre!("Expected at least one album title, found none"))?
-            .clone()
+            .map_or(UNKNOWN_ARTIST.to_string(), |s| s.clone())
     } else {
         Select::new("Album title:", titles).prompt()?
     };
@@ -129,22 +127,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     info!("Found {} release candidates, ranking...", releases.len());
 
-    // let mut rated_releases = releases
-    //     .iter()
-    //     .map(|r| (rate(choice_album.clone(), r.clone()), r.clone()))
-    //     .collect::<Vec<_>>();
-    // rated_releases.sort_by(|a, b| b.0 .0.partial_cmp(&a.0 .0).unwrap());
-    let rated_releases = releases.as_slice()[0..TRY_RELEASE_COUNT].to_vec();
-    for s in rated_releases.clone() {
-        info!(
-            "- {:?} - {:?} ({:?})",
-            s.title,
-            s.artists.iter().map(|a| a.name.clone()).collect::<Vec<_>>(),
-            s.mbid
-        );
-    }
     let mut expanded_releases: Vec<Release> = vec![];
-    for release in rated_releases {
+    for release in releases {
         expanded_releases.push(get(release.clone()).await?);
     }
     let mut rated_expanded_releases = expanded_releases
@@ -152,17 +136,30 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .map(|r| (match_tracks(&choice_release.tracks, &r.tracks), r.clone()))
         .collect::<Vec<_>>();
     rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap());
-    for s in rated_expanded_releases.clone() {
+    let ((diff, tracks_map), final_release) = rated_expanded_releases
+        .first()
+        .ok_or(eyre!("No release available for given tracks"))?;
+    info!(
+        "Tagging as {} - {}",
+        final_release.artists_joined(),
+        final_release.title
+    );
+
+    let path = final_release.path()?;
+    let other_paths = final_release.other_paths()?;
+    debug!("Creating paths {:?}, {:?}", path, other_paths);
+    mkdirp(&path)?;
+    if !other_paths.is_empty() {
+        for path in other_paths.iter() {
+            mkdirp(path)?;
+        }
+    }
+    // let mut final_tracks = vec![];
+    for (i, map) in tracks_map.iter().enumerate() {
         info!(
-            "- {}: {:?} - {:?} ({:?}) len {}",
-            s.0 .0,
-            s.1.title,
-            s.1.artists
-                .iter()
-                .map(|a| a.name.clone())
-                .collect::<Vec<_>>(),
-            s.1.mbid,
-            s.1.tracks.len()
+            "map {:?} to {:?}",
+            TryInto::<Track>::try_into(tracks[i].clone())?,
+            final_release.tracks[*map]
         );
     }
 

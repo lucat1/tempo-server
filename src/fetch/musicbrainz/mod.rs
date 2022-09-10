@@ -1,6 +1,6 @@
 mod structures;
 
-use super::Fetch;
+use super::{Fetch, UNKNOWN_ARTIST};
 use async_trait::async_trait;
 use const_format::formatcp;
 use eyre::{bail, eyre, Result};
@@ -9,7 +9,7 @@ use reqwest::header::USER_AGENT;
 use std::time::Instant;
 use structures::{Release, ReleaseSearch};
 
-static DEFAULT_COUNT: u32 = 50;
+static DEFAULT_COUNT: u32 = 10;
 static MB_USER_AGENT: &str =
     formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
 
@@ -22,7 +22,7 @@ pub struct MusicBrainz {
 impl MusicBrainz {
     pub fn new(_: Option<String>, count: Option<u32>) -> Self {
         MusicBrainz {
-            count: count.or(Some(DEFAULT_COUNT)).unwrap(),
+            count: count.unwrap_or(DEFAULT_COUNT),
             client: reqwest::Client::new(),
         }
     }
@@ -32,7 +32,11 @@ impl MusicBrainz {
 impl Fetch for MusicBrainz {
     async fn search(&self, release: crate::models::Release) -> Result<Vec<crate::models::Release>> {
         let start = Instant::now();
-        let artists = release.artists_joined();
+        let raw_artists = release.artists_joined();
+        let artists = match raw_artists.as_str() {
+            UNKNOWN_ARTIST => "",
+            s => s,
+        };
         let res = self
             .client
             .get(format!(

@@ -1,5 +1,4 @@
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -127,6 +126,8 @@ pub struct Medium {
     #[serde(rename = "track-offset")]
     pub track_offset: Option<i64>,
     pub tracks: Option<Vec<Track>>,
+
+    pub release: Option<Box<Release>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -137,6 +138,8 @@ pub struct Track {
     pub position: u64,
     pub length: Option<u64>,
     pub title: String,
+
+    pub medium: Option<Box<Medium>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -188,8 +191,7 @@ impl From<Track> for crate::models::Track {
             // TODO: gather
             disc: None,
             number: Some(track.position),
-            // TODO: track.Recording into album?
-            album: None,
+            release: None,
         }
     }
 }

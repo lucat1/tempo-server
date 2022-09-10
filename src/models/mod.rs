@@ -1,9 +1,10 @@
 use crate::fetch::Fetch;
+use sqlx::FromRow;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromRow)]
 pub struct Artist {
     pub mbid: Option<String>,
     pub name: String,
@@ -11,7 +12,7 @@ pub struct Artist {
     pub sort_name: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromRow)]
 pub struct Track {
     pub mbid: Option<String>,
     pub title: String,
@@ -19,10 +20,10 @@ pub struct Track {
     pub length: Option<Duration>,
     pub disc: Option<u64>,
     pub number: Option<u64>,
-    pub album: Option<Box<Release>>,
+    pub release: Option<Box<Release>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromRow)]
 pub struct Release {
     pub fetcher: Option<Arc<dyn Fetch + Send + Sync>>,
     pub mbid: Option<String>,

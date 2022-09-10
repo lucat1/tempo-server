@@ -48,7 +48,7 @@ impl TrackFile {
         })
     }
 
-    fn r#move(&mut self, path: &PathBuf) -> Result<PathBuf> {
+    fn duplicate_to(&mut self, path: &PathBuf) -> Result<PathBuf> {
         copy(&self.path, path)?;
         let path = self.path.clone();
         self.path = path.to_path_buf();
@@ -172,7 +172,7 @@ impl TryFrom<TrackFile> for Track {
             length,
             disc,
             number,
-            album: None,
+            release: None,
         })
     }
 }

@@ -1,4 +1,7 @@
 use eyre::{bail, eyre, Result};
+use std::fs::create_dir_all;
+use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
 pub fn path_to_str(path: &PathBuf) -> Result<String> {
@@ -19,4 +22,13 @@ pub fn take_first<T: Clone>(v: Vec<T>, bail_msg: String) -> Result<T> {
         bail!(bail_msg);
     }
     Ok(v[0].clone())
+}
+
+pub fn mkdirp<P: AsRef<Path>>(path: &P) -> io::Result<()> {
+    if let Err(e) = create_dir_all(path) {
+        if e.kind() != io::ErrorKind::AlreadyExists {
+            return Err(e);
+        }
+    }
+    Ok(())
 }

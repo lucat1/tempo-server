@@ -1,18 +1,33 @@
 mod album;
 mod fetch;
 mod import;
+mod library;
+mod models;
 mod rank;
+mod settings;
 mod track;
 mod util;
-mod models;
 
+use async_once_cell::OnceCell;
 use clap::{arg, Command};
+use directories::ProjectDirs;
 use eyre::{eyre, Result};
+use lazy_static::lazy_static;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
+use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use settings::Settings;
 
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
 pub const GITHUB: &str = "github.com/lucat1/tagger";
+
+lazy_static! {
+    pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
+    pub static ref DB: Arc<OnceCell<SqlitePool>> = Arc::new(OnceCell::new());
+}
 
 fn cli() -> Command<'static> {
     Command::new(CLI_NAME)
@@ -40,6 +55,16 @@ fn cli() -> Command<'static> {
         )
 }
 
+fn cfg() -> Result<Settings> {
+    let dirs = ProjectDirs::from("com", "github", CLI_NAME)
+        .ok_or(eyre!("Could not locate program directories"))?;
+    let path = dirs.config_dir().join(PathBuf::from("config.toml"));
+    match fs::read_to_string(path) {
+        Ok(str) => toml::from_str(str.as_str()).map_err(|e| eyre!(e)),
+        Err(_) => Settings::gen_default(),
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     if let Err(_) = std::env::var("RUST_LOG") {
@@ -47,6 +72,22 @@ async fn main() -> Result<()> {
     }
     pretty_env_logger::init();
     color_eyre::install()?;
+
+    SETTINGS.get_or_try_init(async { cfg() }).await?;
+    let db = DB
+        .get_or_try_init(async {
+            SqlitePool::connect_with(
+                SqliteConnectOptions::new()
+                    .filename(util::path_to_str(
+                        &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
+                    )?)
+                    .create_if_missing(true),
+            )
+            .await
+            .map_err(|e| eyre!(e))
+        })
+        .await?;
+    sqlx::migrate!().run(db).await?;
 
     let matches = cli().get_matches();
     match matches.subcommand() {
