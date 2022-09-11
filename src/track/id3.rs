@@ -36,6 +36,7 @@ impl crate::track::Tag for Tag {
         for key in map.keys().into_iter() {
             self.tag.remove(key);
         }
+        self.set_pictures(vec![]);
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())

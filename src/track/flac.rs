@@ -117,6 +117,7 @@ impl crate::track::Tag for Tag {
         for key in map.keys().into_iter() {
             self.tag.remove_vorbis(key);
         }
+        self.set_pictures(vec![]);
     }
     fn separator(&self) -> Option<String> {
         None
@@ -186,8 +187,7 @@ impl crate::track::Tag for Tag {
 
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {
         // remove all the previous pictures
-        let retag = self.tag.clone();
-        for pic in retag.pictures() {
+        for pic in self.tag.clone().pictures() {
             self.tag.remove_picture_type(pic.picture_type);
         }
         for pic in pictures {
