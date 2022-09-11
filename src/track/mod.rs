@@ -48,17 +48,16 @@ impl TrackFile {
         })
     }
 
-    pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<PathBuf> {
+    pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<()> {
         copy(&self.path, path)?;
-        let path_copy = self.path.clone();
-        self.path = path_copy.to_path_buf();
+        self.path = path.to_path_buf();
         self.tag = match self.format {
-            Format::FLAC => flac::Tag::from_path(path),
-            Format::MP4 => mp4::Tag::from_path(path),
-            Format::ID3 => id3::Tag::from_path(path),
-            Format::APE => ape::Tag::from_path(path),
+            Format::FLAC => flac::Tag::from_path(&self.path),
+            Format::MP4 => mp4::Tag::from_path(&self.path),
+            Format::ID3 => id3::Tag::from_path(&self.path),
+            Format::APE => ape::Tag::from_path(&self.path),
         }?;
-        Ok(path_copy)
+        Ok(())
     }
 
     pub fn write(&mut self) -> Result<()> {
