@@ -48,17 +48,32 @@ impl TrackFile {
         })
     }
 
-    fn duplicate_to(&mut self, path: &PathBuf) -> Result<PathBuf> {
+    pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<PathBuf> {
         copy(&self.path, path)?;
-        let path = self.path.clone();
-        self.path = path.to_path_buf();
-        Ok(path)
+        let path_copy = self.path.clone();
+        self.path = path_copy.to_path_buf();
+        self.tag = match self.format {
+            Format::FLAC => flac::Tag::from_path(path),
+            Format::MP4 => mp4::Tag::from_path(path),
+            Format::ID3 => id3::Tag::from_path(path),
+            Format::APE => ape::Tag::from_path(path),
+        }?;
+        Ok(path_copy)
     }
 
-    fn write(&mut self) -> Result<()> {
+    pub fn write(&mut self) -> Result<()> {
+        println!("wrote tags to {:?}", self.path);
         self.tag
             .write_to_path(&self.path)
             .wrap_err(format!("Could not write tags to file: {:?}", self.path))
+    }
+
+    pub fn clear(&mut self) {
+        self.tag.clear();
+    }
+
+    pub fn ext(&self) -> &'static str {
+        self.format.ext()
     }
 }
 
@@ -101,6 +116,7 @@ impl Debug for Box<dyn Tag> {
 pub trait Tag: TagClone {
     fn separator(&self) -> Option<String>;
 
+    fn clear(&mut self);
     fn get_str(&self, key: &str) -> Option<Vec<String>>;
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn get_all(&self) -> HashMap<String, Vec<String>>;
@@ -172,6 +188,7 @@ impl TryFrom<TrackFile> for Track {
             length,
             disc,
             number,
+            abs_number: None,
             release: None,
         })
     }

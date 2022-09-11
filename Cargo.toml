@@ -19,7 +19,7 @@ log = "0.4"
 pretty_env_logger = "0.4"
 infer = "0.9"
 pathfinding = "0.7"
-sqlx = { version="0.6.1", features = ["sqlite","runtime-tokio-native-tls"] }
+sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-native-tls"] }
 
 inquire = "0.3.0"
 metaflac = "0.2"
@@ -33,7 +33,7 @@ reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures = "0.3"
-serde = "1.0"
-serde_derive = "1.0"
+serde = { version = "1.0", features = ["rc"] }
+serde_derive = { version = "1.0" }
 async-once-cell = "0.4"
 lazy_static = "1.4.0"

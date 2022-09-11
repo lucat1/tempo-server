@@ -1,7 +1,7 @@
-use crate::models::{Artist, Track};
+use crate::models::Track;
 
 use levenshtein::levenshtein;
-use log::trace;
+use log::{debug, trace};
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
@@ -68,7 +68,7 @@ pub fn match_tracks(
     candidate_tracks: &Vec<Track>,
 ) -> (i64, Vec<usize>) {
     let rows = original_tracks.len();
-    let columns = candidate_tracks.len();
+    let mut columns = candidate_tracks.len();
     let mut matrix_vec = vec![];
     for original_track in original_tracks.iter() {
         for candidate_track in candidate_tracks.iter() {
@@ -100,6 +100,17 @@ pub fn match_tracks(
     }
     if matrix_vec.len() == 0 {
         return (0, vec![]);
+    }
+    debug!("kuhn_munkers matrix is {}x{}", rows, columns);
+    if rows > columns {
+        let max = match matrix_vec.iter().max() {
+            Some(v) => *v,
+            None => i64::MAX / (rows as i64),
+        } + 1;
+        for _ in 0..((rows - columns) * rows) {
+            matrix_vec.push(max);
+        }
+        columns = rows
     }
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
     kuhn_munkres_min(&matrix)

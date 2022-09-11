@@ -1,5 +1,5 @@
 use directories::UserDirs;
-use eyre::{eyre, Report, Result};
+use eyre::{eyre, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 

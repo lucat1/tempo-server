@@ -36,4 +36,13 @@ impl Format {
             )),
         }
     }
+
+    pub fn ext(&self) -> &'static str {
+        match self {
+            Format::FLAC => "flac",
+            Format::MP4 => "mp4",
+            Format::ID3 => "mp3",
+            Format::APE => "ape",
+        }
+    }
 }

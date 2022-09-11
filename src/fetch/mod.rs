@@ -1,37 +1,78 @@
-mod musicbrainz;
+mod structures;
 
-use self::musicbrainz::MusicBrainz;
-use crate::models::Release;
-use async_trait::async_trait;
-use eyre::{eyre, Result};
-use std::fmt::Debug;
+use crate::models::{GroupTracks, Joined, UNKNOWN_ARTIST};
+use const_format::formatcp;
+use eyre::{bail, eyre, Result};
+use lazy_static::lazy_static;
+use log::trace;
+use reqwest::header::USER_AGENT;
+use std::sync::Arc;
+use std::time::Instant;
+use structures::{Release, ReleaseSearch};
 
-pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
-
-#[async_trait]
-pub trait Fetch: Debug {
-    async fn search(&self, release: Release) -> Result<Vec<Release>>;
-    async fn get(&self, release: Release) -> Result<Release>;
+static COUNT: u32 = 8;
+static MB_USER_AGENT: &str =
+    formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
+lazy_static! {
+    pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-pub fn default_fetchers() -> Vec<Box<dyn Fetch>> {
-    vec![Box::new(MusicBrainz::new(None, None))]
-}
-
-pub async fn search(
-    fetchers: Vec<Box<dyn Fetch>>,
-    release: Release,
-) -> Result<Vec<Release>> {
-    let mut result = Vec::new();
-    for f in fetchers {
-        result.append(&mut f.search(release.clone()).await?);
+pub async fn search(release: &crate::models::Release) -> Result<Vec<crate::models::Release>> {
+    let start = Instant::now();
+    let raw_artists = release.artists.joined();
+    let artists = match raw_artists.as_str() {
+        UNKNOWN_ARTIST => "",
+        s => s,
+    };
+    let res = CLIENT
+        .get(format!(
+            "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{}&fmt=json&limit={}",
+            release.title, artists, COUNT
+        ))
+        .header(USER_AGENT, MB_USER_AGENT)
+        .send()
+        .await?;
+    let req_time = start.elapsed();
+    trace!("MusicBrainz HTTP request took {:?}", req_time);
+    if !res.status().is_success() {
+        bail!(
+            "Musicbrainz request returned non-success error code: {} {}",
+            res.status(),
+            res.text().await?
+        );
     }
-    Ok(result)
+    let json = res.json::<ReleaseSearch>().await?;
+    let json_time = start.elapsed();
+    trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
+    Ok(json.releases.iter().map(|v| v.clone().into()).collect())
 }
 
-pub async fn get(release: Release) -> Result<Release> {
-    match release.fetcher.clone() {
-        Some(f) => f.get(release).await,
-        None => Err(eyre!("The given release doesn't provide any fetcher")),
+pub async fn get(
+    release: &crate::models::Release,
+) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
+    let start = Instant::now();
+    let id = release.mbid.clone().ok_or(eyre!(
+        "The given release doesn't have an ID associated with it, can not fetch specific metadata"
+    ))?;
+    let res = CLIENT
+        .get(format!(
+            "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc=artists+labels+recordings",
+            id
+        ))
+        .header(USER_AGENT, MB_USER_AGENT)
+        .send()
+        .await?;
+    let req_time = start.elapsed();
+    trace!("MusicBrainz HTTP request took {:?}", req_time);
+    if !res.status().is_success() {
+        bail!(
+            "Musicbrainz request returned non-success error code: {} {}",
+            res.status(),
+            res.text().await?
+        );
     }
+    let json = res.json::<Arc<Release>>().await?;
+    let json_time = start.elapsed();
+    trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
+    json.group_tracks()
 }

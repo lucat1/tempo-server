@@ -1,8 +1,9 @@
+use eyre::{eyre, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::MusicBrainz;
+use crate::models::GroupTracks;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Release {
@@ -115,19 +116,9 @@ pub struct Area {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Medium {
-    #[serde(rename = "disc-count")]
-    pub disc_count: Option<i64>,
-    #[serde(rename = "track-count")]
-    pub track_count: i64,
-    pub format: String,
-    pub title: Option<String>,
-    #[serde(rename = "format-id")]
-    pub format_id: Option<String>,
-    #[serde(rename = "track-offset")]
-    pub track_offset: Option<i64>,
+    pub position: Option<u64>,
+    pub track_offset: Option<u64>,
     pub tracks: Option<Vec<Track>>,
-
-    pub release: Option<Box<Release>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -139,14 +130,15 @@ pub struct Track {
     pub length: Option<u64>,
     pub title: String,
 
-    pub medium: Option<Box<Medium>>,
+    pub medium: Option<Arc<Medium>>,
+    pub release: Option<Arc<Release>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Recording {
     pub disambiguation: String,
     pub id: String,
-    pub length: i64,
+    pub length: u64,
     pub video: bool,
     #[serde(rename = "first-release-date")]
     pub first_release_date: String,
@@ -182,16 +174,23 @@ pub struct Tag {
 
 impl From<Track> for crate::models::Track {
     fn from(track: Track) -> Self {
+        let offset = match track.medium.clone() {
+            Some(m) => m.track_offset.unwrap_or(0),
+            None => 0,
+        };
         crate::models::Track {
             mbid: Some(track.id),
             title: track.title,
             // TODO: gather these somehow
             artists: vec![],
-            length: track.length.map(|d| Duration::from_millis(d)),
-            // TODO: gather
-            disc: None,
+            length: track
+                .length
+                .or(Some(track.recording.length))
+                .map(|d| Duration::from_millis(d)),
+            disc: track.medium.map_or(None, |m| m.position),
             number: Some(track.position),
-            release: None,
+            abs_number: Some(offset + track.position),
+            release: track.release.map(|r| Arc::new((*r).clone().into())),
         }
     }
 }
@@ -200,7 +199,6 @@ impl From<Release> for crate::models::Release {
     fn from(release: Release) -> Self {
         crate::models::Release {
             // TODO: no good
-            fetcher: Some(Arc::new(MusicBrainz::new(None, None))),
             mbid: Some(release.id),
             title: release.title,
             artists: release
@@ -213,13 +211,39 @@ impl From<Release> for crate::models::Release {
                     sort_name: Some(a.artist.sort_name.clone()),
                 })
                 .collect::<Vec<_>>(),
-            tracks: release
-                .media
-                .iter()
-                .filter_map(|media| media.tracks.clone())
-                .flatten()
-                .map(|t| t.into())
-                .collect::<Vec<_>>(),
         }
+    }
+}
+
+impl GroupTracks for Arc<Release> {
+    fn group_tracks(self) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
+        let tracks = self
+            .media
+            .clone()
+            .into_iter()
+            .map(|m| Arc::new(m))
+            .filter_map(|medium| match medium.tracks {
+                Some(ref tracks) => Some(
+                    tracks
+                        .into_iter()
+                        .map(|t| {
+                            let mut t_copy = t.clone();
+                            t_copy.medium = Some(medium.clone());
+                            t_copy.release = Some(self.clone());
+                            t_copy
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+                None => None,
+            })
+            .flatten()
+            .map(|t| t.into())
+            .collect::<Vec<_>>();
+        Ok((
+            Arc::try_unwrap(self)
+                .map_err(|_| eyre!("Could not take ownership of Arc<Release>"))?
+                .try_into()?,
+            tracks,
+        ))
     }
 }

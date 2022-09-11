@@ -7,9 +7,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::album::FileAlbum;
-use crate::fetch::{default_fetchers, get, search, UNKNOWN_ARTIST};
-use crate::library::LibraryRelease;
-use crate::models::{Artist, Release, Track};
+use crate::fetch::{get, search};
+use crate::library::{LibraryRelease, LibraryTrack};
+use crate::models::{Artist, GroupTracks, Joined, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
@@ -28,7 +28,6 @@ impl TryFrom<ChoiceAlbum> for Release {
     type Error = Report;
     fn try_from(album: ChoiceAlbum) -> Result<Self> {
         Ok(Release {
-            fetcher: None,
             // TODO: consider reading mbid from files tag?
             // maybe an optin. Would make tagging really stale :/
             mbid: None,
@@ -45,12 +44,18 @@ impl TryFrom<ChoiceAlbum> for Release {
                     sort_name: None,
                 })
                 .collect::<Vec<_>>(),
-            tracks: album
-                .tracks
-                .iter()
-                .map(|t| t.clone().try_into())
-                .collect::<Result<Vec<_>>>()?,
         })
+    }
+}
+
+impl GroupTracks for ChoiceAlbum {
+    fn group_tracks(self) -> Result<(Release, Vec<Track>)> {
+        let tracks = self
+            .tracks
+            .iter()
+            .map(|t| t.clone().try_into())
+            .collect::<Result<Vec<_>>>()?;
+        Ok((self.try_into()?, tracks))
     }
 }
 
@@ -119,50 +124,60 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         artists,
         tracks: ralbum.tracks,
     };
-    let choice_release: Release = choice_album
-        .try_into()
+    let (choice_release, choice_tracks) = choice_album
+        .group_tracks()
         .wrap_err("Trying to convert local files to internal structures")?;
-    let releases = search(default_fetchers(), choice_release.clone())
+    let releases = search(&choice_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     info!("Found {} release candidates, ranking...", releases.len());
 
-    let mut expanded_releases: Vec<Release> = vec![];
-    for release in releases {
-        expanded_releases.push(get(release.clone()).await?);
+    let mut expanded_releases: Vec<(Release, Vec<Track>)> = vec![];
+    for release in releases.into_iter() {
+        expanded_releases.push(get(&release).await?);
     }
     let mut rated_expanded_releases = expanded_releases
-        .iter()
-        .map(|r| (match_tracks(&choice_release.tracks, &r.tracks), r.clone()))
+        .into_iter()
+        .map(|(r, tracks)| (match_tracks(&choice_tracks, &tracks), (r, tracks)))
         .collect::<Vec<_>>();
     rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap());
-    let ((diff, tracks_map), final_release) = rated_expanded_releases
+    let ((_diff, tracks_map), final_release) = rated_expanded_releases
         .first()
         .ok_or(eyre!("No release available for given tracks"))?;
     info!(
-        "Tagging as {} - {}",
-        final_release.artists_joined(),
-        final_release.title
+        "Tagging as {} - {} ({})",
+        final_release.0.artists.joined(),
+        final_release.0.title,
+        final_release
+            .0
+            .mbid
+            .clone()
+            .unwrap_or("no mbid".to_string()),
     );
 
-    let path = final_release.path()?;
-    let other_paths = final_release.other_paths()?;
-    debug!("Creating paths {:?}, {:?}", path, other_paths);
-    mkdirp(&path)?;
+    let dest = final_release.0.path()?;
+    let other_paths = final_release.0.other_paths()?;
+    debug!("Creating paths {:?}, {:?}", dest, other_paths);
+    mkdirp(&dest)?;
     if !other_paths.is_empty() {
         for path in other_paths.iter() {
             mkdirp(path)?;
         }
     }
-    // let mut final_tracks = vec![];
-    for (i, map) in tracks_map.iter().enumerate() {
-        info!(
-            "map {:?} to {:?}",
-            TryInto::<Track>::try_into(tracks[i].clone())?,
-            final_release.tracks[*map]
-        );
+    let mut final_tracks = tracks_map
+        .into_iter()
+        .enumerate()
+        .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
+        .collect::<Vec<_>>();
+    for (src, dest) in final_tracks.iter_mut() {
+        let dest_path = dest.path(src.ext())?;
+        info!("move {:?} to {:?}", src, dest_path);
+        src.duplicate_to(&dest_path)?;
+        src.clear();
+        src.write()?;
+        info!("new tags {:?}", src);
     }
 
-    info!("Import for {:?} took {:?}", path, start.elapsed());
+    info!("Import for {:?} took {:?}", dest, start.elapsed());
     Ok(())
 }

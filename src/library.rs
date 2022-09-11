@@ -52,11 +52,11 @@ impl LibraryRelease for Release {
 }
 
 pub trait LibraryTrack {
-    fn path(&self, ext: String) -> Result<PathBuf>;
+    fn path(&self, ext: &str) -> Result<PathBuf>;
 }
 
 impl LibraryTrack for Track {
-    fn path(&self, ext: String) -> Result<PathBuf> {
+    fn path(&self, ext: &str) -> Result<PathBuf> {
         let base = self
             .release
             .clone()
@@ -68,7 +68,7 @@ impl LibraryTrack for Track {
             .wrap_err("While generating a path for the library")?;
         let mut extensionless = settings.track_name.clone();
         extensionless.push('.');
-        extensionless.push_str(ext.as_str());
+        extensionless.push_str(ext);
         let path_str = extensionless
             .replace(
                 "{track.disc}",
