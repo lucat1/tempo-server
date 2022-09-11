@@ -25,7 +25,7 @@ use self::map::TagKey;
 
 #[derive(Clone, Debug)]
 pub struct TrackFile {
-    path: PathBuf,
+    pub path: PathBuf,
     format: Format,
     tag: Box<dyn Tag>,
 }
@@ -65,6 +65,10 @@ impl TrackFile {
         self.tag
             .write_to_path(&self.path)
             .wrap_err(format!("Could not write tags to file: {:?}", self.path))
+    }
+
+    pub fn apply(&mut self, rel: &Track) -> Result<()> {
+        Ok(())
     }
 
     pub fn clear(&mut self) {

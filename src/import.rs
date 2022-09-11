@@ -172,8 +172,14 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     for (src, dest) in final_tracks.iter_mut() {
         let dest_path = dest.path(src.ext())?;
         info!("move {:?} to {:?}", src, dest_path);
-        src.duplicate_to(&dest_path)?;
+        src.duplicate_to(&dest_path).wrap_err(eyre!(
+            "Could not copy track {:?} to its new location: {:?}",
+            src.path,
+            dest_path
+        ))?;
         src.clear();
+        src.apply(&dest)
+            .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
         src.write()?;
         info!("new tags {:?}", src);
     }
