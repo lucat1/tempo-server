@@ -5,6 +5,9 @@ use log::{debug, trace};
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
+static TRACK_TITLE_FACTOR: usize = 1000;
+static RELEASE_TITLE_FACTOR: usize = 10000;
+
 // static TITLE_WEIGHT: f32 = 0.25;
 // static ARTISTS_WEIGHT: f32 = 0.25;
 // static TRACKS_WEIGHT: f32 = 0.5;
@@ -75,7 +78,7 @@ pub fn match_tracks(
             let distance = ((levenshtein(
                 original_track.title.as_str(),
                 candidate_track.title.as_str(),
-            ) * 1000) as i64)
+            ) * TRACK_TITLE_FACTOR) as i64)
                 + if_both(
                     original_track.length,
                     candidate_track.length,
@@ -95,7 +98,7 @@ pub fn match_tracks(
                     n1.abs_diff(n2) as i64
                 })
                 + if_both(original_track.release.clone(), candidate_track.release.clone(), |r1, r2| {
-                        levenshtein(r1.title.as_str(), r2.title.as_str()) as i64
+                        (levenshtein(r1.title.as_str(), r2.title.as_str())*RELEASE_TITLE_FACTOR) as i64
                         + if_both_or_default(r1.mbid.clone(), r2.mbid.clone(), |mbid1, mbid2| {
                             levenshtein(mbid1.as_str(), mbid2.as_str()) as i64
                         })

@@ -143,7 +143,7 @@ pub struct Recording {
     pub length: u64,
     pub video: bool,
     #[serde(rename = "first-release-date")]
-    pub first_release_date: String,
+    pub first_release_date: Option<String>,
     pub title: Option<String>,
     pub genres: Option<Vec<Genre>>,
 }

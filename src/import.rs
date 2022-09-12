@@ -5,6 +5,7 @@ use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::fetch::{get, search};
@@ -57,12 +58,31 @@ impl TryFrom<ChoiceAlbum> for Release {
 
 impl GroupTracks for ChoiceAlbum {
     fn group_tracks(self) -> Result<(Release, Vec<Track>)> {
-        let tracks = self
+        let tracks: Vec<Track> = self
             .tracks
             .iter()
             .map(|t| t.clone().try_into())
             .collect::<Result<Vec<_>>>()?;
-        Ok((self.try_into()?, tracks))
+        let rel: Release = self.try_into()?;
+        let release = Some(Arc::new(rel.clone()));
+
+        Ok((
+            rel,
+            tracks
+                .into_iter()
+                .map(|t| Track {
+                    mbid: t.mbid,
+                    title: t.title,
+                    artists: t.artists,
+                    length: t.length,
+                    disc: t.disc,
+                    disc_mbid: t.disc_mbid,
+                    number: t.number,
+                    genres: t.genres,
+                    release: release.clone(),
+                })
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 
@@ -183,7 +203,10 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let mut final_tracks = tracks_map
         .into_iter()
         .enumerate()
-        .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
+        .map(|(i, map)| {
+            info!("tracks_len: {}, i: {}, map: {}", tracks.len(), i, *map);
+            (tracks[i].clone(), final_release.1[*map].clone())
+        })
         .collect::<Vec<_>>();
     for (src, dest) in final_tracks.iter_mut() {
         let dest_path = dest.path(src.ext())?;
