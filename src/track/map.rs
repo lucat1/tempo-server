@@ -1,8 +1,3 @@
-use std::collections::HashMap;
-
-use super::TrackFile;
-use eyre::{eyre, Result};
-
 // Taken from Music Brainz Picard as a reference:
 // https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -101,36 +96,4 @@ pub enum TagKey {
 
     // Internal, not mapped from picard
     Duration,
-}
-
-impl TrackFile {
-    pub fn get_tag(&self, key: TagKey) -> Result<Vec<String>> {
-        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
-            "The {:?} key is not supported in the output format {:?}",
-            key,
-            self.format
-        ))?;
-        self.tag
-            .get_str(keystr)
-            .ok_or(eyre!("Could not read tag {:?} as {}", key, keystr))
-    }
-
-    pub fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<()> {
-        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
-            "The {:?} key is not supported in the output format {:?}",
-            key,
-            self.format
-        ))?;
-        self.tag.set_str(keystr, values)
-    }
-
-    pub fn tags(&self) -> HashMap<TagKey, Vec<String>> {
-        let mut map = HashMap::new();
-        for (key, value) in self.tag.get_all() {
-            if let Some(k) = self.tag.str_to_key(key.as_str()) {
-                map.insert(k, value);
-            }
-        }
-        map
-    }
 }

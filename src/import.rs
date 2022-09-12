@@ -7,11 +7,11 @@ use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::album::FileAlbum;
 use crate::fetch::{get, search};
 use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
+use crate::track::FileAlbum;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
 
@@ -193,7 +193,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             src.path,
             dest_path
         ))?;
-        src.clear();
+        src.clear()?;
         src.apply(dest.clone())
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
         src.write()?;

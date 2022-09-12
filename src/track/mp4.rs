@@ -64,8 +64,9 @@ fn str_to_ident(ident: &str) -> DataIdent {
 }
 
 impl crate::track::Tag for Tag {
-    fn clear(&mut self) {
+    fn clear(&mut self) -> Result<()> {
         self.tag.clear();
+        Ok(())
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())

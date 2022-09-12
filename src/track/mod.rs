@@ -48,6 +48,36 @@ impl TrackFile {
         })
     }
 
+    pub fn get_tag(&self, key: TagKey) -> Result<Vec<String>> {
+        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
+            "The {:?} key is not supported in the output format {:?}",
+            key,
+            self.format
+        ))?;
+        self.tag
+            .get_str(keystr)
+            .ok_or(eyre!("Could not read tag {:?} as {}", key, keystr))
+    }
+
+    pub fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<()> {
+        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
+            "The {:?} key is not supported in the output format {:?}",
+            key,
+            self.format
+        ))?;
+        self.tag.set_str(keystr, values)
+    }
+
+    pub fn tags(&self) -> HashMap<TagKey, Vec<String>> {
+        let mut map = HashMap::new();
+        for (key, value) in self.tag.get_all() {
+            if let Some(k) = self.tag.str_to_key(key.as_str()) {
+                map.insert(k, value);
+            }
+        }
+        map
+    }
+
     pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<()> {
         copy(&self.path, path)?;
         self.path = path.to_path_buf();
@@ -104,12 +134,46 @@ impl TrackFile {
         Ok(())
     }
 
-    pub fn clear(&mut self) {
-        self.tag.clear();
+    pub fn clear(&mut self) -> Result<()> {
+        self.tag.clear()?;
+        Ok(())
     }
 
     pub fn ext(&self) -> &'static str {
         self.format.ext()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FileAlbum {
+    pub tracks: Vec<TrackFile>,
+}
+
+impl FileAlbum {
+    pub fn from_tracks(tracks: Vec<TrackFile>) -> Result<FileAlbum> {
+        Ok(FileAlbum { tracks })
+    }
+
+    pub fn artists(&self) -> Result<Vec<String>> {
+        let artists = self
+            .tracks
+            .iter()
+            .map(|t| t.album_artists())
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .flatten()
+            .map(|s| s.clone())
+            .collect::<Vec<_>>();
+        Ok(dedup(artists))
+    }
+
+    pub fn titles(&self) -> Result<Vec<String>> {
+        let titles = self
+            .tracks
+            .iter()
+            .map(|t| t.album_title())
+            .collect::<Result<Vec<_>>>()?;
+        Ok(dedup(titles))
     }
 }
 
@@ -152,7 +216,7 @@ impl Debug for Box<dyn Tag> {
 pub trait Tag: TagClone {
     fn separator(&self) -> Option<String>;
 
-    fn clear(&mut self);
+    fn clear(&mut self) -> Result<()>;
     fn get_str(&self, key: &str) -> Option<Vec<String>>;
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn get_all(&self) -> HashMap<String, Vec<String>>;

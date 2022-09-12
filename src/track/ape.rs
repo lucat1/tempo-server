@@ -42,12 +42,13 @@ fn value_to_strings(value: &ItemValue, separator: &String) -> Option<Vec<String>
 }
 
 impl crate::track::Tag for Tag {
-    fn clear(&mut self) {
+    fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
         for key in map.keys().into_iter() {
             self.tag.remove_item(key);
         }
-        self.set_pictures(vec![]);
+        self.set_pictures(vec![])?;
+        Ok(())
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())

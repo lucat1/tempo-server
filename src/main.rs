@@ -1,4 +1,3 @@
-mod album;
 mod fetch;
 mod import;
 mod library;
