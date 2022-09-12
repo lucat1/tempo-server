@@ -1,5 +1,6 @@
 use eyre::{eyre, Result};
 use serde_derive::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -116,6 +117,7 @@ pub struct Area {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Medium {
+    pub id: Option<String>,
     pub position: Option<u64>,
     pub track_offset: Option<u64>,
     pub tracks: Option<Vec<Track>>,
@@ -143,6 +145,15 @@ pub struct Recording {
     #[serde(rename = "first-release-date")]
     pub first_release_date: String,
     pub title: Option<String>,
+    pub genres: Option<Vec<Genre>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Genre {
+    pub id: String,
+    pub count: u64,
+    pub disambiguation: String,
+    pub name: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -174,10 +185,8 @@ pub struct Tag {
 
 impl From<Track> for crate::models::Track {
     fn from(track: Track) -> Self {
-        let offset = match track.medium.clone() {
-            Some(m) => m.track_offset.unwrap_or(0),
-            None => 0,
-        };
+        let mut sorted_genres = track.recording.genres.unwrap_or(vec![]);
+        sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
         crate::models::Track {
             mbid: Some(track.id),
             title: track.title,
@@ -187,9 +196,13 @@ impl From<Track> for crate::models::Track {
                 .length
                 .or(Some(track.recording.length))
                 .map(|d| Duration::from_millis(d)),
-            disc: track.medium.map_or(None, |m| m.position),
+            disc: track.medium.clone().map_or(None, |m| m.position),
+            disc_mbid: track.medium.map_or(None, |m| m.id.clone()),
             number: Some(track.position),
-            abs_number: Some(offset + track.position),
+            genres: sorted_genres
+                .into_iter()
+                .map(|g| g.name)
+                .collect::<Vec<_>>(),
             release: track.release.map(|r| Arc::new((*r).clone().into())),
         }
     }
@@ -201,6 +214,7 @@ impl From<Release> for crate::models::Release {
             // TODO: no good
             mbid: Some(release.id),
             title: release.title,
+            discs: Some(release.media.len() as u64),
             artists: release
                 .artist_credit
                 .iter()

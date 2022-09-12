@@ -21,8 +21,12 @@ pub struct Track {
     pub artists: Vec<Artist>,
     pub length: Option<Duration>,
     pub disc: Option<u64>,
+    pub disc_mbid: Option<String>,
+    // TODO: discids, consider referencing a medium as well as the release
+    // would include things like numbering and disc data in a more appropriate
+    // structure. Con: would increase memory management complexity
     pub number: Option<u64>,
-    pub abs_number: Option<u64>,
+    pub genres: Vec<String>,
     pub release: Option<Arc<Release>>,
 }
 
@@ -31,17 +35,36 @@ pub struct Release {
     pub mbid: Option<String>,
     pub title: String,
     pub artists: Vec<Artist>,
+    pub discs: Option<u64>,
 }
 
 pub trait GroupTracks {
     fn group_tracks(self) -> Result<(Release, Vec<Track>)>;
 }
 
-pub trait Joined {
+pub trait Artists {
+    fn names(&self) -> Vec<String>;
+    fn ids(&self) -> Vec<String>;
+    fn sort_order(&self) -> String;
     fn joined(&self) -> String;
 }
 
-impl Joined for Vec<Artist> {
+impl Artists for Vec<Artist> {
+    fn names(&self) -> Vec<String> {
+        self.iter().map(|s| s.name.clone()).collect::<Vec<_>>()
+    }
+    fn ids(&self) -> Vec<String> {
+        self.iter()
+            .filter_map(|s| s.mbid.clone())
+            .collect::<Vec<_>>()
+    }
+    fn sort_order(&self) -> String {
+        // TODO: investigate on wether the artist.separator shall be used here
+        self.iter()
+            .filter_map(|s| s.sort_name.clone())
+            .collect::<Vec<_>>()
+            .join(",")
+    }
     fn joined(&self) -> String {
         let mut res = "".to_string();
         for (i, artist) in self.into_iter().enumerate() {

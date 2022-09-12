@@ -144,7 +144,9 @@ impl crate::track::Tag for Tag {
         if let Some(vorbis) = self.tag.vorbis_comments() {
             // Get value of tag with proper separators
             vorbis.comments.iter().for_each(|(k, _)| {
-                out.insert(k.to_string(), self.get_str(k).unwrap());
+                if let Some(v) = self.get_str(k) {
+                    out.insert(k.to_string(), v);
+                }
             });
         }
         out

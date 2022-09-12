@@ -95,14 +95,12 @@ async fn main() -> Result<()> {
             let filter = sub_matches
                 .get_one::<String>("Filter")
                 .ok_or(eyre!("Filter argument expected"))?;
-            println!("list: {}", filter);
             Ok(())
         }
         Some(("fix", sub_matches)) => {
             let filter = sub_matches
                 .get_one::<String>("Filter")
                 .ok_or(eyre!("Filter argument expected"))?;
-            println!("fix: {}", filter);
             Ok(())
         }
         Some(("import", sub_matches)) => {

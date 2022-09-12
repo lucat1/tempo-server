@@ -2,6 +2,7 @@ use eyre::{bail, eyre, Context, Report, Result};
 use inquire::{MultiSelect, Select};
 use log::{debug, info};
 use scan_dir::ScanDir;
+use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -9,7 +10,7 @@ use std::time::Instant;
 use crate::album::FileAlbum;
 use crate::fetch::{get, search};
 use crate::library::{LibraryRelease, LibraryTrack};
-use crate::models::{Artist, GroupTracks, Joined, Release, Track, UNKNOWN_ARTIST};
+use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
@@ -32,6 +33,12 @@ impl TryFrom<ChoiceAlbum> for Release {
             // maybe an optin. Would make tagging really stale :/
             mbid: None,
             title: album.title,
+            discs: album
+                .tracks
+                .iter()
+                .filter_map(|t| t.clone().try_into().ok())
+                .filter_map(|t: Track| t.disc)
+                .max(),
             artists: album
                 .artists
                 .iter()
@@ -127,7 +134,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let (choice_release, choice_tracks) = choice_album
         .group_tracks()
         .wrap_err("Trying to convert local files to internal structures")?;
-    let releases = search(&choice_release)
+    let releases = search(&choice_release, choice_tracks.len())
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     info!("Found {} release candidates, ranking...", releases.len());
@@ -140,7 +147,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .into_iter()
         .map(|(r, tracks)| (match_tracks(&choice_tracks, &tracks), (r, tracks)))
         .collect::<Vec<_>>();
-    rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap());
+    rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap_or(Ordering::Equal));
     let ((_diff, tracks_map), final_release) = rated_expanded_releases
         .first()
         .ok_or(eyre!("No release available for given tracks"))?;
@@ -159,10 +166,19 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let other_paths = final_release.0.other_paths()?;
     debug!("Creating paths {:?}, {:?}", dest, other_paths);
     mkdirp(&dest)?;
-    if !other_paths.is_empty() {
-        for path in other_paths.iter() {
-            mkdirp(path)?;
-        }
+    for path in other_paths.iter() {
+        mkdirp(
+            &path
+                .parent()
+                .ok_or(eyre!("Could not get parent of a release folder"))?
+                .to_path_buf(),
+        )?;
+
+        #[cfg(target_os = "windows")]
+        std::os::windows::fs::symlink_dir(&dest, path)?;
+
+        #[cfg(not(target_os = "windows"))]
+        std::os::unix::fs::symlink(&dest, path)?;
     }
     let mut final_tracks = tracks_map
         .into_iter()
@@ -178,7 +194,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             dest_path
         ))?;
         src.clear();
-        src.apply(&dest)
+        src.apply(dest.clone())
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
         src.write()?;
         info!("new tags {:?}", src);

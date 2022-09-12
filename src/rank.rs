@@ -85,9 +85,21 @@ pub fn match_tracks(
                 + if_both_or_default(original_track.mbid.clone(), candidate_track.mbid.clone(), |mbid1, mbid2| {
                     levenshtein(mbid1.as_str(), mbid2.as_str()) as i64
                 })
+                + if_both_or_default(original_track.disc, candidate_track.disc, |n1, n2| {
+                    n1.abs_diff(n2) as i64
+                }) 
+                + if_both_or_default(original_track.disc_mbid.clone(), candidate_track.disc_mbid.clone(), |mbid1, mbid2| {
+                    levenshtein(mbid1.as_str(), mbid2.as_str()) as i64
+                })
                 + if_both_or_default(original_track.number, candidate_track.number, |n1, n2| {
                     n1.abs_diff(n2) as i64
-                });
+                })
+                + if_both(original_track.release.clone(), candidate_track.release.clone(), |r1, r2| {
+                        levenshtein(r1.title.as_str(), r2.title.as_str()) as i64
+                        + if_both_or_default(r1.mbid.clone(), r2.mbid.clone(), |mbid1, mbid2| {
+                            levenshtein(mbid1.as_str(), mbid2.as_str()) as i64
+                        })
+                }).unwrap_or(0);
 
             trace!(
                 "Rated track compatibility {}: {:?} -- {:?}",

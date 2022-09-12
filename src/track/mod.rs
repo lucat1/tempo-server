@@ -8,7 +8,7 @@ pub mod format;
 pub mod map;
 pub mod picture;
 
-use super::models::{Artist, Track};
+use super::models::{Artist, Artists, Track};
 use super::util::{dedup, take_first};
 use core::convert::AsRef;
 use eyre::{eyre, Report, Result, WrapErr};
@@ -61,13 +61,46 @@ impl TrackFile {
     }
 
     pub fn write(&mut self) -> Result<()> {
-        println!("wrote tags to {:?}", self.path);
         self.tag
             .write_to_path(&self.path)
             .wrap_err(format!("Could not write tags to file: {:?}", self.path))
     }
 
-    pub fn apply(&mut self, rel: &Track) -> Result<()> {
+    pub fn apply(&mut self, track: Track) -> Result<()> {
+        // work
+        if let Some(id) = track.mbid {
+            self.set_tag(TagKey::MusicBrainzTrackID, vec![id])?;
+        }
+        if let Some(release) = track.release {
+            if let Some(rel_id) = &release.mbid {
+                self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()])?;
+            }
+            self.set_tag(TagKey::Album, vec![release.title.clone()])?;
+            self.set_tag(TagKey::AlbumArtist, release.artists.names())?;
+            self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids())?;
+            if let Some(discs) = release.discs {
+                self.set_tag(TagKey::TotalDiscs, vec![discs.to_string()])?;
+            }
+        }
+        self.set_tag(TagKey::TrackTitle, vec![track.title])?;
+
+        // artists
+        self.set_tag(TagKey::Artists, track.artists.names())?;
+        self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids())?;
+        self.set_tag(TagKey::ArtistSortOrder, vec![track.artists.sort_order()])?;
+        if let Some(len) = track.length {
+            self.set_tag(TagKey::Duration, vec![len.as_secs().to_string()])?;
+        }
+        if let Some(disc) = track.disc {
+            self.set_tag(TagKey::DiscNumber, vec![disc.to_string()])?;
+        }
+        if let Some(disc_mbid) = track.disc_mbid {
+            self.set_tag(TagKey::MusicBrainzDiscID, vec![disc_mbid.to_string()])?;
+        }
+        if let Some(number) = track.number {
+            self.set_tag(TagKey::TrackNumber, vec![number.to_string()])?;
+        }
+        self.set_tag(TagKey::Genre, track.genres)?;
         Ok(())
     }
 
@@ -179,6 +212,10 @@ impl TryFrom<TrackFile> for Track {
             .ok()
             .map_or(None, |t| t.first().map(|d| d.to_string()))
             .map_or(None, |d| d.parse::<u64>().ok());
+        let disc_mbid = file
+            .get_tag(TagKey::MusicBrainzDiscID)
+            .ok()
+            .map_or(None, |ids| ids.first().map(|f| f.to_string()));
         let number = file
             .get_tag(TagKey::TrackNumber)
             .ok()
@@ -190,8 +227,10 @@ impl TryFrom<TrackFile> for Track {
             artists,
             length,
             disc,
+            disc_mbid,
             number,
-            abs_number: None,
+            // TODO: fetch from tags, decide on how (and if) to split
+            genres: vec![],
             release: None,
         })
     }

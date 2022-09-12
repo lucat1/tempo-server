@@ -1,6 +1,6 @@
 mod structures;
 
-use crate::models::{GroupTracks, Joined, UNKNOWN_ARTIST};
+use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
 use const_format::formatcp;
 use eyre::{bail, eyre, Result};
 use lazy_static::lazy_static;
@@ -17,7 +17,10 @@ lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-pub async fn search(release: &crate::models::Release) -> Result<Vec<crate::models::Release>> {
+pub async fn search(
+    release: &crate::models::Release,
+    tracks: usize,
+) -> Result<Vec<crate::models::Release>> {
     let start = Instant::now();
     let raw_artists = release.artists.joined();
     let artists = match raw_artists.as_str() {
@@ -26,8 +29,8 @@ pub async fn search(release: &crate::models::Release) -> Result<Vec<crate::model
     };
     let res = CLIENT
         .get(format!(
-            "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{}&fmt=json&limit={}",
-            release.title, artists, COUNT
+            "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{} tracks:{}&fmt=json&limit={}",
+            release.title, artists, tracks, COUNT
         ))
         .header(USER_AGENT, MB_USER_AGENT)
         .send()
@@ -56,7 +59,7 @@ pub async fn get(
     ))?;
     let res = CLIENT
         .get(format!(
-            "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc=artists+labels+recordings",
+            "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc=artists+labels+recordings+genres",
             id
         ))
         .header(USER_AGENT, MB_USER_AGENT)
