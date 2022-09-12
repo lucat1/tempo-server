@@ -10,10 +10,13 @@ mod util;
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use directories::ProjectDirs;
+use env_logger::{fmt::Color, Builder, Env};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
+use log::LevelFilter;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -22,6 +25,10 @@ use settings::Settings;
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
 pub const GITHUB: &str = "github.com/lucat1/tagger";
+
+// logging constants
+pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
+pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
 
 lazy_static! {
     pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
@@ -64,13 +71,34 @@ fn cfg() -> Result<Settings> {
     }
 }
 
+fn init_logger() {
+    let env = Env::default()
+        .filter(TAGGER_LOGLEVEL)
+        .write_style(TAGGER_STYLE);
+
+    Builder::from_env(env)
+        .filter_level(LevelFilter::Info)
+        .filter(Some("sqlx"), LevelFilter::Warn)
+        .format(|buf, record| {
+            let mut style = buf.style();
+            style.set_bg(Color::Yellow).set_bold(true);
+
+            let timestamp = buf.timestamp();
+
+            writeln!(
+                buf,
+                "My formatted log ({}): {}",
+                timestamp,
+                style.value(record.args())
+            )
+        })
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    if let Err(_) = std::env::var("RUST_LOG") {
-        std::env::set_var("RUST_LOG", "info");
-    }
-    pretty_env_logger::init();
     color_eyre::install()?;
+    init_logger();
 
     SETTINGS.get_or_try_init(async { cfg() }).await?;
     let db = DB

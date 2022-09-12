@@ -6,7 +6,6 @@ use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
 
 use crate::fetch::{get, search};
 use crate::library::{LibraryRelease, LibraryTrack};
@@ -98,7 +97,6 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
 }
 
 pub async fn import(path: &PathBuf) -> Result<()> {
-    let start = Instant::now();
     let files = all_files(&canonicalize(path)?)?;
     let (tracks, errors): (Vec<_>, Vec<_>) = files
         .iter()
@@ -106,6 +104,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .partition(Result::is_ok);
     let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
     let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+    info!("Importing {} audio files from {:?}", tracks.len(), path);
 
     debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
     if !errors.is_empty() {
@@ -123,11 +122,6 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let ralbum = FileAlbum::from_tracks(tracks.clone())?;
     let rartists = ralbum.artists()?;
     let titles = ralbum.titles()?;
-    info!(
-        "Importing {} files from {}",
-        ralbum.tracks.len(),
-        path_to_str(path)?
-    );
     debug!("Possible artists for album {:?}: {:?}", path, rartists);
     debug!("Possible titles for album {:?}: {:?}", path, titles);
     if rartists.len() < 1 {
@@ -223,6 +217,5 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         info!("new tags {:?}", src);
     }
 
-    info!("Import for {:?} took {:?}", dest, start.elapsed());
     Ok(())
 }

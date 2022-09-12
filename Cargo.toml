@@ -16,7 +16,7 @@ phf = { version = "0.11", features = ["macros"] }
 const_format = "0.2"
 levenshtein = "1.0"
 log = "0.4"
-pretty_env_logger = "0.4"
+env_logger = "0.9"
 infer = "0.9"
 pathfinding = "0.7"
 sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-native-tls"] }
@@ -37,3 +37,4 @@ serde = { version = "1.0", features = ["rc"] }
 serde_derive = { version = "1.0" }
 async-once-cell = "0.4"
 lazy_static = "1.4.0"
+indicatif = "0.17.0"
