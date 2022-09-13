@@ -1,19 +1,23 @@
+use dialoguer::{Confirm, Input, MultiSelect, Select};
 use eyre::{bail, eyre, Context, Report, Result};
-use inquire::{MultiSelect, Select};
-use log::{debug, info};
+use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
+use std::iter::repeat;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::fetch::{get, search};
 use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
+use crate::theme::DialoguerTheme;
 use crate::track::FileAlbum;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
+use crate::SETTINGS;
 
 #[derive(Clone, Debug)]
 // TODO: make the structure more complex to extract more data from the tags
@@ -96,7 +100,56 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
         })
 }
 
+fn get_artist_and_title(
+    theme: &DialoguerTheme,
+    maybe_artists: Vec<String>,
+    maybe_titles: Vec<String>,
+) -> Result<(Vec<String>, String)> {
+    debug!("Possible artists for album: {:?}", maybe_artists);
+    debug!("Possible titles for album: {:?}", maybe_titles);
+    let artists = if maybe_artists.is_empty() {
+        vec![UNKNOWN_ARTIST.to_string()]
+    } else if maybe_artists.len() == 1 {
+        maybe_artists
+    } else {
+        match MultiSelect::with_theme(theme)
+            .with_prompt("Which album artist should be used?")
+            .items(&maybe_artists)
+            .defaults(&repeat(true).take(maybe_artists.len()).collect::<Vec<_>>())
+            .interact_opt()?
+            .map_or(None, |v| if v.len() > 0 { Some(v) } else { None })
+        {
+            Some(v) => v.into_iter().map(|i| maybe_artists[i].clone()).collect(),
+            None => {
+                warn!("No artist chosen. Using: \"{}\"", UNKNOWN_ARTIST);
+                vec![UNKNOWN_ARTIST.to_string()]
+            }
+        }
+    };
+    let title = if maybe_titles.is_empty() {
+        Input::new().interact_text()?
+    } else if maybe_titles.len() == 1 {
+        maybe_titles.first().unwrap().to_string()
+    } else {
+        let index = match Select::with_theme(theme)
+            .with_prompt("What's the title of the release?")
+            .items(&maybe_titles)
+            .default(0)
+            .interact_opt()?
+        {
+            Some(v) => v,
+            None => bail!("No album title selected"),
+        };
+        maybe_titles[index].to_string()
+    };
+    Ok((artists, title))
+}
+
 pub async fn import(path: &PathBuf) -> Result<()> {
+    let start = Instant::now();
+    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let theme = DialoguerTheme::default();
+
     let files = all_files(&canonicalize(path)?)?;
     let (tracks, errors): (Vec<_>, Vec<_>) = files
         .iter()
@@ -104,47 +157,30 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .partition(Result::is_ok);
     let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
     let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+    debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
     info!("Importing {} audio files from {:?}", tracks.len(), path);
 
-    debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
     if !errors.is_empty() {
         errors
             .iter()
             .for_each(|e| debug!("Error while importing file:{}", e));
     }
-
-    if tracks.is_empty() && !errors.is_empty() {
-        bail!(
-            "Encountered an empty album folder but some files could not be analyzed:\n{:?}",
-            errors
-        )
+    if tracks.is_empty() {
+        bail!("No tracks to import were found");
     }
     let ralbum = FileAlbum::from_tracks(tracks.clone())?;
-    let rartists = ralbum.artists()?;
-    let titles = ralbum.titles()?;
-    debug!("Possible artists for album {:?}: {:?}", path, rartists);
-    debug!("Possible titles for album {:?}: {:?}", path, titles);
-    if rartists.len() < 1 {
-        bail!("Expected at least one album artist, found none")
-    }
-    let artists = if rartists.len() == 1 {
-        rartists
-    } else {
-        MultiSelect::new("Album artist(s):", rartists).prompt()?
-    };
-    let title = if titles.len() <= 1 {
-        titles
-            .first()
-            .map_or(UNKNOWN_ARTIST.to_string(), |s| s.clone())
-    } else {
-        Select::new("Album title:", titles).prompt()?
-    };
+    let (artists, title) = get_artist_and_title(&theme, ralbum.artists()?, ralbum.titles()?)?;
 
     let choice_album = ChoiceAlbum {
         title,
         artists,
         tracks: ralbum.tracks,
     };
+    info!(
+        "Searching for {} - {}...",
+        choice_album.artists.join(", "),
+        choice_album.title
+    );
     let (choice_release, choice_tracks) = choice_album
         .group_tracks()
         .wrap_err("Trying to convert local files to internal structures")?;
@@ -175,6 +211,12 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             .clone()
             .unwrap_or("no mbid".to_string()),
     );
+    if !Confirm::with_theme(&theme)
+        .with_prompt("Proceed?")
+        .interact()?
+    {
+        bail!("Aborted")
+    }
 
     let dest = final_release.0.path()?;
     let other_paths = final_release.0.other_paths()?;
@@ -197,25 +239,27 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let mut final_tracks = tracks_map
         .into_iter()
         .enumerate()
-        .map(|(i, map)| {
-            info!("tracks_len: {}, i: {}, map: {}", tracks.len(), i, *map);
-            (tracks[i].clone(), final_release.1[*map].clone())
-        })
+        .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
         .collect::<Vec<_>>();
     for (src, dest) in final_tracks.iter_mut() {
+        debug!("Beofre tagging {:?}", src);
         let dest_path = dest.path(src.ext())?;
-        info!("move {:?} to {:?}", src, dest_path);
         src.duplicate_to(&dest_path).wrap_err(eyre!(
             "Could not copy track {:?} to its new location: {:?}",
             src.path,
             dest_path
         ))?;
-        src.clear()?;
+        if settings.tagging.clear {
+            src.clear()
+                .wrap_err(eyre!("Could not celar tracks from file: {:?}", dest_path))?;
+        }
         src.apply(dest.clone())
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
-        src.write()?;
-        info!("new tags {:?}", src);
+        src.write()
+            .wrap_err(eyre!("Could not write tags to track: {:?}", dest_path))?;
+        debug!("After tagging {:?}", src);
     }
 
+    info!("Import done, took {:?}", start.elapsed());
     Ok(())
 }

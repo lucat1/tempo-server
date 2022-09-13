@@ -4,19 +4,17 @@ mod library;
 mod models;
 mod rank;
 mod settings;
+mod theme;
 mod track;
 mod util;
 
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use directories::ProjectDirs;
-use env_logger::{fmt::Color, Builder, Env};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use log::LevelFilter;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -71,34 +69,10 @@ fn cfg() -> Result<Settings> {
     }
 }
 
-fn init_logger() {
-    let env = Env::default()
-        .filter(TAGGER_LOGLEVEL)
-        .write_style(TAGGER_STYLE);
-
-    Builder::from_env(env)
-        .filter_level(LevelFilter::Info)
-        .filter(Some("sqlx"), LevelFilter::Warn)
-        .format(|buf, record| {
-            let mut style = buf.style();
-            style.set_bg(Color::Yellow).set_bold(true);
-
-            let timestamp = buf.timestamp();
-
-            writeln!(
-                buf,
-                "My formatted log ({}): {}",
-                timestamp,
-                style.value(record.args())
-            )
-        })
-        .init();
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
-    init_logger();
+    theme::init_logger();
 
     SETTINGS.get_or_try_init(async { cfg() }).await?;
     let db = DB
