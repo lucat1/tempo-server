@@ -105,6 +105,9 @@ impl TrackFile {
             if let Some(rel_id) = &release.mbid {
                 self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()])?;
             }
+            if let Some(rel_asin) = &release.asin {
+                self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()])?;
+            }
             self.set_tag(TagKey::Album, vec![release.title.clone()])?;
             self.set_tag(TagKey::AlbumArtist, release.artists.names())?;
             self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids())?;

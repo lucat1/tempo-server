@@ -213,6 +213,7 @@ impl From<Release> for crate::models::Release {
         crate::models::Release {
             // TODO: no good
             mbid: Some(release.id),
+            asin: release.asin,
             title: release.title,
             discs: Some(release.media.len() as u64),
             artists: release

@@ -33,6 +33,7 @@ pub struct Track {
 #[derive(Clone, Debug, FromRow)]
 pub struct Release {
     pub mbid: Option<String>,
+    pub asin: Option<String>,
     pub title: String,
     pub artists: Vec<Artist>,
     pub discs: Option<u64>,

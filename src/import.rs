@@ -43,6 +43,11 @@ impl TryFrom<ChoiceAlbum> for Release {
                 .filter_map(|t| t.clone().try_into().ok())
                 .filter_map(|t: Track| t.disc)
                 .max(),
+            // TODO: as part of removing this structure to somewhere else,
+            // make sense of where it is more appropriate to fetch this kind of
+            // data (answer: here in the try_from) from a Vec<TrackFile> and
+            // move all the data gathering here (fetching title and artists)
+            asin: None,
             artists: album
                 .artists
                 .iter()
