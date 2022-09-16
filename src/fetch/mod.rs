@@ -59,8 +59,21 @@ pub async fn get(
     ))?;
     let res = CLIENT
         .get(format!(
-            "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc=artists+release-groups+labels+recordings+genres",
-            id
+            "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc={}",
+            id,
+            [
+                "artists",
+                "artist-credits",
+                "release-groups",
+                "labels",
+                "recordings",
+                "genres",
+                "artist-rels",
+                "recording-rels",
+                "instrument-rels",
+                "recording-level-rels"
+            ]
+            .join("+")
         ))
         .header(USER_AGENT, MB_USER_AGENT)
         .send()

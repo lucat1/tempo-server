@@ -149,6 +149,8 @@ pub struct Recording {
     pub first_release_date: Option<String>,
     pub title: Option<String>,
     pub genres: Option<Vec<Genre>>,
+    #[serde(rename = "artist-credit")]
+    pub artist_credit: Option<Vec<ArtistCredit>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -186,6 +188,17 @@ pub struct Tag {
     pub name: String,
 }
 
+impl From<ArtistCredit> for crate::models::Artist {
+    fn from(artist: ArtistCredit) -> Self {
+        crate::models::Artist {
+            mbid: Some(artist.artist.id.clone()),
+            join_phrase: artist.joinphrase.clone(),
+            name: artist.name.clone(),
+            sort_name: Some(artist.artist.sort_name.clone()),
+        }
+    }
+}
+
 impl From<Track> for crate::models::Track {
     fn from(track: Track) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or(vec![]);
@@ -193,8 +206,9 @@ impl From<Track> for crate::models::Track {
         crate::models::Track {
             mbid: Some(track.id),
             title: track.title,
-            // TODO: gather these somehow
-            artists: vec![],
+            artists: track.recording.artist_credit.map_or(vec![], |artists| {
+                artists.into_iter().map(|a| a.into()).collect()
+            }),
             length: track
                 .length
                 .or(Some(track.recording.length))
@@ -250,13 +264,8 @@ impl From<Release> for crate::models::Release {
             script: release.text_representation.map_or(None, |t| t.script),
             artists: release
                 .artist_credit
-                .iter()
-                .map(|a| crate::models::Artist {
-                    mbid: Some(a.artist.id.clone()),
-                    join_phrase: a.joinphrase.clone(),
-                    name: a.name.clone(),
-                    sort_name: Some(a.artist.sort_name.clone()),
-                })
+                .into_iter()
+                .map(|a| a.into())
                 .collect::<Vec<_>>(),
         }
     }
