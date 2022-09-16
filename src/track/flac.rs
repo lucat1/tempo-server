@@ -289,7 +289,7 @@ impl crate::track::Tag for Tag {
             TagKey::Producer => Some("Producer"),
             TagKey::RecordLabel => Some("Label"),
             TagKey::ReleaseCountry => Some("RELEASECOUNTRY"),
-            TagKey::ReleaseDate => Some("Year"),
+            TagKey::ReleaseDate => Some("Year111"),
             TagKey::ReleaseStatus => Some("MUSICBRAINZ_ALBUMSTATUS"),
             TagKey::ReleaseType => Some("MUSICBRAINZ_ALBUMTYPE"),
             TagKey::Remixer => Some("MixArtist"),

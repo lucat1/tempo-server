@@ -108,6 +108,19 @@ impl TrackFile {
             if let Some(rel_asin) = &release.asin {
                 self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()])?;
             }
+            if let Some(rel_country) = &release.country {
+                self.set_tag(TagKey::ReleaseCountry, vec![rel_country.to_string()])?;
+            }
+            if let Some(rel_status) = &release.status {
+                self.set_tag(TagKey::ReleaseStatus, vec![rel_status.to_string()])?;
+            }
+            if let Some(rel_date) = &release.date {
+                // TODO: fix
+                self.set_tag(TagKey::ReleaseDate, vec![rel_date.to_string()])?;
+            }
+            if let Some(rel_script) = &release.script {
+                self.set_tag(TagKey::Script, vec![rel_script.to_string()])?;
+            }
             self.set_tag(TagKey::Album, vec![release.title.clone()])?;
             self.set_tag(TagKey::AlbumArtist, release.artists.names())?;
             self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids())?;

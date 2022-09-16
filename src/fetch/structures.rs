@@ -1,6 +1,7 @@
 use eyre::{eyre, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -216,6 +217,12 @@ impl From<Release> for crate::models::Release {
             asin: release.asin,
             title: release.title,
             discs: Some(release.media.len() as u64),
+            country: release.country,
+            status: release.status,
+            date: release
+                .date
+                .map_or(None, |s| u32::from_str(s.as_str()).ok()),
+            script: release.text_representation.map_or(None, |t| t.script),
             artists: release
                 .artist_credit
                 .iter()

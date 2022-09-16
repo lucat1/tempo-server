@@ -37,6 +37,10 @@ pub struct Release {
     pub title: String,
     pub artists: Vec<Artist>,
     pub discs: Option<u64>,
+    pub country: Option<String>,
+    pub status: Option<String>,
+    pub date: Option<u32>,
+    pub script: Option<String>,
 }
 
 pub trait GroupTracks {

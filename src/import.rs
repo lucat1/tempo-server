@@ -48,6 +48,10 @@ impl TryFrom<ChoiceAlbum> for Release {
             // data (answer: here in the try_from) from a Vec<TrackFile> and
             // move all the data gathering here (fetching title and artists)
             asin: None,
+            country: None,
+            status: None,
+            date: None,
+            script: None,
             artists: album
                 .artists
                 .iter()
