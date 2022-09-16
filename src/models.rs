@@ -29,6 +29,13 @@ pub struct Track {
     pub number: Option<u64>,
     pub genres: Vec<String>,
     pub release: Option<Arc<Release>>,
+
+    // Performer, Vocal, Instrument
+    pub performers: Vec<Artist>,
+    pub engigneers: Vec<Artist>,
+    pub mixers: Vec<Artist>,
+    pub producers: Vec<Artist>,
+    pub composers: Vec<Artist>,
 }
 
 #[derive(Clone, Debug, FromRow)]
@@ -41,6 +48,7 @@ pub struct Release {
     pub media: Option<String>,
     pub tracks: Option<u64>,
     pub country: Option<String>,
+    pub label: Option<String>,
     pub status: Option<String>,
     pub date: Option<NaiveDate>,
     pub original_date: Option<NaiveDate>,

@@ -141,6 +141,7 @@ pub struct Track {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Recording {
+    pub relations: Vec<Relation>,
     pub disambiguation: String,
     pub id: String,
     pub length: u64,
@@ -151,6 +152,52 @@ pub struct Recording {
     pub genres: Option<Vec<Genre>>,
     #[serde(rename = "artist-credit")]
     pub artist_credit: Option<Vec<ArtistCredit>>,
+}
+
+pub enum RelationType {
+    ENGIGNEER,
+    INSTRUMENT,
+    PERFORMER,
+    MIX,
+    PRODUCER,
+    VOCAL,
+    OTHER(String),
+}
+
+impl From<String> for RelationType {
+    fn from(str: String) -> Self {
+        match str.as_str() {
+            "engigneer" => Self::ENGIGNEER,
+            "instrument" => Self::ENGIGNEER,
+            "performer" => Self::PERFORMER,
+            "mix" => Self::MIX,
+            "producer" => Self::PRODUCER,
+            "vocal" => Self::VOCAL,
+            _ => Self::OTHER(str),
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Relation {
+    #[serde(rename = "type-id")]
+    pub type_id: String,
+    pub begin: Option<String>,
+    #[serde(rename = "target-credit")]
+    pub target_credit: String,
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub artist: Option<Artist>,
+    pub end: Option<String>,
+    pub attributes: Vec<String>,
+    #[serde(rename = "source-credit")]
+    pub source_credit: String,
+    pub direction: String,
+    #[serde(rename = "target-type")]
+    pub target_type: String,
+    pub ended: bool,
+    #[serde(rename = "ordering-key")]
+    pub ordering_key: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -68,6 +68,8 @@ pub async fn get(
                 "labels",
                 "recordings",
                 "genres",
+                "work-rels",
+                "work-level-rels",
                 "artist-rels",
                 "recording-rels",
                 "instrument-rels",
