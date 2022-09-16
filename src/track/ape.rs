@@ -101,7 +101,7 @@ impl crate::track::Tag for Tag {
     fn str_to_key(&self, str: &str) -> Option<TagKey> {
         unimplemented!()
     }
-    fn key_to_str(&self, key: TagKey) -> Option<&'static str> {
+    fn key_to_str(&self, key: TagKey) -> Vec<&'static str> {
         match key {
             // TODO
             // TagKey::AcoustidID => Some(""),
@@ -194,7 +194,7 @@ impl crate::track::Tag for Tag {
             // TagKey::Website => Some(""),
             // TagKey::WorkTitle => Some(""),
             // TagKey::Writer => Some(""),
-            _ => None,
+            _ => vec![],
         }
     }
 

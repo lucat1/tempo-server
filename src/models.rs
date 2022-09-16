@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use eyre::Result;
 use sqlx::FromRow;
 use std::fmt::Debug;
@@ -37,9 +38,12 @@ pub struct Release {
     pub title: String,
     pub artists: Vec<Artist>,
     pub discs: Option<u64>,
+    pub media: Option<String>,
+    pub tracks: Option<u64>,
     pub country: Option<String>,
     pub status: Option<String>,
-    pub date: Option<u32>,
+    pub date: Option<NaiveDate>,
+    pub original_date: Option<NaiveDate>,
     pub script: Option<String>,
 }
 

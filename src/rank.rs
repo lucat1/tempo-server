@@ -102,6 +102,33 @@ pub fn match_tracks(
                         + if_both_or_default(r1.mbid.clone(), r2.mbid.clone(), |mbid1, mbid2| {
                             levenshtein(mbid1.as_str(), mbid2.as_str()) as i64
                         })
+                        + if_both_or_default(r1.asin.clone(), r2.asin.clone(), |asin1, asin2| {
+                            levenshtein(asin1.as_str(), asin2.as_str()) as i64
+                        })
+                        + if_both_or_default(r1.discs, r2.discs, |discs1, discs2| {
+                            discs1.abs_diff(discs2) as i64
+                        })
+                        + if_both_or_default(r1.media.clone(), r2.media.clone(), |media1, media2| {
+                            levenshtein(media1.as_str(), media2.as_str()) as i64
+                        })
+                        + if_both_or_default(r1.tracks, r2.tracks, |tracks1, tracks2| {
+                            tracks1.abs_diff(tracks2) as i64
+                        }) * 100
+                        + if_both_or_default(r1.country.clone(), r2.country.clone(), |country1, country2| {
+                            levenshtein(country1.as_str(), country2.as_str()) as i64
+                        })
+                        + if_both_or_default(r1.status.clone(), r2.status.clone(), |status1, status2| {
+                            levenshtein(status1.as_str(), status2.as_str()) as i64
+                        })
+                        + if_both_or_default(r1.date.clone(), r2.date.clone(), |date1, date2| {
+                            date1.signed_duration_since(date2).num_days()
+                        })
+                        + if_both_or_default(r1.original_date.clone(), r2.original_date.clone(), |date1, date2| {
+                            date1.signed_duration_since(date2).num_days()
+                        })
+                        + if_both_or_default(r1.script.clone(), r2.script.clone(), |script1, script2| {
+                            levenshtein(script1.as_str(), script2.as_str()) as i64
+                        })
                 }).unwrap_or(0);
 
             trace!(

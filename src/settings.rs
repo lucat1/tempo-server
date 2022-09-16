@@ -16,6 +16,7 @@ pub struct Settings {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Tagging {
     pub clear: bool,
+    pub use_original_date: bool,
 }
 
 impl Settings {
@@ -30,7 +31,10 @@ impl Settings {
             db: library.join(PathBuf::from("db")),
             release_name: "{release.artist}/{release.title}".to_string(),
             track_name: "{track.disc} - {track.number} - {track.title}".to_string(),
-            tagging: Tagging { clear: true },
+            tagging: Tagging {
+                clear: true,
+                use_original_date: true,
+            },
         })
     }
 }

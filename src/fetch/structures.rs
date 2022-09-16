@@ -1,11 +1,12 @@
+use chrono::NaiveDate;
 use eyre::{eyre, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::models::GroupTracks;
+use crate::SETTINGS;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Release {
@@ -122,6 +123,7 @@ pub struct Medium {
     pub position: Option<u64>,
     pub track_offset: Option<u64>,
     pub tracks: Option<Vec<Track>>,
+    pub format: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -209,19 +211,42 @@ impl From<Track> for crate::models::Track {
     }
 }
 
+fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
+    d.map_or(None, |s| {
+        NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+            .ok()
+            .or(NaiveDate::parse_from_str(s.as_str(), "%Y").ok())
+    })
+}
+
 impl From<Release> for crate::models::Release {
     fn from(release: Release) -> Self {
+        let original_date =
+            maybe_date(release.release_group.map_or(None, |r| r.first_release_date));
         crate::models::Release {
             // TODO: no good
             mbid: Some(release.id),
             asin: release.asin,
             title: release.title,
+            tracks: Some(
+                release
+                    .media
+                    .iter()
+                    .map(|m| m.tracks.as_ref().map_or(0, |tracks| tracks.len() as u64))
+                    .sum(),
+            ),
             discs: Some(release.media.len() as u64),
+            media: release.media.first().map_or(None, |m| m.format.clone()),
             country: release.country,
             status: release.status,
-            date: release
-                .date
-                .map_or(None, |s| u32::from_str(s.as_str()).ok()),
+            date: SETTINGS.get().map_or(None, |s| {
+                if s.tagging.use_original_date {
+                    original_date
+                } else {
+                    maybe_date(release.date)
+                }
+            }),
+            original_date,
             script: release.text_representation.map_or(None, |t| t.script),
             artists: release
                 .artist_credit

@@ -1,4 +1,3 @@
-extern crate infer;
 pub mod ape;
 pub mod flac;
 pub mod id3;
@@ -10,24 +9,31 @@ pub mod picture;
 
 use super::models::{Artist, Artists, Track};
 use super::util::{dedup, take_first};
+use chrono::Datelike;
 use core::convert::AsRef;
-use eyre::{eyre, Report, Result, WrapErr};
+use eyre::{bail, eyre, Report, Result, WrapErr};
+use itertools::Itertools;
+use log::debug;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::fs::copy;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use self::map::TagKey;
 use format::Format;
 use picture::Picture;
-
-use self::map::TagKey;
 
 #[derive(Clone, Debug)]
 pub struct TrackFile {
     pub path: PathBuf,
     format: Format,
     tag: Box<dyn Tag>,
+}
+
+pub enum TagError {
+    NotSupported,
+    Other(Report),
 }
 
 impl TrackFile {
@@ -49,23 +55,42 @@ impl TrackFile {
     }
 
     pub fn get_tag(&self, key: TagKey) -> Result<Vec<String>> {
-        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
-            "The {:?} key is not supported in the output format {:?}",
-            key,
-            self.format
-        ))?;
-        self.tag
-            .get_str(keystr)
-            .ok_or(eyre!("Could not read tag {:?} as {}", key, keystr))
+        let keystrs = self.tag.key_to_str(key);
+        if keystrs.is_empty() {
+            debug!(
+                "The {:?} key is not supported in the output format {:?}",
+                key, self.format
+            );
+            bail!(
+                "The {:?} key is not supported in the output format {:?}",
+                key,
+                self.format
+            )
+        }
+        keystrs
+            .into_iter()
+            .map(|keystr| {
+                self.tag
+                    .get_str(keystr)
+                    .ok_or(eyre!("Could not read tag {:?} as {}", key, keystr))
+            })
+            .flatten_ok()
+            .collect()
     }
 
-    pub fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<()> {
-        let keystr = self.tag.key_to_str(key).ok_or(eyre!(
-            "The {:?} key is not supported in the output format {:?}",
-            key,
-            self.format
-        ))?;
-        self.tag.set_str(keystr, values)
+    pub fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<(), TagError> {
+        let keystrs = self.tag.key_to_str(key);
+        if keystrs.is_empty() {
+            return Err(TagError::NotSupported);
+        }
+        keystrs
+            .into_iter()
+            .map(|keystr| {
+                self.tag
+                    .set_str(keystr, values.clone())
+                    .map_err(|e| TagError::Other(e))
+            })
+            .collect()
     }
 
     pub fn tags(&self) -> HashMap<TagKey, Vec<String>> {
@@ -96,57 +121,102 @@ impl TrackFile {
             .wrap_err(format!("Could not write tags to file: {:?}", self.path))
     }
 
+    fn ignore_unsupported(r: Result<(), TagError>) -> Result<()> {
+        match r {
+            Err(TagError::NotSupported) => Ok(()),
+            Err(TagError::Other(v)) => Err(eyre!(v)),
+            Ok(v) => Ok(v),
+        }
+    }
+
     pub fn apply(&mut self, track: Track) -> Result<()> {
         // work
         if let Some(id) = track.mbid {
-            self.set_tag(TagKey::MusicBrainzTrackID, vec![id])?;
+            Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzTrackID, vec![id]))?;
         }
         if let Some(release) = track.release {
             if let Some(rel_id) = &release.mbid {
-                self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()]),
+                )?;
             }
             if let Some(rel_asin) = &release.asin {
-                self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()])?;
+                Self::ignore_unsupported(self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()]))?;
             }
             if let Some(rel_country) = &release.country {
-                self.set_tag(TagKey::ReleaseCountry, vec![rel_country.to_string()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::ReleaseCountry, vec![rel_country.to_string()]),
+                )?;
             }
             if let Some(rel_status) = &release.status {
-                self.set_tag(TagKey::ReleaseStatus, vec![rel_status.to_string()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::ReleaseStatus, vec![rel_status.to_string()]),
+                )?;
             }
             if let Some(rel_date) = &release.date {
-                // TODO: fix
-                self.set_tag(TagKey::ReleaseDate, vec![rel_date.to_string()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::ReleaseDate, vec![rel_date.year().to_string()]),
+                )?;
+            }
+            if let Some(rel_original_date) = &release.original_date {
+                Self::ignore_unsupported(self.set_tag(
+                    TagKey::OriginalReleaseDate,
+                    vec![rel_original_date.to_string()],
+                ))?;
+                Self::ignore_unsupported(self.set_tag(
+                    TagKey::OriginalReleaseYear,
+                    vec![rel_original_date.year().to_string()],
+                ))?;
             }
             if let Some(rel_script) = &release.script {
-                self.set_tag(TagKey::Script, vec![rel_script.to_string()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::Script, vec![rel_script.to_string()]),
+                )?;
             }
-            self.set_tag(TagKey::Album, vec![release.title.clone()])?;
-            self.set_tag(TagKey::AlbumArtist, release.artists.names())?;
-            self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids())?;
+            if let Some(rel_media) = &release.media {
+                Self::ignore_unsupported(self.set_tag(TagKey::Media, vec![rel_media.to_string()]))?;
+            }
+            Self::ignore_unsupported(self.set_tag(TagKey::Album, vec![release.title.clone()]))?;
+            Self::ignore_unsupported(self.set_tag(TagKey::AlbumArtist, release.artists.names()))?;
+            Self::ignore_unsupported(
+                self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids()),
+            )?;
             if let Some(discs) = release.discs {
-                self.set_tag(TagKey::TotalDiscs, vec![discs.to_string()])?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::TotalDiscs, vec![discs.to_string()]),
+                )?;
+            }
+            if let Some(tracks) = release.tracks {
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::TotalTracks, vec![tracks.to_string()]),
+                )?;
             }
         }
-        self.set_tag(TagKey::TrackTitle, vec![track.title])?;
+        Self::ignore_unsupported(self.set_tag(TagKey::TrackTitle, vec![track.title]))?;
 
         // artists
-        self.set_tag(TagKey::Artists, track.artists.names())?;
-        self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids())?;
-        self.set_tag(TagKey::ArtistSortOrder, vec![track.artists.sort_order()])?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Artists, track.artists.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids()))?;
+        Self::ignore_unsupported(
+            self.set_tag(TagKey::ArtistSortOrder, vec![track.artists.sort_order()]),
+        )?;
         if let Some(len) = track.length {
-            self.set_tag(TagKey::Duration, vec![len.as_secs().to_string()])?;
+            Self::ignore_unsupported(
+                self.set_tag(TagKey::Duration, vec![len.as_secs().to_string()]),
+            )?;
         }
         if let Some(disc) = track.disc {
-            self.set_tag(TagKey::DiscNumber, vec![disc.to_string()])?;
+            Self::ignore_unsupported(self.set_tag(TagKey::DiscNumber, vec![disc.to_string()]))?;
         }
         if let Some(disc_mbid) = track.disc_mbid {
-            self.set_tag(TagKey::MusicBrainzDiscID, vec![disc_mbid.to_string()])?;
+            Self::ignore_unsupported(
+                self.set_tag(TagKey::MusicBrainzDiscID, vec![disc_mbid.to_string()]),
+            )?;
         }
         if let Some(number) = track.number {
-            self.set_tag(TagKey::TrackNumber, vec![number.to_string()])?;
+            Self::ignore_unsupported(self.set_tag(TagKey::TrackNumber, vec![number.to_string()]))?;
         }
-        self.set_tag(TagKey::Genre, track.genres)?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Genre, track.genres))?;
         Ok(())
     }
 
@@ -240,7 +310,7 @@ pub trait Tag: TagClone {
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()>;
 
     fn str_to_key(&self, str: &str) -> Option<TagKey>;
-    fn key_to_str(&self, key: TagKey) -> Option<&'static str>;
+    fn key_to_str(&self, key: TagKey) -> Vec<&'static str>;
 
     fn write_to_path(&mut self, path: &PathBuf) -> Result<()>;
 }

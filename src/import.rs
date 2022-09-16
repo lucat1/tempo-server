@@ -37,12 +37,14 @@ impl TryFrom<ChoiceAlbum> for Release {
             // maybe an optin. Would make tagging really stale :/
             mbid: None,
             title: album.title,
+            tracks: Some(album.tracks.len() as u64),
             discs: album
                 .tracks
                 .iter()
                 .filter_map(|t| t.clone().try_into().ok())
                 .filter_map(|t: Track| t.disc)
                 .max(),
+            media: None,
             // TODO: as part of removing this structure to somewhere else,
             // make sense of where it is more appropriate to fetch this kind of
             // data (answer: here in the try_from) from a Vec<TrackFile> and
@@ -51,6 +53,7 @@ impl TryFrom<ChoiceAlbum> for Release {
             country: None,
             status: None,
             date: None,
+            original_date: None,
             script: None,
             artists: album
                 .artists
