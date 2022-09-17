@@ -69,6 +69,7 @@ pub enum TagKey {
     Rating,
     RecordLabel,
     ReleaseCountry,
+    ReleaseYear,
     ReleaseDate,
     ReleaseStatus,
     ReleaseType,

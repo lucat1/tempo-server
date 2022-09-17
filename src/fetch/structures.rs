@@ -165,6 +165,8 @@ pub enum RelationType {
     LYRICIST,
     WRITER,
     COMPOSER,
+
+    PERFORMANCE,
     OTHER(String),
 }
 
@@ -180,6 +182,7 @@ impl From<String> for RelationType {
             "lyricist" => Self::LYRICIST,
             "writer" => Self::WRITER,
             "composer" => Self::COMPOSER,
+            "performance" => Self::PERFORMANCE,
             _ => Self::OTHER(str),
         }
     }
@@ -187,24 +190,16 @@ impl From<String> for RelationType {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Relation {
-    #[serde(rename = "type-id")]
-    pub type_id: String,
-    pub begin: Option<String>,
-    #[serde(rename = "target-credit")]
-    pub target_credit: String,
     #[serde(rename = "type")]
     pub type_field: String,
     pub artist: Option<Artist>,
-    pub end: Option<String>,
+    pub work: Option<Work>,
     pub attributes: Vec<String>,
-    #[serde(rename = "source-credit")]
-    pub source_credit: String,
-    pub direction: String,
-    #[serde(rename = "target-type")]
-    pub target_type: String,
-    pub ended: bool,
-    #[serde(rename = "ordering-key")]
-    pub ordering_key: Option<i64>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Work {
+    pub relations: Option<Vec<Relation>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -284,6 +279,23 @@ impl From<Track> for crate::models::Track {
     fn from(track: Track) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or(vec![]);
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
+        let mut other_relations = track
+            .recording
+            .relations
+            .iter()
+            .filter_map(|rel| {
+                if RelationType::PERFORMANCE == rel.type_field.clone().into() {
+                    rel.work.clone()
+                } else {
+                    None
+                }
+            })
+            .filter_map(|work| work.relations)
+            .flatten()
+            .collect::<Vec<_>>();
+        let mut relations = track.recording.relations.clone();
+        relations.append(&mut other_relations);
+
         crate::models::Track {
             mbid: Some(track.id),
             title: track.title,
@@ -304,34 +316,19 @@ impl From<Track> for crate::models::Track {
             release: track.release.map(|r| Arc::new((*r).clone().into())),
 
             performers: artists_from_relationships(
-                &track.recording.relations,
+                &relations,
                 vec![
                     RelationType::INSTRUMENT,
                     RelationType::PERFORMER,
                     RelationType::VOCAL,
                 ],
             ),
-            engigneers: artists_from_relationships(
-                &track.recording.relations,
-                vec![RelationType::ENGIGNEER],
-            ),
+            engigneers: artists_from_relationships(&relations, vec![RelationType::ENGIGNEER]),
             mixers: artists_from_relationships(&track.recording.relations, vec![RelationType::MIX]),
-            producers: artists_from_relationships(
-                &track.recording.relations,
-                vec![RelationType::PRODUCER],
-            ),
-            lyricists: artists_from_relationships(
-                &track.recording.relations,
-                vec![RelationType::LYRICIST],
-            ),
-            writers: artists_from_relationships(
-                &track.recording.relations,
-                vec![RelationType::WRITER],
-            ),
-            composers: artists_from_relationships(
-                &track.recording.relations,
-                vec![RelationType::COMPOSER],
-            ),
+            producers: artists_from_relationships(&relations, vec![RelationType::PRODUCER]),
+            lyricists: artists_from_relationships(&relations, vec![RelationType::LYRICIST]),
+            writers: artists_from_relationships(&relations, vec![RelationType::WRITER]),
+            composers: artists_from_relationships(&relations, vec![RelationType::COMPOSER]),
         }
     }
 }

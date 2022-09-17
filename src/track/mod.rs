@@ -130,7 +130,6 @@ impl TrackFile {
     }
 
     pub fn apply(&mut self, track: Track) -> Result<()> {
-        // work
         if let Some(id) = track.mbid {
             Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzTrackID, vec![id]))?;
         }
@@ -155,7 +154,10 @@ impl TrackFile {
             }
             if let Some(rel_date) = &release.date {
                 Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseDate, vec![rel_date.year().to_string()]),
+                    self.set_tag(TagKey::ReleaseDate, vec![rel_date.to_string()]),
+                )?;
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::ReleaseYear, vec![rel_date.year().to_string()]),
                 )?;
             }
             if let Some(rel_original_date) = &release.original_date {
@@ -178,6 +180,9 @@ impl TrackFile {
             }
             Self::ignore_unsupported(self.set_tag(TagKey::Album, vec![release.title.clone()]))?;
             Self::ignore_unsupported(self.set_tag(TagKey::AlbumArtist, release.artists.names()))?;
+            Self::ignore_unsupported(
+                self.set_tag(TagKey::AlbumArtistSortOrder, release.artists.sort_order()),
+            )?;
             Self::ignore_unsupported(
                 self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids()),
             )?;
@@ -216,22 +221,13 @@ impl TrackFile {
         if let Some(number) = track.number {
             Self::ignore_unsupported(self.set_tag(TagKey::TrackNumber, vec![number.to_string()]))?;
         }
-        println!(
-            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
-            track.engigneers,
-            track.mixers,
-            track.producers,
-            track.lyricists,
-            track.writers,
-            track.composers
-        );
         Self::ignore_unsupported(self.set_tag(TagKey::Genre, track.genres))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Performer, track.performers.instruments()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Engineer, track.engigneers.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Mixer, track.mixers.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Producer, track.producers.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Lyricist, track.lyricists.sort_order()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Writer, track.writers.sort_order()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Lyricist, track.lyricists.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Writer, track.writers.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Composer, track.composers.names()))?;
         Self::ignore_unsupported(
             self.set_tag(TagKey::ComposerSortOrder, track.composers.sort_order()),
