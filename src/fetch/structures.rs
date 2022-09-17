@@ -17,8 +17,6 @@ pub struct Release {
     pub status: Option<String>,
     #[serde(rename = "release-group")]
     pub release_group: Option<ReleaseGroup>,
-    #[serde(rename = "cover-art-archive")]
-    pub cover_art_archive: Option<CoverArtArchive>,
     #[serde(rename = "status-id")]
     pub status_id: Option<String>,
     pub packaging: Option<String>,
@@ -69,15 +67,6 @@ pub struct ReleaseGroup {
     pub disambiguation: Option<String>,
     #[serde(rename = "primary-type")]
     pub primary_type: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CoverArtArchive {
-    pub count: i64,
-    pub front: bool,
-    pub back: bool,
-    pub artwork: bool,
-    pub darkened: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -343,11 +332,16 @@ fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
 
 impl From<Release> for crate::models::Release {
     fn from(release: Release) -> Self {
-        let original_date =
-            maybe_date(release.release_group.map_or(None, |r| r.first_release_date));
+        let original_date = maybe_date(
+            release
+                .release_group
+                .as_ref()
+                .map_or(None, |r| r.first_release_date.clone()),
+        );
         crate::models::Release {
             // TODO: no good
             mbid: Some(release.id),
+            release_group_mbid: release.release_group.as_ref().map(|r| r.id.clone()),
             asin: release.asin,
             title: release.title,
             tracks: Some(
@@ -365,7 +359,15 @@ impl From<Release> for crate::models::Release {
                 .first()
                 .map_or(None, |li| li.label.as_ref())
                 .map(|l| l.name.clone()),
+            catalog_no: release
+                .label_info
+                .first()
+                .map_or(None, |l| l.catalog_number.clone()),
             status: release.status,
+            release_type: release
+                .release_group
+                .as_ref()
+                .map(|r| r.primary_type.clone()),
             date: SETTINGS.get().map_or(None, |s| {
                 if s.tagging.use_original_date {
                     original_date
@@ -415,4 +417,34 @@ impl GroupTracks for Arc<Release> {
             tracks,
         ))
     }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CoverArtArchive {
+    images: Vec<Image>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Image {
+    approved: bool,
+    back: bool,
+    comment: String,
+    edit: i64,
+    front: bool,
+    id: i64,
+    image: String,
+    thumbnails: Thumbnails,
+    types: Vec<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Thumbnails {
+    #[serde(rename = "250")]
+    the_250: String,
+    #[serde(rename = "500")]
+    the_500: String,
+    #[serde(rename = "1200")]
+    the_1200: String,
+    large: String,
+    small: String,
 }

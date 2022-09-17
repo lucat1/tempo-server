@@ -8,10 +8,10 @@ pub mod map;
 pub mod picture;
 
 use super::models::{Artist, Artists, Track};
-use super::util::{dedup, take_first};
+use super::util::dedup;
 use chrono::Datelike;
 use core::convert::AsRef;
-use eyre::{bail, eyre, Report, Result, WrapErr};
+use eyre::{eyre, Report, Result, WrapErr};
 use itertools::Itertools;
 use log::debug;
 use std::collections::HashMap;
@@ -54,27 +54,19 @@ impl TrackFile {
         })
     }
 
-    pub fn get_tag(&self, key: TagKey) -> Result<Vec<String>> {
+    pub fn get_tag(&self, key: TagKey) -> Vec<String> {
         let keystrs = self.tag.key_to_str(key);
         if keystrs.is_empty() {
             debug!(
                 "The {:?} key is not supported in the output format {:?}",
                 key, self.format
             );
-            bail!(
-                "The {:?} key is not supported in the output format {:?}",
-                key,
-                self.format
-            )
+            return vec![];
         }
         keystrs
             .into_iter()
-            .map(|keystr| {
-                self.tag
-                    .get_str(keystr)
-                    .ok_or(eyre!("Could not read tag {:?} as {}", key, keystr))
-            })
-            .flatten_ok()
+            .filter_map(|keystr| self.tag.get_str(keystr))
+            .flatten()
             .collect()
     }
 
@@ -139,6 +131,12 @@ impl TrackFile {
                     self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()]),
                 )?;
             }
+            if let Some(rel_group_id) = &release.release_group_mbid {
+                Self::ignore_unsupported(self.set_tag(
+                    TagKey::MusicBrainzReleaseGroupID,
+                    vec![rel_group_id.clone()],
+                ))?;
+            }
             if let Some(rel_asin) = &release.asin {
                 Self::ignore_unsupported(self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()]))?;
             }
@@ -147,9 +145,24 @@ impl TrackFile {
                     self.set_tag(TagKey::ReleaseCountry, vec![rel_country.to_string()]),
                 )?;
             }
+            if let Some(rel_label) = &release.label {
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::RecordLabel, vec![rel_label.to_string()]),
+                )?;
+            }
+            if let Some(rel_catno) = &release.catalog_no {
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::CatalogNumber, vec![rel_catno.to_string()]),
+                )?;
+            }
             if let Some(rel_status) = &release.status {
                 Self::ignore_unsupported(
                     self.set_tag(TagKey::ReleaseStatus, vec![rel_status.to_string()]),
+                )?;
+            }
+            if let Some(rel_type) = &release.release_type {
+                Self::ignore_unsupported(
+                    self.set_tag(TagKey::ReleaseType, vec![rel_type.to_string()]),
                 )?;
             }
             if let Some(rel_date) = &release.date {
@@ -255,26 +268,19 @@ impl FileAlbum {
         Ok(FileAlbum { tracks })
     }
 
-    pub fn artists(&self) -> Result<Vec<String>> {
-        let artists = self
-            .tracks
-            .iter()
-            .map(|t| t.album_artists())
-            .collect::<Result<Vec<_>>>()?
-            .iter()
-            .flatten()
-            .map(|s| s.clone())
-            .collect::<Vec<_>>();
-        Ok(dedup(artists))
+    pub fn artists(&self) -> Vec<String> {
+        dedup(
+            self.tracks
+                .iter()
+                .map(|t| t.album_artists())
+                .flatten()
+                .map(|s| s.clone())
+                .collect(),
+        )
     }
 
-    pub fn titles(&self) -> Result<Vec<String>> {
-        let titles = self
-            .tracks
-            .iter()
-            .map(|t| t.album_title())
-            .collect::<Result<Vec<_>>>()?;
-        Ok(dedup(titles))
+    pub fn titles(&self) -> Vec<String> {
+        dedup(self.tracks.iter().map(|t| t.album_title()).collect())
     }
 }
 
@@ -331,17 +337,16 @@ pub trait Tag: TagClone {
 }
 
 impl TrackFile {
-    pub fn artists(&self) -> Result<Vec<String>> {
+    pub fn artists(&self) -> Vec<String> {
         self.get_tag(TagKey::Artists)
     }
-    pub fn album_artists(&self) -> Result<Vec<String>> {
+    pub fn album_artists(&self) -> Vec<String> {
         self.get_tag(TagKey::AlbumArtist)
     }
-    pub fn album_title(&self) -> Result<String> {
-        take_first(
-            self.get_tag(TagKey::Album)?,
-            "Track has no album title".to_string(),
-        )
+    pub fn album_title(&self) -> String {
+        self.get_tag(TagKey::Album)
+            .first()
+            .map_or("".to_string(), |t| t.to_string())
     }
 }
 
@@ -363,45 +368,42 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
 }
 
 fn artists_from_tag(file: &TrackFile, key: TagKey) -> Vec<Artist> {
-    file.get_tag(key).map_or(vec![], |names| {
-        names
-            .iter()
-            .map(|name| artists_with_name(name.to_string(), file.tag.separator()))
-            .flatten()
-            .collect()
-    })
+    file.get_tag(key)
+        .iter()
+        .map(|name| artists_with_name(name.to_string(), file.tag.separator()))
+        .flatten()
+        .collect()
 }
 
 impl TryFrom<TrackFile> for Track {
     type Error = Report;
     fn try_from(file: TrackFile) -> Result<Self> {
-        let titles = file
+        let title = file
             .get_tag(TagKey::TrackTitle)
-            .wrap_err(eyre!("Could not read title tag"))?;
-        let title = take_first(titles, format!("Track {:?} has no title", file.path))?;
+            .first()
+            .ok_or(eyre!("Could not read title tag"))?
+            .to_string();
         let mbid = file
             .get_tag(TagKey::MusicBrainzTrackID)
-            .ok()
-            .map_or(None, |ids| ids.first().map(|f| f.to_string()));
+            .first()
+            .map(|id| id.to_string());
         let length = file
             .get_tag(TagKey::Duration)
-            .map_or(None, |d| d.first().map(|d| d.to_string()))
+            .first()
             .map_or(None, |d| d.parse::<u64>().ok())
             .map(|d| Duration::from_secs(d));
         let artists = artists_from_tag(&file, TagKey::Artists);
         let disc = file
             .get_tag(TagKey::DiscNumber)
-            .ok()
-            .map_or(None, |t| t.first().map(|d| d.to_string()))
+            .first()
             .map_or(None, |d| d.parse::<u64>().ok());
         let disc_mbid = file
             .get_tag(TagKey::MusicBrainzDiscID)
-            .ok()
-            .map_or(None, |ids| ids.first().map(|f| f.to_string()));
+            .first()
+            .map(|f| f.to_string());
         let number = file
             .get_tag(TagKey::TrackNumber)
-            .ok()
-            .map_or(None, |t| t.first().map(|n| n.to_string()))
+            .first()
             .map_or(None, |d| d.parse::<u64>().ok());
         let performers = artists_from_tag(&file, TagKey::Performer);
         let engigneers = artists_from_tag(&file, TagKey::Engineer);

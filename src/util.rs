@@ -1,4 +1,4 @@
-use eyre::{bail, eyre, Result};
+use eyre::{eyre, Result};
 use std::fs::create_dir_all;
 use std::io;
 use std::path::Path;
@@ -15,13 +15,6 @@ pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
     vec.sort_unstable();
     vec.dedup();
     vec
-}
-
-pub fn take_first<T: Clone>(v: Vec<T>, bail_msg: String) -> Result<T> {
-    if v.len() < 1 {
-        bail!(bail_msg);
-    }
-    Ok(v[0].clone())
 }
 
 pub fn mkdirp<P: AsRef<Path>>(path: &P) -> io::Result<()> {

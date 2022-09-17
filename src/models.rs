@@ -44,6 +44,7 @@ pub struct Track {
 #[derive(Clone, Debug, FromRow)]
 pub struct Release {
     pub mbid: Option<String>,
+    pub release_group_mbid: Option<String>,
     pub asin: Option<String>,
     pub title: String,
     pub artists: Vec<Artist>,
@@ -52,7 +53,9 @@ pub struct Release {
     pub tracks: Option<u64>,
     pub country: Option<String>,
     pub label: Option<String>,
+    pub catalog_no: Option<String>,
     pub status: Option<String>,
+    pub release_type: Option<String>,
     pub date: Option<NaiveDate>,
     pub original_date: Option<NaiveDate>,
     pub script: Option<String>,

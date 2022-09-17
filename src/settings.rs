@@ -17,6 +17,7 @@ pub struct Settings {
 pub struct Tagging {
     pub clear: bool,
     pub use_original_date: bool,
+    pub use_release_group: bool,
 }
 
 impl Settings {
@@ -34,6 +35,7 @@ impl Settings {
             tagging: Tagging {
                 clear: true,
                 use_original_date: true,
+                use_release_group: true,
             },
         })
     }

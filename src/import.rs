@@ -36,6 +36,7 @@ impl TryFrom<ChoiceAlbum> for Release {
             // TODO: consider reading mbid from files tag?
             // maybe an optin. Would make tagging really stale :/
             mbid: None,
+            release_group_mbid: None,
             title: album.title,
             tracks: Some(album.tracks.len() as u64),
             discs: album
@@ -52,7 +53,9 @@ impl TryFrom<ChoiceAlbum> for Release {
             asin: None,
             country: None,
             label: None,
+            catalog_no: None,
             status: None,
+            release_type: None,
             date: None,
             original_date: None,
             script: None,
@@ -171,7 +174,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         bail!("No tracks to import were found");
     }
     let ralbum = FileAlbum::from_tracks(tracks.clone())?;
-    let (artists, title) = get_artist_and_title(&theme, ralbum.artists()?, ralbum.titles()?)?;
+    let (artists, title) = get_artist_and_title(&theme, ralbum.artists(), ralbum.titles())?;
 
     let choice_album = ChoiceAlbum {
         title,
