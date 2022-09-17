@@ -196,7 +196,7 @@ impl crate::track::Tag for Tag {
             TagKey::ISRC => vec!["ISRC"],
             TagKey::Language => vec!["LANGUAGE"],
             TagKey::License => vec!["LICENSE"],
-            TagKey::Liricist => vec!["LYRICIST"],
+            TagKey::Lyricist => vec!["LYRICIST"],
             TagKey::Lyrics => vec!["©lyr"],
             TagKey::Media => vec!["MEDIA"],
             TagKey::MixDJ => vec!["DJMIXER"],

@@ -198,7 +198,7 @@ impl TrackFile {
         Self::ignore_unsupported(self.set_tag(TagKey::Artists, track.artists.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids()))?;
         Self::ignore_unsupported(
-            self.set_tag(TagKey::ArtistSortOrder, vec![track.artists.sort_order()]),
+            self.set_tag(TagKey::ArtistSortOrder, track.artists.sort_order()),
         )?;
         if let Some(len) = track.length {
             Self::ignore_unsupported(
@@ -216,7 +216,26 @@ impl TrackFile {
         if let Some(number) = track.number {
             Self::ignore_unsupported(self.set_tag(TagKey::TrackNumber, vec![number.to_string()]))?;
         }
+        println!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            track.engigneers,
+            track.mixers,
+            track.producers,
+            track.lyricists,
+            track.writers,
+            track.composers
+        );
         Self::ignore_unsupported(self.set_tag(TagKey::Genre, track.genres))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Performer, track.performers.instruments()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Engineer, track.engigneers.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Mixer, track.mixers.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Producer, track.producers.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Lyricist, track.lyricists.sort_order()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Writer, track.writers.sort_order()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Composer, track.composers.names()))?;
+        Self::ignore_unsupported(
+            self.set_tag(TagKey::ComposerSortOrder, track.composers.sort_order()),
+        )?;
         Ok(())
     }
 
@@ -317,7 +336,7 @@ pub trait Tag: TagClone {
 
 impl TrackFile {
     pub fn artists(&self) -> Result<Vec<String>> {
-        Ok(dedup(self.get_tag(TagKey::AlbumArtist)?))
+        self.get_tag(TagKey::Artists)
     }
     pub fn album_artists(&self) -> Result<Vec<String>> {
         self.get_tag(TagKey::AlbumArtist)
@@ -328,6 +347,33 @@ impl TrackFile {
             "Track has no album title".to_string(),
         )
     }
+}
+
+fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
+    match sep {
+        Some(ref s) => name.split(s.as_str()).map(|s| s.to_string()).collect_vec(),
+        None => vec![name],
+    }
+    .into_iter()
+    .map(|s| Artist {
+        mbid: None,
+        name: s.to_string(),
+        join_phrase: sep.clone(),
+        // TODO: take a look into artist sort order
+        sort_name: None,
+        instruments: vec![],
+    })
+    .collect()
+}
+
+fn artists_from_tag(file: &TrackFile, key: TagKey) -> Vec<Artist> {
+    file.get_tag(key).map_or(vec![], |names| {
+        names
+            .iter()
+            .map(|name| artists_with_name(name.to_string(), file.tag.separator()))
+            .flatten()
+            .collect()
+    })
 }
 
 impl TryFrom<TrackFile> for Track {
@@ -346,17 +392,7 @@ impl TryFrom<TrackFile> for Track {
             .map_or(None, |d| d.first().map(|d| d.to_string()))
             .map_or(None, |d| d.parse::<u64>().ok())
             .map(|d| Duration::from_secs(d));
-        let artists = file.artists().ok().map_or(vec![], |a| {
-            a.iter()
-                .map(|name| Artist {
-                    mbid: None,
-                    name: name.to_string(),
-                    join_phrase: file.tag.separator(),
-                    // TODO: take a look into artist sort order
-                    sort_name: None,
-                })
-                .collect::<Vec<_>>()
-        });
+        let artists = artists_from_tag(&file, TagKey::Artists);
         let disc = file
             .get_tag(TagKey::DiscNumber)
             .ok()
@@ -371,6 +407,13 @@ impl TryFrom<TrackFile> for Track {
             .ok()
             .map_or(None, |t| t.first().map(|n| n.to_string()))
             .map_or(None, |d| d.parse::<u64>().ok());
+        let performers = artists_from_tag(&file, TagKey::Performer);
+        let engigneers = artists_from_tag(&file, TagKey::Engineer);
+        let mixers = artists_from_tag(&file, TagKey::Mixer);
+        let producers = artists_from_tag(&file, TagKey::Producer);
+        let lyricists = artists_from_tag(&file, TagKey::Lyrics);
+        let writers = artists_from_tag(&file, TagKey::Writer);
+        let composers = artists_from_tag(&file, TagKey::Composer);
         Ok(Track {
             mbid,
             title,
@@ -382,6 +425,13 @@ impl TryFrom<TrackFile> for Track {
             // TODO: fetch from tags, decide on how (and if) to split
             genres: vec![],
             release: None,
+            performers,
+            engigneers,
+            mixers,
+            producers,
+            lyricists,
+            writers,
+            composers,
         })
     }
 }

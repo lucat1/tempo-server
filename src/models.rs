@@ -13,6 +13,7 @@ pub struct Artist {
     pub name: String,
     pub join_phrase: Option<String>,
     pub sort_name: Option<String>,
+    pub instruments: Vec<String>,
 }
 
 #[derive(Clone, Debug, FromRow)]
@@ -35,6 +36,8 @@ pub struct Track {
     pub engigneers: Vec<Artist>,
     pub mixers: Vec<Artist>,
     pub producers: Vec<Artist>,
+    pub lyricists: Vec<Artist>,
+    pub writers: Vec<Artist>,
     pub composers: Vec<Artist>,
 }
 
@@ -62,8 +65,9 @@ pub trait GroupTracks {
 pub trait Artists {
     fn names(&self) -> Vec<String>;
     fn ids(&self) -> Vec<String>;
-    fn sort_order(&self) -> String;
+    fn sort_order(&self) -> Vec<String>;
     fn joined(&self) -> String;
+    fn instruments(&self) -> Vec<String>;
 }
 
 impl Artists for Vec<Artist> {
@@ -75,12 +79,10 @@ impl Artists for Vec<Artist> {
             .filter_map(|s| s.mbid.clone())
             .collect::<Vec<_>>()
     }
-    fn sort_order(&self) -> String {
-        // TODO: investigate on wether the artist.separator shall be used here
+    fn sort_order(&self) -> Vec<String> {
         self.iter()
             .filter_map(|s| s.sort_name.clone())
             .collect::<Vec<_>>()
-            .join(",")
     }
     fn joined(&self) -> String {
         let mut res = "".to_string();
@@ -98,5 +100,20 @@ impl Artists for Vec<Artist> {
             }
         }
         res
+    }
+    fn instruments(&self) -> Vec<String> {
+        self.iter()
+            .map(|s| {
+                if s.instruments.len() > 0 {
+                    s.instruments
+                        .iter()
+                        .map(|i| format!("{} ({})", s.name, i))
+                        .collect()
+                } else {
+                    vec![s.name.clone()]
+                }
+            })
+            .flatten()
+            .collect()
     }
 }

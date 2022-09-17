@@ -51,6 +51,7 @@ impl TryFrom<ChoiceAlbum> for Release {
             // move all the data gathering here (fetching title and artists)
             asin: None,
             country: None,
+            label: None,
             status: None,
             date: None,
             original_date: None,
@@ -65,6 +66,8 @@ impl TryFrom<ChoiceAlbum> for Release {
                     // TODO
                     join_phrase: None,
                     sort_name: None,
+                    // TODO
+                    instruments: vec![],
                 })
                 .collect::<Vec<_>>(),
         })
@@ -73,7 +76,7 @@ impl TryFrom<ChoiceAlbum> for Release {
 
 impl GroupTracks for ChoiceAlbum {
     fn group_tracks(self) -> Result<(Release, Vec<Track>)> {
-        let tracks: Vec<Track> = self
+        let mut tracks: Vec<Track> = self
             .tracks
             .iter()
             .map(|t| t.clone().try_into())
@@ -81,23 +84,10 @@ impl GroupTracks for ChoiceAlbum {
         let rel: Release = self.try_into()?;
         let release = Some(Arc::new(rel.clone()));
 
-        Ok((
-            rel,
-            tracks
-                .into_iter()
-                .map(|t| Track {
-                    mbid: t.mbid,
-                    title: t.title,
-                    artists: t.artists,
-                    length: t.length,
-                    disc: t.disc,
-                    disc_mbid: t.disc_mbid,
-                    number: t.number,
-                    genres: t.genres,
-                    release: release.clone(),
-                })
-                .collect::<Vec<_>>(),
-        ))
+        for track in tracks.iter_mut() {
+            track.release = release.clone();
+        }
+        Ok((rel, tracks))
     }
 }
 

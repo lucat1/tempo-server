@@ -137,7 +137,7 @@ impl crate::track::Tag for Tag {
             // TagKey::ISRC => Some(""),
             // TagKey::Language => Some(""),
             // TagKey::License => Some(""),
-            // TagKey::Liricist => Some(""),
+            // TagKey::Lyricist => Some(""),
             // TagKey::Lyrics => Some(""),
             // TagKey::Media => Some(""),
             // TagKey::MixDJ => Some(""),

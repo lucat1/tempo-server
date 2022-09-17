@@ -215,7 +215,7 @@ impl crate::track::Tag for Tag {
             TagKey::ISRC => vec!["TSRC"],
             TagKey::Language => vec!["TLAN"],
             TagKey::License => vec!["WCOP"], // TODO: or LICEN]E
-            TagKey::Liricist => vec!["TEXT"],
+            TagKey::Lyricist => vec!["TEXT"],
             TagKey::Lyrics => vec!["USLT:description"],
             TagKey::Media => vec!["TMED"],
             TagKey::MixDJ => vec!["TIPL:DJ-mix"], // TODO: or IP]S

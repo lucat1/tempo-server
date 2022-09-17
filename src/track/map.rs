@@ -35,7 +35,7 @@ pub enum TagKey {
     ISRC,
     Language,
     License,
-    Liricist,
+    Lyricist,
     Lyrics,
     Media,
     MixDJ,

@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use eyre::{eyre, Result};
+use eyre::{eyre, Report, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -154,6 +154,7 @@ pub struct Recording {
     pub artist_credit: Option<Vec<ArtistCredit>>,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum RelationType {
     ENGIGNEER,
     INSTRUMENT,
@@ -161,6 +162,9 @@ pub enum RelationType {
     MIX,
     PRODUCER,
     VOCAL,
+    LYRICIST,
+    WRITER,
+    COMPOSER,
     OTHER(String),
 }
 
@@ -168,11 +172,14 @@ impl From<String> for RelationType {
     fn from(str: String) -> Self {
         match str.as_str() {
             "engigneer" => Self::ENGIGNEER,
-            "instrument" => Self::ENGIGNEER,
+            "instrument" => Self::INSTRUMENT,
             "performer" => Self::PERFORMER,
             "mix" => Self::MIX,
             "producer" => Self::PRODUCER,
             "vocal" => Self::VOCAL,
+            "lyricist" => Self::LYRICIST,
+            "writer" => Self::WRITER,
+            "composer" => Self::COMPOSER,
             _ => Self::OTHER(str),
         }
     }
@@ -242,8 +249,35 @@ impl From<ArtistCredit> for crate::models::Artist {
             join_phrase: artist.joinphrase.clone(),
             name: artist.name.clone(),
             sort_name: Some(artist.artist.sort_name.clone()),
+            instruments: vec![],
         }
     }
+}
+
+impl TryFrom<Relation> for crate::models::Artist {
+    type Error = Report;
+    fn try_from(relation: Relation) -> Result<Self> {
+        let artist = relation
+            .artist
+            .ok_or(eyre!("Relation doesn't contain an artist"))?;
+        Ok(crate::models::Artist {
+            mbid: Some(artist.id.clone()),
+            join_phrase: None,
+            name: artist.name.clone(),
+            sort_name: Some(artist.sort_name.clone()),
+            instruments: relation.attributes,
+        })
+    }
+}
+
+fn artists_from_relationships(
+    rels: &Vec<Relation>,
+    ok: Vec<RelationType>,
+) -> Vec<crate::models::Artist> {
+    rels.iter()
+        .filter(|r| ok.contains(&r.type_field.clone().into()))
+        .filter_map(|a| a.clone().try_into().ok())
+        .collect()
 }
 
 impl From<Track> for crate::models::Track {
@@ -268,6 +302,36 @@ impl From<Track> for crate::models::Track {
                 .map(|g| g.name)
                 .collect::<Vec<_>>(),
             release: track.release.map(|r| Arc::new((*r).clone().into())),
+
+            performers: artists_from_relationships(
+                &track.recording.relations,
+                vec![
+                    RelationType::INSTRUMENT,
+                    RelationType::PERFORMER,
+                    RelationType::VOCAL,
+                ],
+            ),
+            engigneers: artists_from_relationships(
+                &track.recording.relations,
+                vec![RelationType::ENGIGNEER],
+            ),
+            mixers: artists_from_relationships(&track.recording.relations, vec![RelationType::MIX]),
+            producers: artists_from_relationships(
+                &track.recording.relations,
+                vec![RelationType::PRODUCER],
+            ),
+            lyricists: artists_from_relationships(
+                &track.recording.relations,
+                vec![RelationType::LYRICIST],
+            ),
+            writers: artists_from_relationships(
+                &track.recording.relations,
+                vec![RelationType::WRITER],
+            ),
+            composers: artists_from_relationships(
+                &track.recording.relations,
+                vec![RelationType::COMPOSER],
+            ),
         }
     }
 }
@@ -299,6 +363,11 @@ impl From<Release> for crate::models::Release {
             discs: Some(release.media.len() as u64),
             media: release.media.first().map_or(None, |m| m.format.clone()),
             country: release.country,
+            label: release
+                .label_info
+                .first()
+                .map_or(None, |li| li.label.as_ref())
+                .map(|l| l.name.clone()),
             status: release.status,
             date: SETTINGS.get().map_or(None, |s| {
                 if s.tagging.use_original_date {
