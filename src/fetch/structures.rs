@@ -421,7 +421,42 @@ impl GroupTracks for Arc<Release> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoverArtArchive {
-    images: Vec<Image>,
+    pub images: Vec<Image>,
+}
+
+impl TryFrom<CoverArtArchive> for String {
+    type Error = Report;
+    fn try_from(caa: CoverArtArchive) -> Result<Self, Self::Error> {
+        caa.images
+            .into_iter()
+            .filter(|i| i.front)
+            .next()
+            .ok_or(eyre!("No front covers found"))
+            .map(|i| i.image)
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Itunes {
+    pub results: Vec<ItunesResult>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ItunesResult {
+    // pub artistName: String,
+    // pub collectionName: String,
+    #[serde(rename = "artworkUrl100")]
+    pub artwork_url_100: String,
+}
+
+impl TryFrom<Itunes> for String {
+    type Error = Report;
+    fn try_from(caa: Itunes) -> Result<Self, Self::Error> {
+        caa.results
+            .first()
+            .ok_or(eyre!("No front covers found"))
+            .map(|i| i.artwork_url_100.replace("100x100", "1200x1200"))
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

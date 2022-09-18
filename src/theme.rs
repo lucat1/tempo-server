@@ -8,7 +8,7 @@ use std::io::Write;
 
 pub fn init_logger() {
     let env = Env::default()
-        .default_filter_or(TAGGER_LOGLEVEL)
+        .filter(TAGGER_LOGLEVEL)
         .write_style(TAGGER_STYLE);
 
     Builder::from_env(env)

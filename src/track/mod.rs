@@ -7,6 +7,8 @@ pub mod format;
 pub mod map;
 pub mod picture;
 
+use crate::SETTINGS;
+
 use super::models::{Artist, Artists, Track};
 use super::util::dedup;
 use chrono::Datelike;
@@ -85,14 +87,8 @@ impl TrackFile {
             .collect()
     }
 
-    pub fn tags(&self) -> HashMap<TagKey, Vec<String>> {
-        let mut map = HashMap::new();
-        for (key, value) in self.tag.get_all() {
-            if let Some(k) = self.tag.str_to_key(key.as_str()) {
-                map.insert(k, value);
-            }
-        }
-        map
+    pub fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {
+        self.tag.set_pictures(pictures)
     }
 
     pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<()> {
@@ -122,6 +118,7 @@ impl TrackFile {
     }
 
     pub fn apply(&mut self, track: Track) -> Result<()> {
+        let settings = SETTINGS.get().ok_or(eyre!("Could not get settings"))?;
         if let Some(id) = track.mbid {
             Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzTrackID, vec![id]))?;
         }
@@ -234,7 +231,13 @@ impl TrackFile {
         if let Some(number) = track.number {
             Self::ignore_unsupported(self.set_tag(TagKey::TrackNumber, vec![number.to_string()]))?;
         }
-        Self::ignore_unsupported(self.set_tag(TagKey::Genre, track.genres))?;
+        Self::ignore_unsupported(self.set_tag(
+            TagKey::Genre,
+            match settings.tagging.genre_limit {
+                None => track.genres,
+                Some(l) => track.genres.into_iter().take(l).collect(),
+            },
+        ))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Performer, track.performers.instruments()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Engineer, track.engigneers.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::Mixer, track.mixers.names()))?;

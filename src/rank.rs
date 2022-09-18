@@ -131,12 +131,7 @@ pub fn match_tracks(
                         })
                 }).unwrap_or(0);
 
-            trace!(
-                "Rated track compatibility {}: {:?} -- {:?}",
-                distance,
-                original_track,
-                candidate_track
-            );
+            trace!("Rated track compatibility {}", distance);
             matrix_vec.push(distance);
         }
     }

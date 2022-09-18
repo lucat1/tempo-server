@@ -9,11 +9,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::fetch::{get, search};
+use crate::fetch::{get, get_cover, search, search_cover};
 use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
 use crate::theme::DialoguerTheme;
+use crate::track::picture::{Picture, PictureType};
 use crate::track::FileAlbum;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
@@ -216,6 +217,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             .clone()
             .unwrap_or("no mbid".to_string()),
     );
+    let (url, provider) = search_cover(&final_release.0).await?;
+    info!("Found cover art from {:?}, converting...", provider);
+    let (image, mime) = get_cover(url).await?;
     if !Confirm::with_theme(&theme)
         .with_prompt("Proceed?")
         .interact()?
@@ -260,6 +264,12 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }
         src.apply(dest.clone())
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
+        src.set_pictures(vec![Picture {
+            mime_type: mime.to_string(),
+            picture_type: PictureType::CoverFront,
+            description: "Front".to_string(),
+            data: image.clone(),
+        }])?;
         src.write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", dest_path))?;
         debug!("After tagging {:?}", src);
