@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
+pub const UNKNOWN_TITLE: &str = "(unkown title)";
 
 #[derive(Clone, Debug, FromRow)]
 pub struct Artist {

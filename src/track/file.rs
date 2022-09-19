@@ -1,7 +1,7 @@
 use chrono::Datelike;
 use eyre::{eyre, Report, Result, WrapErr};
 use itertools::Itertools;
-use log::debug;
+use log::{debug, warn};
 use std::fs::copy;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -14,8 +14,10 @@ use super::mp4;
 use super::Picture;
 use super::TagFrom;
 use super::{Tag, TagError};
+use crate::models::UNKNOWN_TITLE;
 use crate::models::{Artist, Artists, GroupTracks, Release, Track};
 use crate::track::TagKey;
+use crate::util::{dedup, maybe_date};
 use crate::SETTINGS;
 
 #[derive(Clone, Debug)]
@@ -176,6 +178,9 @@ impl TrackFile {
                 Self::ignore_unsupported(self.set_tag(TagKey::Media, vec![rel_media.to_string()]))?;
             }
             Self::ignore_unsupported(self.set_tag(TagKey::Album, vec![release.title.clone()]))?;
+            Self::ignore_unsupported(
+                self.set_tag(TagKey::AlbumSortOrder, vec![release.title.clone()]),
+            )?;
             Self::ignore_unsupported(self.set_tag(TagKey::AlbumArtist, release.artists.names()))?;
             Self::ignore_unsupported(
                 self.set_tag(TagKey::AlbumArtistSortOrder, release.artists.sort_order()),
@@ -198,6 +203,7 @@ impl TrackFile {
 
         // artists
         Self::ignore_unsupported(self.set_tag(TagKey::Artists, track.artists.names()))?;
+        Self::ignore_unsupported(self.set_tag(TagKey::Artist, track.artists.names()))?;
         Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids()))?;
         Self::ignore_unsupported(
             self.set_tag(TagKey::ArtistSortOrder, track.artists.sort_order()),
@@ -265,69 +271,57 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
     .collect()
 }
 
-fn artists_from_tag(file: &TrackFile, key: TagKey) -> Vec<Artist> {
-    file.get_tag(key)
+fn artists_from_tag(tracks: &Vec<TrackFile>, tag: TagKey) -> Vec<Artist> {
+    let separator = match tracks.first() {
+        Some(t) => t.tag.separator(),
+        None => return vec![],
+    };
+    dedup(tracks.iter().map(|t| t.get_tag(tag)).flatten().collect())
         .iter()
-        .map(|name| artists_with_name(name.to_string(), file.tag.separator()))
+        .map(|name| artists_with_name(name.to_string(), separator.clone()))
         .flatten()
         .collect()
+}
+
+fn first_tag(tracks: &Vec<TrackFile>, tag: TagKey) -> Option<String> {
+    let options = dedup(tracks.iter().map(|t| t.get_tag(tag)).flatten().collect());
+    if options.len() > 1 {
+        warn!(
+            "Multiple ({}) unique tag values for {:?} in the given tracks",
+            options.len(),
+            tag
+        );
+    }
+    options.first().map(|f| f.to_string())
 }
 
 impl TryFrom<TrackFile> for Track {
     type Error = Report;
     fn try_from(file: TrackFile) -> Result<Self> {
-        let title = file
-            .get_tag(TagKey::TrackTitle)
-            .first()
-            .ok_or(eyre!("Could not read title tag"))?
-            .to_string();
-        let mbid = file
-            .get_tag(TagKey::MusicBrainzTrackID)
-            .first()
-            .map(|id| id.to_string());
-        let length = file
-            .get_tag(TagKey::Duration)
-            .first()
-            .map_or(None, |d| d.parse::<u64>().ok())
-            .map(|d| Duration::from_secs(d));
-        let artists = artists_from_tag(&file, TagKey::Artists);
-        let disc = file
-            .get_tag(TagKey::DiscNumber)
-            .first()
-            .map_or(None, |d| d.parse::<u64>().ok());
-        let disc_mbid = file
-            .get_tag(TagKey::MusicBrainzDiscID)
-            .first()
-            .map(|f| f.to_string());
-        let number = file
-            .get_tag(TagKey::TrackNumber)
-            .first()
-            .map_or(None, |d| d.parse::<u64>().ok());
-        let performers = artists_from_tag(&file, TagKey::Performer);
-        let engigneers = artists_from_tag(&file, TagKey::Engineer);
-        let mixers = artists_from_tag(&file, TagKey::Mixer);
-        let producers = artists_from_tag(&file, TagKey::Producer);
-        let lyricists = artists_from_tag(&file, TagKey::Lyrics);
-        let writers = artists_from_tag(&file, TagKey::Writer);
-        let composers = artists_from_tag(&file, TagKey::Composer);
+        let file_singleton = vec![file];
         Ok(Track {
-            mbid,
-            title,
-            artists,
-            length,
-            disc,
-            disc_mbid,
-            number,
-            // TODO: fetch from tags, decide on how (and if) to split
+            mbid: first_tag(&file_singleton, TagKey::MusicBrainzTrackID),
+            title: first_tag(&file_singleton, TagKey::TrackTitle)
+                .ok_or(eyre!("A track doesn't have any title"))?,
+            artists: artists_from_tag(&file_singleton, TagKey::Artists),
+            length: first_tag(&file_singleton, TagKey::Duration)
+                .map_or(None, |d| d.parse::<u64>().ok())
+                .map(|d| Duration::from_secs(d)),
+            disc: first_tag(&file_singleton, TagKey::DiscNumber)
+                .map_or(None, |d| d.parse::<u64>().ok()),
+            disc_mbid: first_tag(&file_singleton, TagKey::MusicBrainzDiscID),
+            number: first_tag(&file_singleton, TagKey::TrackNumber)
+                .map_or(None, |d| d.parse::<u64>().ok()),
+            // TODO: fetch from tags, the eventual splitting should be handled track::Tag side
             genres: vec![],
             release: None,
-            performers,
-            engigneers,
-            mixers,
-            producers,
-            lyricists,
-            writers,
-            composers,
+            performers: artists_from_tag(&file_singleton, TagKey::Performer),
+            engigneers: artists_from_tag(&file_singleton, TagKey::Engineer),
+            mixers: artists_from_tag(&file_singleton, TagKey::Mixer),
+            producers: artists_from_tag(&file_singleton, TagKey::Producer),
+            lyricists: artists_from_tag(&file_singleton, TagKey::Lyrics),
+            writers: artists_from_tag(&file_singleton, TagKey::Writer),
+            composers: artists_from_tag(&file_singleton, TagKey::Composer),
         })
     }
 }
@@ -335,7 +329,29 @@ impl TryFrom<TrackFile> for Track {
 impl TryFrom<Vec<TrackFile>> for Release {
     type Error = Report;
     fn try_from(tracks: Vec<TrackFile>) -> Result<Self, Self::Error> {
-        Err(eyre!("unimpl"))
+        Ok(Release {
+            mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseID),
+            release_group_mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseGroupID),
+            asin: first_tag(&tracks, TagKey::ASIN),
+            title: first_tag(&tracks, TagKey::Album).unwrap_or(UNKNOWN_TITLE.to_string()),
+            artists: artists_from_tag(&tracks, TagKey::AlbumArtist),
+            discs: first_tag(&tracks, TagKey::TotalDiscs).map_or(None, |d| d.parse::<u64>().ok()),
+            media: first_tag(&tracks, TagKey::Media),
+            tracks: first_tag(&tracks, TagKey::TotalTracks).map_or(None, |d| d.parse::<u64>().ok()),
+            country: first_tag(&tracks, TagKey::ReleaseCountry),
+            label: first_tag(&tracks, TagKey::RecordLabel),
+            catalog_no: first_tag(&tracks, TagKey::CatalogNumber),
+            status: first_tag(&tracks, TagKey::ReleaseStatus),
+            release_type: first_tag(&tracks, TagKey::ReleaseType),
+            date: maybe_date(
+                first_tag(&tracks, TagKey::ReleaseDate).or(first_tag(&tracks, TagKey::ReleaseYear)),
+            ),
+            original_date: maybe_date(
+                first_tag(&tracks, TagKey::OriginalReleaseDate)
+                    .or(first_tag(&tracks, TagKey::OriginalReleaseYear)),
+            ),
+            script: first_tag(&tracks, TagKey::Script),
+        })
     }
 }
 

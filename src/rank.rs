@@ -8,43 +8,6 @@ use pathfinding::matrix::Matrix;
 static TRACK_TITLE_FACTOR: usize = 1000;
 static RELEASE_TITLE_FACTOR: usize = 10000;
 
-// static TITLE_WEIGHT: f32 = 0.25;
-// static ARTISTS_WEIGHT: f32 = 0.25;
-// static TRACKS_WEIGHT: f32 = 0.5;
-//
-// #[derive(Clone, Debug)]
-// pub enum AlbumChange {
-//     TITLE,
-//     ARTISTS,
-// }
-//
-// fn rate_int(original: u64, candidate: u64) -> f32 {
-//     (1.0 - original.abs_diff(candidate) as f32) / std::cmp::max(original, candidate) as f32
-// }
-//
-// fn rate_str(original: &str, candidate: &str) -> f32 {
-//     1.0 - (levenshtein(original, candidate) as f32
-//         / std::cmp::max(original.len(), candidate.len()) as f32)
-// }
-//
-// // TODO: take mbids and join phrases into consideration
-// fn rate_artists(original: Vec<Artist>, candidate: Vec<Artist>) -> f32 {
-//     // TODO: don't expect accurate sorting, use monkers here too
-//     let weight = 1.0 / std::cmp::max(candidate.len(), original.len()) as f32;
-//     let mut res = 0.0;
-//     for (i, original_artist) in original.iter().enumerate() {
-//         if candidate.len() <= i {
-//             continue;
-//         }
-//         res += rate_str(original_artist.name.as_str(), candidate[i].name.as_str()) * weight;
-//     }
-//     if candidate.len() > original.len() {
-//         // weight newly added values as .5 each element
-//         res += 0.5 * weight * (candidate.len() - original.len()) as f32;
-//     }
-//     res
-// }
-
 fn if_both<T, R>(a: Option<T>, b: Option<T>, then: impl Fn(T, T) -> R) -> Option<R> {
     if let Some(a_val) = a {
         if let Some(b_val) = b {

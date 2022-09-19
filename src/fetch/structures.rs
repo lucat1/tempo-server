@@ -1,4 +1,3 @@
-use chrono::NaiveDate;
 use eyre::{eyre, Report, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -6,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::models::GroupTracks;
+use crate::util::maybe_date;
 use crate::SETTINGS;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -322,14 +322,6 @@ impl From<Track> for crate::models::Track {
     }
 }
 
-fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
-    d.map_or(None, |s| {
-        NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
-            .ok()
-            .or(NaiveDate::parse_from_str(s.as_str(), "%Y").ok())
-    })
-}
-
 impl From<Release> for crate::models::Release {
     fn from(release: Release) -> Self {
         let original_date = maybe_date(
@@ -339,7 +331,6 @@ impl From<Release> for crate::models::Release {
                 .map_or(None, |r| r.first_release_date.clone()),
         );
         crate::models::Release {
-            // TODO: no good
             mbid: Some(release.id),
             release_group_mbid: release.release_group.as_ref().map(|r| r.id.clone()),
             asin: release.asin,

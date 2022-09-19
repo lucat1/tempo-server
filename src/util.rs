@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use eyre::{eyre, Result};
 use std::fs::create_dir_all;
 use std::io;
@@ -24,4 +25,12 @@ pub fn mkdirp<P: AsRef<Path>>(path: &P) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
+    d.map_or(None, |s| {
+        NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+            .ok()
+            .or(NaiveDate::parse_from_str(s.as_str(), "%Y").ok())
+    })
 }
