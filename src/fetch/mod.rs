@@ -131,6 +131,7 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
     let json = res.json::<Itunes>().await?;
     let json_time = start.elapsed();
     trace!("Itunes JSON parse took {:?}", json_time - req_time);
+    // TODO: sort to get better results, really important
     json.try_into()
 }
 
