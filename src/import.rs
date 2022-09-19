@@ -1,10 +1,9 @@
-use dialoguer::{Confirm, Input, MultiSelect, Select};
+use dialoguer::{Confirm, Input, Select};
 use eyre::{bail, eyre, Context, Report, Result};
-use log::{debug, info, warn};
+use log::{debug, info};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
-use std::iter::repeat;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -14,9 +13,8 @@ use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
 use crate::theme::DialoguerTheme;
+use crate::track::file::TrackFile;
 use crate::track::picture::{Picture, PictureType};
-use crate::track::FileAlbum;
-use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
 use crate::SETTINGS;
 
@@ -115,25 +113,13 @@ fn get_artist_and_title(
     debug!("Possible titles for album: {:?}", maybe_titles);
     let artists = if maybe_artists.is_empty() {
         vec![UNKNOWN_ARTIST.to_string()]
-    } else if maybe_artists.len() == 1 {
-        maybe_artists
     } else {
-        match MultiSelect::with_theme(theme)
-            .with_prompt("Which album artist should be used?")
-            .items(&maybe_artists)
-            .defaults(&repeat(true).take(maybe_artists.len()).collect::<Vec<_>>())
-            .interact_opt()?
-            .map_or(None, |v| if v.len() > 0 { Some(v) } else { None })
-        {
-            Some(v) => v.into_iter().map(|i| maybe_artists[i].clone()).collect(),
-            None => {
-                warn!("No artist chosen. Using: \"{}\"", UNKNOWN_ARTIST);
-                vec![UNKNOWN_ARTIST.to_string()]
-            }
-        }
+        maybe_artists
     };
     let title = if maybe_titles.is_empty() {
-        Input::new().interact_text()?
+        Input::new()
+            .with_prompt("Insert a title for this release")
+            .interact_text()?
     } else if maybe_titles.len() == 1 {
         maybe_titles.first().unwrap().to_string()
     } else {
@@ -174,22 +160,18 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     if tracks.is_empty() {
         bail!("No tracks to import were found");
     }
-    let ralbum = FileAlbum::from_tracks(tracks.clone())?;
-    let (artists, title) = get_artist_and_title(&theme, ralbum.artists(), ralbum.titles())?;
-
-    let choice_album = ChoiceAlbum {
-        title,
-        artists,
-        tracks: ralbum.tracks,
-    };
-    info!(
-        "Searching for {} - {}...",
-        choice_album.artists.join(", "),
-        choice_album.title
-    );
-    let (choice_release, choice_tracks) = choice_album
+    let (choice_release, choice_tracks) = tracks
+        .clone()
         .group_tracks()
         .wrap_err("Trying to convert local files to internal structures")?;
+    // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
+    // let (artists, title) = get_artist_and_title(&theme, ralbum.artists(), ralbum.titles())?;
+
+    info!(
+        "Searching for {} - {}...",
+        choice_release.artists.joined(),
+        choice_release.title
+    );
     let releases = search(&choice_release, choice_tracks.len())
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
