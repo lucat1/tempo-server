@@ -1,6 +1,7 @@
 use directories::UserDirs;
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
+use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::path::PathBuf;
@@ -32,16 +33,16 @@ pub enum ArtProvider {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArtFormat {
-    #[default]
     PNG,
-    JPG,
+    #[default]
+    JPEG,
 }
 
 impl ArtFormat {
-    pub fn mime(&self) -> &'static str {
+    pub fn mime(&self) -> Mime {
         match self {
-            ArtFormat::PNG => "image/png",
-            ArtFormat::JPG => "image/jpeg",
+            ArtFormat::PNG => IMAGE_PNG,
+            ArtFormat::JPEG => IMAGE_JPEG,
         }
     }
 }
@@ -50,7 +51,7 @@ impl From<ArtFormat> for ImageOutputFormat {
     fn from(f: ArtFormat) -> Self {
         match f {
             ArtFormat::PNG => ImageOutputFormat::Png,
-            ArtFormat::JPG => ImageOutputFormat::Jpeg(100),
+            ArtFormat::JPEG => ImageOutputFormat::Jpeg(100),
         }
     }
 }
@@ -64,6 +65,8 @@ pub struct Art {
     #[default = 1200]
     pub height: u32,
     pub format: ArtFormat,
+    #[default(_code = "Some(\"cover\".to_string())")]
+    pub filename: Option<String>,
 }
 
 impl Settings {

@@ -1963,6 +1963,7 @@ dependencies = [
  "levenshtein",
  "log",
  "metaflac",
+ "mime",
  "mp4ameta",
  "pathfinding",
  "phf",

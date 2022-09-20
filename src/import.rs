@@ -1,97 +1,21 @@
 use dialoguer::{Confirm, Input, Select};
-use eyre::{bail, eyre, Context, Report, Result};
+use eyre::{bail, eyre, Context, Result};
 use log::{debug, info};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Instant;
 
 use crate::fetch::{get, get_cover, search, search_cover};
 use crate::library::{LibraryRelease, LibraryTrack};
-use crate::models::{Artist, Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
+use crate::models::{Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
 use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
-use crate::track::picture::{Picture, PictureType};
+use crate::track::picture::{write_picture, Picture, PictureType};
 use crate::util::{mkdirp, path_to_str};
 use crate::SETTINGS;
-
-#[derive(Clone, Debug)]
-// TODO: make the structure more complex to extract more data from the tags
-// i.e. mbids, join phrase, sort name for artists
-//      mbid for the album *maybe*
-struct ChoiceAlbum {
-    artists: Vec<String>,
-    title: String,
-    tracks: Vec<TrackFile>,
-}
-
-impl TryFrom<ChoiceAlbum> for Release {
-    type Error = Report;
-    fn try_from(album: ChoiceAlbum) -> Result<Self> {
-        Ok(Release {
-            // TODO: consider reading mbid from files tag?
-            // maybe an optin. Would make tagging really stale :/
-            mbid: None,
-            release_group_mbid: None,
-            title: album.title,
-            tracks: Some(album.tracks.len() as u64),
-            discs: album
-                .tracks
-                .iter()
-                .filter_map(|t| t.clone().try_into().ok())
-                .filter_map(|t: Track| t.disc)
-                .max(),
-            media: None,
-            // TODO: as part of removing this structure to somewhere else,
-            // make sense of where it is more appropriate to fetch this kind of
-            // data (answer: here in the try_from) from a Vec<TrackFile> and
-            // move all the data gathering here (fetching title and artists)
-            asin: None,
-            country: None,
-            label: None,
-            catalog_no: None,
-            status: None,
-            release_type: None,
-            date: None,
-            original_date: None,
-            script: None,
-            artists: album
-                .artists
-                .iter()
-                .map(|a| Artist {
-                    mbid: None,
-                    // TODO
-                    name: a.to_string(),
-                    // TODO
-                    join_phrase: None,
-                    sort_name: None,
-                    // TODO
-                    instruments: vec![],
-                })
-                .collect::<Vec<_>>(),
-        })
-    }
-}
-
-impl GroupTracks for ChoiceAlbum {
-    fn group_tracks(self) -> Result<(Release, Vec<Track>)> {
-        let mut tracks: Vec<Track> = self
-            .tracks
-            .iter()
-            .map(|t| t.clone().try_into())
-            .collect::<Result<Vec<_>>>()?;
-        let rel: Release = self.try_into()?;
-        let release = Some(Arc::new(rel.clone()));
-
-        for track in tracks.iter_mut() {
-            track.release = release.clone();
-        }
-        Ok((rel, tracks))
-    }
-}
 
 fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
     ScanDir::files()
@@ -232,6 +156,13 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .enumerate()
         .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
         .collect::<Vec<_>>();
+    let picture = Picture {
+        mime_type: mime,
+        picture_type: PictureType::CoverFront,
+        description: "Front".to_string(),
+        data: image.clone(),
+    };
+    write_picture(&picture, &final_release.0)?;
     for (src, dest) in final_tracks.iter_mut() {
         debug!("Beofre tagging {:?}", src);
         let dest_path = dest.path(src.ext())?;
@@ -246,12 +177,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }
         src.apply(dest.clone())
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
-        src.set_pictures(vec![Picture {
-            mime_type: mime.to_string(),
-            picture_type: PictureType::CoverFront,
-            description: "Front".to_string(),
-            data: image.clone(),
-        }])?;
+        src.set_pictures(vec![picture.clone()])?;
         src.write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", dest_path))?;
         debug!("After tagging {:?}", src);

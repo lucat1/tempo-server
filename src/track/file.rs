@@ -287,9 +287,11 @@ fn first_tag(tracks: &Vec<TrackFile>, tag: TagKey) -> Option<String> {
     let options = dedup(tracks.iter().map(|t| t.get_tag(tag)).flatten().collect());
     if options.len() > 1 {
         warn!(
-            "Multiple ({}) unique tag values for {:?} in the given tracks",
+            "Multiple ({}) unique tag values for {:?} in the given tracks ({})",
             options.len(),
-            tag
+            tag,
+            // TODO
+            options.join(", ")
         );
     }
     options.first().map(|f| f.to_string())

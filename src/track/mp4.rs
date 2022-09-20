@@ -4,6 +4,7 @@ use super::map::TagKey;
 use super::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{bail, eyre, Result};
+use mime::{BMP, IMAGE_BMP, IMAGE_JPEG, IMAGE_PNG, JPEG, PNG};
 use mp4ameta::ident::DataIdent;
 use mp4ameta::{Data, ImgFmt};
 use std::collections::HashMap;
@@ -128,9 +129,9 @@ impl crate::track::Tag for Tag {
             .images()
             .map(|img| Picture {
                 mime_type: match img.1.fmt {
-                    ImgFmt::Png => "image/png".to_string(),
-                    ImgFmt::Jpeg => "image/jpeg".to_string(),
-                    ImgFmt::Bmp => "image/bmp".to_string(),
+                    ImgFmt::Png => IMAGE_PNG,
+                    ImgFmt::Jpeg => IMAGE_JPEG,
+                    ImgFmt::Bmp => IMAGE_BMP,
                 },
                 picture_type: PictureType::CoverFront,
                 description: ident_to_string(img.0),
@@ -149,10 +150,10 @@ impl crate::track::Tag for Tag {
             if pic.picture_type != PictureType::CoverFront {
                 bail!("mp4 only supports cover front art");
             }
-            let data = match pic.mime_type.as_str() {
-                "image/png" => Ok(Data::Png(pic.data)),
-                "image/jpeg" => Ok(Data::Jpeg(pic.data)),
-                "image/bmp" => Ok(Data::Bmp(pic.data)),
+            let data = match pic.mime_type.subtype() {
+                PNG => Ok(Data::Png(pic.data)),
+                JPEG => Ok(Data::Jpeg(pic.data)),
+                BMP => Ok(Data::Bmp(pic.data)),
                 mime => Err(eyre!("Invalid mime type for a picture in mp4: {}", mime)),
             }?;
             self.tag.set_data(str_to_ident("covr"), data);

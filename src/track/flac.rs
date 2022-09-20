@@ -157,38 +157,39 @@ impl crate::track::Tag for Tag {
     }
 
     fn get_pictures(&self) -> Result<Vec<Picture>> {
-        Ok(self
-            .tag
+        self.tag
             .pictures()
-            .map(|pic| Picture {
-                mime_type: pic.mime_type.clone(),
-                picture_type: match pic.picture_type {
-                    FLACPictureType::Other => PictureType::Other,
-                    FLACPictureType::Icon => PictureType::Icon,
-                    FLACPictureType::OtherIcon => PictureType::OtherIcon,
-                    FLACPictureType::CoverFront => PictureType::CoverFront,
-                    FLACPictureType::CoverBack => PictureType::CoverBack,
-                    FLACPictureType::Leaflet => PictureType::Leaflet,
-                    FLACPictureType::Media => PictureType::Media,
-                    FLACPictureType::LeadArtist => PictureType::LeadArtist,
-                    FLACPictureType::Artist => PictureType::Artist,
-                    FLACPictureType::Conductor => PictureType::Conductor,
-                    FLACPictureType::Band => PictureType::Band,
-                    FLACPictureType::Composer => PictureType::Composer,
-                    FLACPictureType::Lyricist => PictureType::Lyricist,
-                    FLACPictureType::RecordingLocation => PictureType::RecordingLocation,
-                    FLACPictureType::DuringRecording => PictureType::DuringRecording,
-                    FLACPictureType::DuringPerformance => PictureType::DuringPerformance,
-                    FLACPictureType::ScreenCapture => PictureType::ScreenCapture,
-                    FLACPictureType::BrightFish => PictureType::BrightFish,
-                    FLACPictureType::Illustration => PictureType::Illustration,
-                    FLACPictureType::BandLogo => PictureType::BandLogo,
-                    FLACPictureType::PublisherLogo => PictureType::PublisherLogo,
-                },
-                description: pic.description.clone(),
-                data: pic.data.clone(),
+            .map(|pic| {
+                Ok(Picture {
+                    mime_type: pic.mime_type.parse()?,
+                    picture_type: match pic.picture_type {
+                        FLACPictureType::Other => PictureType::Other,
+                        FLACPictureType::Icon => PictureType::Icon,
+                        FLACPictureType::OtherIcon => PictureType::OtherIcon,
+                        FLACPictureType::CoverFront => PictureType::CoverFront,
+                        FLACPictureType::CoverBack => PictureType::CoverBack,
+                        FLACPictureType::Leaflet => PictureType::Leaflet,
+                        FLACPictureType::Media => PictureType::Media,
+                        FLACPictureType::LeadArtist => PictureType::LeadArtist,
+                        FLACPictureType::Artist => PictureType::Artist,
+                        FLACPictureType::Conductor => PictureType::Conductor,
+                        FLACPictureType::Band => PictureType::Band,
+                        FLACPictureType::Composer => PictureType::Composer,
+                        FLACPictureType::Lyricist => PictureType::Lyricist,
+                        FLACPictureType::RecordingLocation => PictureType::RecordingLocation,
+                        FLACPictureType::DuringRecording => PictureType::DuringRecording,
+                        FLACPictureType::DuringPerformance => PictureType::DuringPerformance,
+                        FLACPictureType::ScreenCapture => PictureType::ScreenCapture,
+                        FLACPictureType::BrightFish => PictureType::BrightFish,
+                        FLACPictureType::Illustration => PictureType::Illustration,
+                        FLACPictureType::BandLogo => PictureType::BandLogo,
+                        FLACPictureType::PublisherLogo => PictureType::PublisherLogo,
+                    },
+                    description: pic.description.clone(),
+                    data: pic.data.clone(),
+                })
             })
-            .collect::<Vec<_>>())
+            .collect::<Result<Vec<_>>>()
     }
 
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {
@@ -198,7 +199,7 @@ impl crate::track::Tag for Tag {
         }
         for pic in pictures {
             self.tag.add_picture(
-                pic.mime_type,
+                pic.mime_type.to_string(),
                 match pic.picture_type {
                     PictureType::Other => FLACPictureType::Other,
                     PictureType::Icon => FLACPictureType::Icon,

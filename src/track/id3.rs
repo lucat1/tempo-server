@@ -104,39 +104,40 @@ impl crate::track::Tag for Tag {
     }
 
     fn get_pictures(&self) -> Result<Vec<Picture>> {
-        Ok(self
-            .tag
+        self.tag
             .pictures()
-            .map(|pic| Picture {
-                mime_type: pic.mime_type.clone(),
-                picture_type: match pic.picture_type {
-                    ID3PictureType::Other => PictureType::Other,
-                    ID3PictureType::Icon => PictureType::Icon,
-                    ID3PictureType::OtherIcon => PictureType::OtherIcon,
-                    ID3PictureType::CoverFront => PictureType::CoverFront,
-                    ID3PictureType::CoverBack => PictureType::CoverBack,
-                    ID3PictureType::Leaflet => PictureType::Leaflet,
-                    ID3PictureType::Media => PictureType::Media,
-                    ID3PictureType::LeadArtist => PictureType::LeadArtist,
-                    ID3PictureType::Artist => PictureType::Artist,
-                    ID3PictureType::Conductor => PictureType::Conductor,
-                    ID3PictureType::Band => PictureType::Band,
-                    ID3PictureType::Composer => PictureType::Composer,
-                    ID3PictureType::Lyricist => PictureType::Lyricist,
-                    ID3PictureType::RecordingLocation => PictureType::RecordingLocation,
-                    ID3PictureType::DuringRecording => PictureType::DuringRecording,
-                    ID3PictureType::DuringPerformance => PictureType::DuringPerformance,
-                    ID3PictureType::ScreenCapture => PictureType::ScreenCapture,
-                    ID3PictureType::BrightFish => PictureType::BrightFish,
-                    ID3PictureType::Illustration => PictureType::Illustration,
-                    ID3PictureType::BandLogo => PictureType::BandLogo,
-                    ID3PictureType::PublisherLogo => PictureType::PublisherLogo,
-                    ID3PictureType::Undefined(_) => PictureType::Other,
-                },
-                description: pic.description.clone(),
-                data: pic.data.clone(),
+            .map(|pic| {
+                Ok(Picture {
+                    mime_type: pic.mime_type.parse()?,
+                    picture_type: match pic.picture_type {
+                        ID3PictureType::Other => PictureType::Other,
+                        ID3PictureType::Icon => PictureType::Icon,
+                        ID3PictureType::OtherIcon => PictureType::OtherIcon,
+                        ID3PictureType::CoverFront => PictureType::CoverFront,
+                        ID3PictureType::CoverBack => PictureType::CoverBack,
+                        ID3PictureType::Leaflet => PictureType::Leaflet,
+                        ID3PictureType::Media => PictureType::Media,
+                        ID3PictureType::LeadArtist => PictureType::LeadArtist,
+                        ID3PictureType::Artist => PictureType::Artist,
+                        ID3PictureType::Conductor => PictureType::Conductor,
+                        ID3PictureType::Band => PictureType::Band,
+                        ID3PictureType::Composer => PictureType::Composer,
+                        ID3PictureType::Lyricist => PictureType::Lyricist,
+                        ID3PictureType::RecordingLocation => PictureType::RecordingLocation,
+                        ID3PictureType::DuringRecording => PictureType::DuringRecording,
+                        ID3PictureType::DuringPerformance => PictureType::DuringPerformance,
+                        ID3PictureType::ScreenCapture => PictureType::ScreenCapture,
+                        ID3PictureType::BrightFish => PictureType::BrightFish,
+                        ID3PictureType::Illustration => PictureType::Illustration,
+                        ID3PictureType::BandLogo => PictureType::BandLogo,
+                        ID3PictureType::PublisherLogo => PictureType::PublisherLogo,
+                        ID3PictureType::Undefined(_) => PictureType::Other,
+                    },
+                    description: pic.description.clone(),
+                    data: pic.data.clone(),
+                })
             })
-            .collect::<Vec<_>>())
+            .collect::<Result<Vec<_>>>()
     }
 
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {
@@ -147,7 +148,7 @@ impl crate::track::Tag for Tag {
         }
         for pic in pictures {
             self.tag.add_frame(ID3Picture {
-                mime_type: pic.mime_type,
+                mime_type: pic.mime_type.to_string(),
                 picture_type: match pic.picture_type {
                     PictureType::Other => ID3PictureType::Other,
                     PictureType::Icon => ID3PictureType::Icon,

@@ -85,7 +85,8 @@ impl crate::track::Tag for Tag {
                 Ok(Picture {
                     mime_type: infer::get(&item.1.to_vec())
                         .ok_or(eyre!("Could not infer mime type from binary picture"))?
-                        .to_string(),
+                        .to_string()
+                        .parse()?,
                     picture_type: PictureType::CoverFront,
                     description: item.0,
                     data: item.1.to_vec(),

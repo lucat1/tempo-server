@@ -11,6 +11,7 @@ use image::ImageOutputFormat;
 use image::{io::Reader as ImageReader, DynamicImage};
 use lazy_static::lazy_static;
 use log::{debug, trace};
+use mime::Mime;
 use reqwest::header::USER_AGENT;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -194,7 +195,7 @@ pub async fn search_cover(release: &crate::models::Release) -> Result<(String, A
     ));
 }
 
-pub async fn get_cover(url: String) -> Result<(Vec<u8>, &'static str)> {
+pub async fn get_cover(url: String) -> Result<(Vec<u8>, Mime)> {
     let start = Instant::now();
     let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
     let res = CLIENT.get(url).send().await?;
