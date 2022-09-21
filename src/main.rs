@@ -1,5 +1,4 @@
 mod fetch;
-mod import;
 mod library;
 mod models;
 mod rank;
@@ -7,6 +6,9 @@ mod settings;
 mod theme;
 mod track;
 mod util;
+
+mod import;
+mod list;
 
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
@@ -96,7 +98,7 @@ async fn main() -> Result<()> {
             let filter = sub_matches
                 .get_one::<String>("Filter")
                 .ok_or(eyre!("Filter argument expected"))?;
-            Ok(())
+            list::list(filter)
         }
         Some(("fix", sub_matches)) => {
             let filter = sub_matches

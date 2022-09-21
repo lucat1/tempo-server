@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::fetch::{get, get_cover, search, search_cover};
+use crate::library::Store;
 use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::match_tracks;
@@ -180,6 +181,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         src.set_pictures(vec![picture.clone()])?;
         src.write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", dest_path))?;
+        dest.store().await?;
         debug!("After tagging {:?}", src);
     }
 

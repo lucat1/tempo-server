@@ -78,7 +78,7 @@ impl Settings {
 
         Ok(Settings {
             library: library.to_path_buf(),
-            db: library.join(PathBuf::from("db")),
+            db: library.join(PathBuf::from("lib.db")),
             release_name: "{release.artist}/{release.title}".to_string(),
             track_name: "{track.disc} - {track.number} - {track.title}".to_string(),
             tagging: Tagging {
