@@ -1968,6 +1968,7 @@ dependencies = [
  "mp4ameta",
  "pathfinding",
  "phf",
+ "regex",
  "reqwest",
  "scan_dir",
  "serde",

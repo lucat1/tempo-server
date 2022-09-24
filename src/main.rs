@@ -44,14 +44,14 @@ fn cli() -> Command<'static> {
         .subcommand(
             Command::new("list")
                 .about("Lists all the music being tracked")
-                .arg(arg!(<FILTER> "Filter the listing"))
-                .arg_required_else_help(false),
+                .arg_required_else_help(false)
+                .arg(arg!(<FILTER> ... "Filter the listing")),
         )
         .subcommand(
             Command::new("fix")
                 .about("Applies the needed changes to all the out-of-date tags of all files being tracked")
-                .arg(arg!(<FILTER> "Filter the part of your collection to fix"))
-                .arg_required_else_help(false),
+                .arg_required_else_help(false)
+                .arg(arg!(<FILTER> "Filter the part of your collection to fix")),
         )
         .subcommand(
             Command::new("import")
@@ -95,10 +95,11 @@ async fn main() -> Result<()> {
     let matches = cli().get_matches();
     match matches.subcommand() {
         Some(("list", sub_matches)) => {
-            let filter = sub_matches
-                .get_one::<String>("Filter")
-                .ok_or(eyre!("Filter argument expected"))?;
-            list::list(filter)
+            let filters = sub_matches
+                .get_many::<String>("FILTER")
+                .map(|i| i.into_iter().collect::<Vec<_>>())
+                .unwrap_or(vec![]);
+            list::list(filters).await
         }
         Some(("fix", sub_matches)) => {
             let filter = sub_matches
