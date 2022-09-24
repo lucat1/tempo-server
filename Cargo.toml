@@ -43,4 +43,5 @@ ape = { git = "https://github.com/lucat1/rust-ape" }
 mime = "0.3.16"
 serde_json = "1.0.85"
 regex = "1.6.0"
+strfmt = "0.2.2"
 # ape = "0.4"

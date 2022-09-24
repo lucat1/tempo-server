@@ -43,21 +43,23 @@ fn cli() -> Command<'static> {
         .allow_external_subcommands(true)
         .subcommand(
             Command::new("list")
+                .alias("ls")
                 .about("Lists all the music being tracked")
-                .arg_required_else_help(false)
-                .arg(arg!(<FILTER> ... "Filter the listing")),
+                .arg(arg!(FORMAT: -f --format [FORMAT] "Format the required objects"))
+                .arg(arg!(OBJECT: -o --object [OBJECT] "The type of object to list"))
+                .arg(arg!(FILTER: [FILTER] ... "Filter the listing")),
         )
         .subcommand(
             Command::new("fix")
                 .about("Applies the needed changes to all the out-of-date tags of all files being tracked")
                 .arg_required_else_help(false)
-                .arg(arg!(<FILTER> "Filter the part of your collection to fix")),
+                .arg(arg!(FILTER: [FILTER] "Filter the part of your collection to fix")),
         )
         .subcommand(
             Command::new("import")
                 .about("Imports an album directory (recursively) into the library")
                 .arg_required_else_help(true)
-                .arg(arg!(<PATH> ... "Folder(s) to import as an album").value_parser(clap::value_parser!(PathBuf))),
+                .arg(arg!(PATH: <PATH> ... "Folder(s) to import as an album").value_parser(clap::value_parser!(PathBuf))),
         )
 }
 
@@ -99,11 +101,13 @@ async fn main() -> Result<()> {
                 .get_many::<String>("FILTER")
                 .map(|i| i.into_iter().collect::<Vec<_>>())
                 .unwrap_or(vec![]);
-            list::list(filters).await
+            let format = sub_matches.get_one::<String>("FORMAT");
+            let object = sub_matches.get_one::<String>("OBJECT");
+            list::list(filters, format, object).await
         }
         Some(("fix", sub_matches)) => {
-            let filter = sub_matches
-                .get_one::<String>("Filter")
+            let _filter = sub_matches
+                .get_one::<String>("FILTER")
                 .ok_or(eyre!("Filter argument expected"))?;
             Ok(())
         }

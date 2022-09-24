@@ -1,9 +1,8 @@
 use crate::models::{Artist, Release, Track};
-use crate::{fetch, DB, SETTINGS};
+use crate::{DB, SETTINGS};
 use async_trait::async_trait;
 use eyre::{eyre, Result, WrapErr};
 use itertools::Itertools;
-use log::info;
 use serde_json;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
