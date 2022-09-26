@@ -7,11 +7,12 @@ use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::fetch::{get, get_cover, search, search_cover};
+use crate::fetch::cover::{get_cover, search_covers};
+use crate::fetch::{get, search};
 use crate::library::Store;
 use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
-use crate::rank::match_tracks;
+use crate::rank::{match_tracks, rank_covers};
 use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
 use crate::track::picture::{write_picture, Picture, PictureType};
@@ -124,9 +125,10 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             .clone()
             .unwrap_or("no mbid".to_string()),
     );
-    let (url, provider) = search_cover(&final_release.0).await?;
-    info!("Found cover art from {:?}, converting...", provider);
-    let (image, mime) = get_cover(url).await?;
+    let mut covers_by_provider = search_covers(&final_release.0).await?;
+    let cover = rank_covers(&mut covers_by_provider, &final_release.0)?;
+    info!("Found cover art from {}, converting...", cover.provider);
+    let (image, mime) = get_cover(cover.url).await?;
     if !Confirm::with_theme(&theme)
         .with_prompt("Proceed?")
         .interact()?

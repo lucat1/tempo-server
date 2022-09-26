@@ -4,7 +4,7 @@ use image::ImageOutputFormat;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
@@ -29,6 +29,15 @@ pub struct Tagging {
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
+}
+
+impl Display for ArtProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArtProvider::CoverArtArchive => write!(f, "CoverArtArchive"),
+            ArtProvider::Itunes => write!(f, "iTunes"),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

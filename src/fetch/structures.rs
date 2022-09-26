@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::models::GroupTracks;
+use crate::settings::ArtProvider;
 use crate::util::maybe_date;
 use crate::SETTINGS;
 
@@ -415,16 +416,32 @@ pub struct CoverArtArchive {
     pub images: Vec<Image>,
 }
 
-impl TryFrom<CoverArtArchive> for String {
-    type Error = Report;
-    fn try_from(caa: CoverArtArchive) -> Result<Self, Self::Error> {
-        caa.images
+impl CoverArtArchive {
+    pub fn into(self, title: String, artist: String) -> Vec<Cover> {
+        self.images
             .into_iter()
-            .filter(|i| i.front)
-            .next()
-            .ok_or(eyre!("No front covers found"))
-            .map(|i| i.image)
+            .filter_map(|i| {
+                if i.front {
+                    Some(Cover {
+                        provider: ArtProvider::CoverArtArchive,
+                        url: i.image,
+                        title: title.clone(),
+                        artist: artist.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Cover {
+    pub provider: ArtProvider,
+    pub url: String,
+    pub title: String,
+    pub artist: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -434,33 +451,33 @@ pub struct Itunes {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ItunesResult {
-    // pub artistName: String,
-    // pub collectionName: String,
+    #[serde(rename = "artistName")]
+    pub artist_name: String,
+    #[serde(rename = "collectionName")]
+    pub collection_name: String,
     #[serde(rename = "artworkUrl100")]
     pub artwork_url_100: String,
 }
 
-impl TryFrom<Itunes> for String {
-    type Error = Report;
-    fn try_from(caa: Itunes) -> Result<Self, Self::Error> {
+impl From<Itunes> for Vec<Cover> {
+    fn from(caa: Itunes) -> Self {
         caa.results
-            .first()
-            .ok_or(eyre!("No front covers found"))
-            .map(|i| i.artwork_url_100.replace("100x100", "1200x1200"))
+            .into_iter()
+            .map(|i| Cover {
+                provider: ArtProvider::Itunes,
+                url: i.artwork_url_100.replace("100x100", "1200x1200"),
+                title: i.collection_name,
+                artist: i.artist_name,
+            })
+            .collect()
     }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Image {
     approved: bool,
-    back: bool,
-    comment: String,
-    edit: i64,
     front: bool,
-    id: i64,
     image: String,
-    thumbnails: Thumbnails,
-    types: Vec<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1,7 +1,9 @@
-use crate::models::Track;
+use crate::fetch::structures::Cover;
+use crate::models::{Track, Release, Artists};
 
 use levenshtein::levenshtein;
 use log::{debug, trace};
+use eyre::{eyre, Result};
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
@@ -114,4 +116,15 @@ pub fn match_tracks(
     }
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
     kuhn_munkres_min(&matrix)
+}
+
+pub fn rank_covers(covers_by_provider: &mut Vec<Vec<Cover>>, release: &Release) -> Result<Cover> {
+    for covers in covers_by_provider.iter_mut() {
+        let mut rank_to_index = covers.iter().enumerate().map(|(i, c)| (levenshtein(c.title.as_str(), release.title.as_str()) + levenshtein(c.artist.as_str(), release.artists.joined().as_str()), i)).collect::<Vec<_>>();
+        rank_to_index.sort_by(|d1,d2| d1.0.cmp(&d2.0));
+        if let Some(c) = rank_to_index.first() {
+                return Ok(covers[c.1].clone());
+        }
+    }
+    Err(eyre!("No cover art found"))
 }
