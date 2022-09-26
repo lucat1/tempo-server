@@ -1,4 +1,6 @@
 use crate::models::{Artist, Release, Track};
+use crate::track::format::Format;
+use crate::util::path_to_str;
 use crate::{DB, SETTINGS};
 use async_trait::async_trait;
 use eyre::{eyre, Result, WrapErr};
@@ -9,6 +11,7 @@ use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
 use std::fmt::Display;
 use std::iter;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 
 pub trait LibraryRelease {
@@ -60,11 +63,11 @@ impl LibraryRelease for Release {
 }
 
 pub trait LibraryTrack {
-    fn path(&self, ext: &str) -> Result<PathBuf>;
+    fn path(&self) -> Result<PathBuf>;
 }
 
 impl LibraryTrack for Track {
-    fn path(&self, ext: &str) -> Result<PathBuf> {
+    fn path(&self) -> Result<PathBuf> {
         let base = self
             .release
             .clone()
@@ -76,7 +79,11 @@ impl LibraryTrack for Track {
             .wrap_err("While generating a path for the library")?;
         let mut extensionless = settings.track_name.clone();
         extensionless.push('.');
-        extensionless.push_str(ext);
+        extensionless.push_str(
+            self.format
+                .ok_or(eyre!("The given Track doesn't have an associated format"))?
+                .ext(),
+        );
         let path_str = extensionless
             .replace(
                 "{track.disc}",
@@ -317,6 +324,8 @@ impl InTable for Track {
             "number",
             "genres",
             "release",
+            "format",
+            "path",
         ]
     }
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
@@ -345,6 +354,14 @@ impl InTable for Track {
             lyricists: vec![],
             writers: vec![],
             composers: vec![],
+
+            format: row
+                .try_get("format")
+                .map_or(Ok(None), |f| Format::from_ext(f).map(|s| Some(s)))
+                .map_err(|e| sqlx::Error::Decode(e.into()))?,
+            path: row
+                .try_get("path")
+                .map_or(None, |p: &str| PathBuf::from_str(p).ok()),
         })
     }
     async fn fill_relationships(&mut self, db: &Pool<Sqlite>) -> Result<()> {
@@ -377,6 +394,11 @@ impl Store for Track {
             .bind(&self.number.map(|n| n as i64))
             .bind(serde_json::to_string(&self.genres)?)
             .bind(self.release.as_ref().map_or(None, |r| r.mbid.as_ref()))
+            .bind(self.format.map(|f| String::from(f)))
+            .bind(self.path.as_ref().map_or(
+                Err(eyre!("The given track doesn't have an associated path")),
+                |p| path_to_str(p),
+            )?)
             .execute(db)
             .await?;
 

@@ -23,7 +23,7 @@ use crate::SETTINGS;
 #[derive(Clone, Debug)]
 pub struct TrackFile {
     pub path: PathBuf,
-    format: Format,
+    pub format: Format,
     tag: Box<dyn Tag>,
 }
 
@@ -248,10 +248,6 @@ impl TrackFile {
         self.tag.clear()?;
         Ok(())
     }
-
-    pub fn ext(&self) -> &'static str {
-        self.format.ext()
-    }
 }
 
 fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
@@ -324,6 +320,9 @@ impl TryFrom<TrackFile> for Track {
             lyricists: artists_from_tag(&file_singleton, TagKey::Lyrics),
             writers: artists_from_tag(&file_singleton, TagKey::Writer),
             composers: artists_from_tag(&file_singleton, TagKey::Composer),
+
+            format: Some(file_singleton[0].format),
+            path: Some(file_singleton[0].path.clone()),
         })
     }
 }

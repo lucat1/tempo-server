@@ -4,9 +4,12 @@ use eyre::{eyre, Result};
 use sqlx::FromRow;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use strfmt::strfmt;
+
+use crate::track::format::Format as TrackFormat;
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
@@ -43,6 +46,9 @@ pub struct Track {
     pub lyricists: Vec<Artist>,
     pub writers: Vec<Artist>,
     pub composers: Vec<Artist>,
+
+    pub format: Option<TrackFormat>,
+    pub path: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, FromRow)]

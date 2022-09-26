@@ -319,6 +319,9 @@ impl From<Track> for crate::models::Track {
             lyricists: artists_from_relationships(&relations, vec![RelationType::LYRICIST]),
             writers: artists_from_relationships(&relations, vec![RelationType::WRITER]),
             composers: artists_from_relationships(&relations, vec![RelationType::COMPOSER]),
+
+            format: None,
+            path: None,
         }
     }
 }

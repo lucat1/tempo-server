@@ -1,4 +1,4 @@
-use eyre::{eyre, Result, WrapErr};
+use eyre::{eyre, Report, Result, WrapErr};
 use std::path::Path;
 
 #[derive(Clone, Copy, Debug)]
@@ -37,12 +37,46 @@ impl Format {
         }
     }
 
+    pub fn from_ext(ext: &str) -> Result<Format> {
+        match ext {
+            "flac" => Ok(Format::FLAC),
+            "mp4" => Ok(Format::MP4),
+            "mp3" => Ok(Format::ID3),
+            "ape" => Ok(Format::APE),
+            _ => Err(eyre!("Unkown extension format with extension {}", ext)),
+        }
+    }
+
     pub fn ext(&self) -> &'static str {
         match self {
             Format::FLAC => "flac",
             Format::MP4 => "mp4",
             Format::ID3 => "mp3",
             Format::APE => "ape",
+        }
+    }
+}
+
+impl TryFrom<String> for Format {
+    type Error = Report;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.as_str() {
+            "flac" => Ok(Format::FLAC),
+            "mp4" => Ok(Format::MP4),
+            "id3" => Ok(Format::ID3),
+            "ape" => Ok(Format::APE),
+            _ => Err(eyre!("Invalid format: {}", s)),
+        }
+    }
+}
+
+impl From<Format> for String {
+    fn from(f: Format) -> Self {
+        match f {
+            Format::FLAC => "flac".to_string(),
+            Format::MP4 => "mp4".to_string(),
+            Format::ID3 => "id3".to_string(),
+            Format::APE => "ape".to_string(),
         }
     }
 }

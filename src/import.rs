@@ -168,7 +168,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     write_picture(&picture, &final_release.0)?;
     for (src, dest) in final_tracks.iter_mut() {
         debug!("Beofre tagging {:?}", src);
-        let dest_path = dest.path(src.ext())?;
+        dest.format = Some(src.format);
+        let dest_path = dest.path()?;
+        dest.path = Some(dest_path.clone());
         src.duplicate_to(&dest_path).wrap_err(eyre!(
             "Could not copy track {:?} to its new location: {:?}",
             src.path,
