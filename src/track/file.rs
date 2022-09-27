@@ -1,7 +1,7 @@
-use chrono::Datelike;
 use eyre::{eyre, Report, Result, WrapErr};
 use itertools::Itertools;
 use log::{debug, warn};
+use std::collections::HashMap;
 use std::fs::copy;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -15,10 +15,9 @@ use super::Picture;
 use super::TagFrom;
 use super::{Tag, TagError};
 use crate::models::UNKNOWN_TITLE;
-use crate::models::{Artist, Artists, GroupTracks, Release, Track};
+use crate::models::{Artist, GroupTracks, Release, Track};
 use crate::track::TagKey;
 use crate::util::{dedup, maybe_date};
-use crate::SETTINGS;
 
 #[derive(Clone, Debug)]
 pub struct TrackFile {
@@ -106,141 +105,10 @@ impl TrackFile {
         }
     }
 
-    pub fn apply(&mut self, track: Track) -> Result<()> {
-        let settings = SETTINGS.get().ok_or(eyre!("Could not get settings"))?;
-        if let Some(id) = track.mbid {
-            Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzTrackID, vec![id]))?;
+    pub fn apply(&mut self, tags: HashMap<TagKey, Vec<String>>) -> Result<()> {
+        for (k, v) in tags.into_iter() {
+            Self::ignore_unsupported(self.set_tag(k, v))?;
         }
-        if let Some(release) = track.release {
-            if let Some(rel_id) = &release.mbid {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()]),
-                )?;
-            }
-            if let Some(rel_group_id) = &release.release_group_mbid {
-                Self::ignore_unsupported(self.set_tag(
-                    TagKey::MusicBrainzReleaseGroupID,
-                    vec![rel_group_id.clone()],
-                ))?;
-            }
-            if let Some(rel_asin) = &release.asin {
-                Self::ignore_unsupported(self.set_tag(TagKey::ASIN, vec![rel_asin.to_string()]))?;
-            }
-            if let Some(rel_country) = &release.country {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseCountry, vec![rel_country.to_string()]),
-                )?;
-            }
-            if let Some(rel_label) = &release.label {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::RecordLabel, vec![rel_label.to_string()]),
-                )?;
-            }
-            if let Some(rel_catno) = &release.catalog_no {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::CatalogNumber, vec![rel_catno.to_string()]),
-                )?;
-            }
-            if let Some(rel_status) = &release.status {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseStatus, vec![rel_status.to_string()]),
-                )?;
-            }
-            if let Some(rel_type) = &release.release_type {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseType, vec![rel_type.to_string()]),
-                )?;
-            }
-            if let Some(rel_date) = &release.date {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseDate, vec![rel_date.to_string()]),
-                )?;
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::ReleaseYear, vec![rel_date.year().to_string()]),
-                )?;
-            }
-            if let Some(rel_original_date) = &release.original_date {
-                Self::ignore_unsupported(self.set_tag(
-                    TagKey::OriginalReleaseDate,
-                    vec![rel_original_date.to_string()],
-                ))?;
-                Self::ignore_unsupported(self.set_tag(
-                    TagKey::OriginalReleaseYear,
-                    vec![rel_original_date.year().to_string()],
-                ))?;
-            }
-            if let Some(rel_script) = &release.script {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::Script, vec![rel_script.to_string()]),
-                )?;
-            }
-            if let Some(rel_media) = &release.media {
-                Self::ignore_unsupported(self.set_tag(TagKey::Media, vec![rel_media.to_string()]))?;
-            }
-            Self::ignore_unsupported(self.set_tag(TagKey::Album, vec![release.title.clone()]))?;
-            Self::ignore_unsupported(
-                self.set_tag(TagKey::AlbumSortOrder, vec![release.title.clone()]),
-            )?;
-            Self::ignore_unsupported(self.set_tag(TagKey::AlbumArtist, release.artists.names()))?;
-            Self::ignore_unsupported(
-                self.set_tag(TagKey::AlbumArtistSortOrder, release.artists.sort_order()),
-            )?;
-            Self::ignore_unsupported(
-                self.set_tag(TagKey::MusicBrainzReleaseArtistID, release.artists.ids()),
-            )?;
-            if let Some(discs) = release.discs {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::TotalDiscs, vec![discs.to_string()]),
-                )?;
-            }
-            if let Some(tracks) = release.tracks {
-                Self::ignore_unsupported(
-                    self.set_tag(TagKey::TotalTracks, vec![tracks.to_string()]),
-                )?;
-            }
-        }
-        Self::ignore_unsupported(self.set_tag(TagKey::TrackTitle, vec![track.title]))?;
-
-        // artists
-        Self::ignore_unsupported(self.set_tag(TagKey::Artists, track.artists.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Artist, track.artists.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::MusicBrainzArtistID, track.artists.ids()))?;
-        Self::ignore_unsupported(
-            self.set_tag(TagKey::ArtistSortOrder, track.artists.sort_order()),
-        )?;
-        if let Some(len) = track.length {
-            Self::ignore_unsupported(
-                self.set_tag(TagKey::Duration, vec![len.as_secs().to_string()]),
-            )?;
-        }
-        if let Some(disc) = track.disc {
-            Self::ignore_unsupported(self.set_tag(TagKey::DiscNumber, vec![disc.to_string()]))?;
-        }
-        if let Some(disc_mbid) = track.disc_mbid {
-            Self::ignore_unsupported(
-                self.set_tag(TagKey::MusicBrainzDiscID, vec![disc_mbid.to_string()]),
-            )?;
-        }
-        if let Some(number) = track.number {
-            Self::ignore_unsupported(self.set_tag(TagKey::TrackNumber, vec![number.to_string()]))?;
-        }
-        Self::ignore_unsupported(self.set_tag(
-            TagKey::Genre,
-            match settings.tagging.genre_limit {
-                None => track.genres,
-                Some(l) => track.genres.into_iter().take(l).collect(),
-            },
-        ))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Performer, track.performers.instruments()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Engineer, track.engigneers.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Mixer, track.mixers.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Producer, track.producers.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Lyricist, track.lyricists.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Writer, track.writers.names()))?;
-        Self::ignore_unsupported(self.set_tag(TagKey::Composer, track.composers.names()))?;
-        Self::ignore_unsupported(
-            self.set_tag(TagKey::ComposerSortOrder, track.composers.sort_order()),
-        )?;
         Ok(())
     }
 

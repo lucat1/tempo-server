@@ -9,8 +9,8 @@ use std::time::Instant;
 
 use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search};
+use crate::library::LibraryTrack;
 use crate::library::Store;
-use crate::library::{LibraryRelease, LibraryTrack};
 use crate::models::{Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
 use crate::rank::{match_tracks, rank_covers};
 use crate::theme::DialoguerTheme;
@@ -136,55 +136,58 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         bail!("Aborted")
     }
 
-    let dest = final_release.0.path()?;
-    let other_paths = final_release.0.other_paths()?;
-    debug!("Creating paths {:?}, {:?}", dest, other_paths);
-    mkdirp(&dest)?;
-    for path in other_paths.iter() {
-        mkdirp(
-            &path
-                .parent()
-                .ok_or(eyre!("Could not get parent of a release folder"))?
-                .to_path_buf(),
-        )?;
-
-        #[cfg(target_os = "windows")]
-        std::os::windows::fs::symlink_dir(&dest, path)?;
-
-        #[cfg(not(target_os = "windows"))]
-        std::os::unix::fs::symlink(&dest, path)?;
-    }
     let mut final_tracks = tracks_map
         .into_iter()
         .enumerate()
         .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
         .collect::<Vec<_>>();
+    for (src, dest) in final_tracks.iter_mut() {
+        dest.format = Some(src.format);
+        let dest_path = dest.path()?;
+        dest.path = Some(dest_path.clone());
+    }
+    let mut folders = final_tracks
+        .iter()
+        .map(|(_, t)| {
+            Ok(t.path()?
+                .parent()
+                .ok_or(eyre!("Could not get parent"))?
+                .to_path_buf())
+        })
+        .collect::<Result<Vec<_>>>()?;
+    folders.sort();
+    folders.dedup();
+    info!("Creating paths {:?}", folders);
     let picture = Picture {
         mime_type: mime,
         picture_type: PictureType::CoverFront,
         description: "Front".to_string(),
         data: image.clone(),
     };
-    write_picture(&picture, &final_release.0)?;
+    for dest in folders.into_iter() {
+        mkdirp(&dest)?;
+        write_picture(&picture, &dest)?;
+    }
     for (src, dest) in final_tracks.iter_mut() {
         debug!("Beofre tagging {:?}", src);
-        dest.format = Some(src.format);
-        let dest_path = dest.path()?;
-        dest.path = Some(dest_path.clone());
-        src.duplicate_to(&dest_path).wrap_err(eyre!(
+        let path = dest
+            .path
+            .as_ref()
+            .ok_or(eyre!("The track doesn't have an associated path"))?;
+        src.duplicate_to(path).wrap_err(eyre!(
             "Could not copy track {:?} to its new location: {:?}",
             src.path,
-            dest_path
+            path
         ))?;
         if settings.tagging.clear {
             src.clear()
-                .wrap_err(eyre!("Could not celar tracks from file: {:?}", dest_path))?;
+                .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
         }
-        src.apply(dest.clone())
-            .wrap_err(eyre!("Could not apply new tags to track: {:?}", dest_path))?;
+        src.apply(dest.clone().try_into()?)
+            .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
         src.set_pictures(vec![picture.clone()])?;
         src.write()
-            .wrap_err(eyre!("Could not write tags to track: {:?}", dest_path))?;
+            .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         dest.store().await?;
         debug!("After tagging {:?}", src);
     }
