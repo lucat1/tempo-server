@@ -1,6 +1,10 @@
+#[cfg(feature = "ape")]
 pub mod ape;
+#[cfg(feature = "flac")]
 pub mod flac;
+#[cfg(feature = "id3")]
 pub mod id3;
+#[cfg(feature = "mp4")]
 pub mod mp4;
 
 pub mod file;

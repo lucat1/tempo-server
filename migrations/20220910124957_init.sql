@@ -41,6 +41,8 @@ CREATE TABLE tracks (
   number INTEGER,
   genres TEXT,
   release BLOB,
+  format TEXT,
+  path TEXT,
   FOREIGN KEY(release) REFERENCES releases(mbid)
 );
 

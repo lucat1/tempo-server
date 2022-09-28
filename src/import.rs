@@ -1,4 +1,4 @@
-use dialoguer::{Confirm, Input, Select};
+use dialoguer::Confirm;
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info};
 use scan_dir::ScanDir;
@@ -11,7 +11,7 @@ use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search};
 use crate::library::Store;
 use crate::library::{LibraryRelease, LibraryTrack};
-use crate::models::{Artists, GroupTracks, Release, Track, UNKNOWN_ARTIST};
+use crate::models::{Artists, GroupTracks, Release, Track};
 use crate::rank::{match_tracks, rank_covers};
 use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
@@ -28,39 +28,6 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
             Some(e) => e,
             None => eyre!("No errors"),
         })
-}
-
-fn get_artist_and_title(
-    theme: &DialoguerTheme,
-    maybe_artists: Vec<String>,
-    maybe_titles: Vec<String>,
-) -> Result<(Vec<String>, String)> {
-    debug!("Possible artists for album: {:?}", maybe_artists);
-    debug!("Possible titles for album: {:?}", maybe_titles);
-    let artists = if maybe_artists.is_empty() {
-        vec![UNKNOWN_ARTIST.to_string()]
-    } else {
-        maybe_artists
-    };
-    let title = if maybe_titles.is_empty() {
-        Input::new()
-            .with_prompt("Insert a title for this release")
-            .interact_text()?
-    } else if maybe_titles.len() == 1 {
-        maybe_titles.first().unwrap().to_string()
-    } else {
-        let index = match Select::with_theme(theme)
-            .with_prompt("What's the title of the release?")
-            .items(&maybe_titles)
-            .default(0)
-            .interact_opt()?
-        {
-            Some(v) => v,
-            None => bail!("No album title selected"),
-        };
-        maybe_titles[index].to_string()
-    };
-    Ok((artists, title))
 }
 
 pub async fn import(path: &PathBuf) -> Result<()> {
@@ -91,7 +58,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .group_tracks()
         .wrap_err("Trying to convert local files to internal structures")?;
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
-    // let (artists, title) = get_artist_and_title(&theme, ralbum.artists(), ralbum.titles())?;
+    // see here for the previous implementation:
+    // https://github.com/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
+    // Decide on what the user interaction should look like before proceeding with the implementation
 
     info!(
         "Searching for {} - {}...",

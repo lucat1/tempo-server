@@ -15,7 +15,7 @@ use clap::{arg, Command};
 use directories::ProjectDirs;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
+use sqlx::sqlite::{Sqlite, SqliteConnectOptions, SqlitePool};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
 
 lazy_static! {
     pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
-    pub static ref DB: Arc<OnceCell<SqlitePool>> = Arc::new(OnceCell::new());
+    pub static ref DB: Arc<OnceCell<Sqlite>> = Arc::new(OnceCell::new());
 }
 
 fn cli() -> Command<'static> {
