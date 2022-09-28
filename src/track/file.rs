@@ -190,10 +190,10 @@ impl TryFrom<TrackFile> for Track {
             disc: first_tag(&file_singleton, TagKey::DiscNumber)
                 .map_or(None, |d| d.parse::<u64>().ok()),
             disc_mbid: first_tag(&file_singleton, TagKey::MusicBrainzDiscID),
-            number: first_tag(&file_singleton, TagKey::TrackNumber)
-                .map_or(None, |d| d.parse::<u64>().ok()),
+            number: first_tag(&file_singleton, tagkey::tracknumber)
+                .map_or(none, |d| d.parse::<u64>().ok()),
             // TODO: fetch from tags, the eventual splitting should be handled track::Tag side
-            genres: vec![],
+            genres: file_singleton[0].get_tag(TagKey::Genre),
             release: None,
             performers: artists_from_tag(&file_singleton, TagKey::Performer),
             engigneers: artists_from_tag(&file_singleton, TagKey::Engineer),
