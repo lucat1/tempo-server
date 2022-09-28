@@ -126,7 +126,6 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
     folders.sort();
     folders.dedup();
-    info!("Creating paths {:?}", folders);
     let picture = Picture {
         mime_type: mime,
         picture_type: PictureType::CoverFront,
