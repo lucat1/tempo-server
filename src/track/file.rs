@@ -1,4 +1,4 @@
-use eyre::{eyre, Report, Result, WrapErr};
+use eyre::{bail, eyre, Report, Result, WrapErr};
 use itertools::Itertools;
 use log::{debug, warn};
 use std::collections::HashMap;
