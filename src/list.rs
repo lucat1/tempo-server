@@ -5,8 +5,8 @@ use log::info;
 use std::time::Instant;
 
 static DEFAULT_FORMAT_ARTIST: &str = "{name} {join_phrase}";
-static DEFAULT_FORMAT_TRACK: &str = "{artists} - {album}";
-static DEFAULT_FORMAT_RELEASE: &str = "{artists} - {title} ({year}) ({release_type})";
+static DEFAULT_FORMAT_TRACK: &str = "{disc_number} - {track_number} - {track_title}";
+static DEFAULT_FORMAT_RELEASE: &str = "{album_artist} - {album} ({release_year}) ({release_type})";
 
 pub async fn list(
     _filters: Vec<&String>,
@@ -27,7 +27,7 @@ pub async fn list(
         "track" | "tracks" => {
             let track = Track::filter::<String, String>(
                 vec![],
-                vec![" ORDER BY release, disc, number".to_string()],
+                vec![" ORDER BY tracks.release, tracks.disc, tracks.number".to_string()],
             )
             .await?
             .into_iter()

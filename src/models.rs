@@ -1,11 +1,9 @@
-use chrono::Datelike;
 use chrono::NaiveDate;
 use eyre::{eyre, Result};
 use sqlx::FromRow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 use strfmt::strfmt;
 
@@ -37,7 +35,7 @@ pub struct Track {
     // structure. Con: would increase memory management complexity
     pub number: Option<u64>,
     pub genres: Vec<String>,
-    pub release: Option<Arc<Release>>,
+    pub release: Option<Release>,
 
     // Performer, Vocal, Instrument
     pub performers: Vec<Artist>,
@@ -187,7 +185,7 @@ impl Format for Track {
             .into_iter()
             .map(|(k, v)| (k, v.join(", "))) // TODO
             .collect();
-        // The artists field is different. The version held in the Track::artists
+        // Multiple value fields are different. The version held in the Track::artists
         // data structure also holds the information for mergining the various
         // artists into a single string. We therefore generate it from the
         // original track instance
@@ -197,6 +195,10 @@ impl Format for Track {
         vars.insert(
             TagKey::ArtistSortOrder.to_string(),
             self.artists.sort_order_joined(),
+        );
+        vars.insert(
+            TagKey::Genre.to_string(),
+            self.genres.join(", "), // TODO
         );
         if let Some(release) = self.release.as_ref() {
             vars.insert(TagKey::AlbumArtist.to_string(), release.artists.joined());
@@ -211,77 +213,19 @@ impl Format for Track {
 
 impl Format for Release {
     fn fmt(&self, template: &str) -> Result<String> {
-        let mut vars = HashMap::new();
+        let multiple_vars: HashMap<String, Vec<String>> = self.clone().try_into()?;
+        let mut vars: HashMap<String, String> = multiple_vars
+            .into_iter()
+            .map(|(k, v)| (k, v.join(", "))) // TODO
+            .collect();
+        // Multiple value fields are different. The version held in the Track::artists
+        // data structure also holds the information for mergining the various
+        // artists into a single string. We therefore generate it from the
+        // original track instance
+        vars.insert(TagKey::AlbumArtist.to_string(), self.artists.joined());
         vars.insert(
-            "mbid".to_string(),
-            self.mbid.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "release_group_mbid".to_string(),
-            self.mbid.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "asin".to_string(),
-            self.release_group_mbid.clone().unwrap_or("".to_string()),
-        );
-        vars.insert("title".to_string(), self.title.clone());
-        vars.insert("artists".to_string(), self.artists.joined());
-        vars.insert(
-            "artists_sort".to_string(),
-            self.artists.sort_order().join(", "),
-        ); // TODO
-        vars.insert(
-            "discs".to_string(),
-            self.discs.map_or("0".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "media".to_string(),
-            self.media.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "tracks".to_string(),
-            self.tracks.map_or("0".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "country".to_string(),
-            self.country.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "label".to_string(),
-            self.label.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "catalog_no".to_string(),
-            self.catalog_no.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "status".to_string(),
-            self.status.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "release_type".to_string(),
-            self.release_type.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "date".to_string(),
-            self.date.map_or("".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "year".to_string(),
-            self.date.map_or("".to_string(), |d| d.year().to_string()),
-        );
-        vars.insert(
-            "original_date".to_string(),
-            self.original_date.map_or("".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "original_year".to_string(),
-            self.original_date
-                .map_or("".to_string(), |d| d.year().to_string()),
-        );
-        vars.insert(
-            "script".to_string(),
-            self.script.clone().unwrap_or("".to_string()),
+            TagKey::AlbumArtistSortOrder.to_string(),
+            self.artists.sort_order_joined(),
         );
         strfmt(template, &vars).map_err(|e| eyre!(e))
     }

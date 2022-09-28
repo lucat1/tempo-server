@@ -303,7 +303,7 @@ impl From<Track> for crate::models::Track {
                 .into_iter()
                 .map(|g| g.name)
                 .collect::<Vec<_>>(),
-            release: track.release.map(|r| Arc::new((*r).clone().into())),
+            release: track.release.map(|r| (*r).clone().into()),
 
             performers: artists_from_relationships(
                 &relations,

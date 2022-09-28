@@ -5,6 +5,7 @@ use crate::{DB, SETTINGS};
 use async_trait::async_trait;
 use eyre::{eyre, Result, WrapErr};
 use itertools::Itertools;
+use log::trace;
 use serde_json;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
@@ -43,6 +44,7 @@ pub trait Value<'args>: Encode<'args, Sqlite> + sqlx::Type<Sqlite> {}
 pub trait InTable {
     fn table() -> &'static str;
     fn fields() -> Vec<&'static str>;
+    fn join() -> Option<&'static str>;
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
     where
         Self: Sized;
@@ -105,9 +107,13 @@ where
                 }
             }
         }
+        if let Some(join) = Self::join() {
+            qb.push(join);
+        }
         for ex in extra.into_iter() {
             qb.push(ex);
         }
+        trace!("Building query: {}", qb.sql());
         qb
     }
     fn store_builder<'args>() -> QueryBuilder<'args, Sqlite> {
@@ -118,6 +124,7 @@ where
         qb.push(") VALUES (");
         qb.push(iter::repeat("?").take(Self::fields().len()).join(","));
         qb.push(")");
+        trace!("Building query: {}", qb.sql());
         qb
     }
 }
@@ -173,6 +180,9 @@ impl InTable for Artist {
     }
     fn fields() -> Vec<&'static str> {
         vec!["mbid", "name", "sort_name", "instruments"]
+    }
+    fn join() -> Option<&'static str> {
+        None
     }
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
     where
@@ -249,36 +259,53 @@ impl InTable for Track {
     }
     fn fields() -> Vec<&'static str> {
         vec![
-            "mbid",
-            "title",
-            "length",
-            "disc",
-            "disc_mbid",
-            "number",
-            "genres",
-            "release",
-            "format",
-            "path",
+            "tracks.mbid AS t_mbid",
+            "tracks.title AS t_title",
+            "tracks.length AS t_length",
+            "tracks.disc AS t_disc",
+            "tracks.disc_mbid AS t_disc_mbid",
+            "tracks.number AS t_number",
+            "tracks.genres AS t_genres",
+            // "tracks.release AS t_release",
+            "tracks.format AS t_format",
+            "tracks.path AS t_path",
+            "releases.mbid AS r_mbid",
+            "releases.release_group_mbid AS r_release_group_mbid",
+            "releases.asin AS r_asin",
+            "releases.title AS r_title",
+            "releases.discs AS r_discs",
+            "releases.media AS r_media",
+            "releases.tracks AS r_tracks",
+            "releases.country AS r_country",
+            "releases.label AS r_label",
+            "releases.catalog_no AS r_catalog_no",
+            "releases.status AS r_status",
+            "releases.release_type AS r_release_type",
+            "releases.date AS r_date",
+            "releases.original_date AS r_original_date",
+            "releases.script AS r_script",
         ]
+    }
+    fn join() -> Option<&'static str> {
+        Some(" INNER JOIN releases ON releases.mbid = tracks.release")
     }
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
     where
         Self: Sized,
     {
         Ok(Self {
-            mbid: row.try_get("mbid").ok(),
-            title: row.try_get("title")?,
+            mbid: row.try_get("t_mbid").ok(),
+            title: row.try_get("t_title")?,
             artists: vec![],
             length: row
-                .try_get("title")
+                .try_get("t_title")
                 .ok()
                 .map(|d: i64| Duration::from_secs(d as u64)),
-            disc: row.try_get("disc").ok().map(|d: i64| d as u64),
-            disc_mbid: row.try_get("disc_mbid").ok(),
-            number: row.try_get("number").ok().map(|d: i64| d as u64),
-            genres: serde_json::from_str(row.try_get("genres")?)
+            disc: row.try_get("t_disc").ok().map(|d: i64| d as u64),
+            disc_mbid: row.try_get("t_disc_mbid").ok(),
+            number: row.try_get("t_number").ok().map(|d: i64| d as u64),
+            genres: serde_json::from_str(row.try_get("t_genres")?)
                 .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-            release: None,
 
             performers: vec![],
             engigneers: vec![],
@@ -295,9 +322,14 @@ impl InTable for Track {
             path: row
                 .try_get("path")
                 .map_or(None, |p: &str| PathBuf::from_str(p).ok()),
+
+            release: Some(Release::decode(row)?),
         })
     }
     async fn fill_relationships(&mut self, db: &Pool<Sqlite>) -> Result<()> {
+        if let Some(mut release) = self.release.as_mut() {
+            release.artists = resolve(db, "release_artists", self.mbid.as_ref()).await?;
+        }
         self.artists = resolve(db, "track_artists", self.mbid.as_ref()).await?;
         self.performers = resolve(db, "track_performers", self.mbid.as_ref()).await?;
         self.engigneers = resolve(db, "track_engigneers", self.mbid.as_ref()).await?;
@@ -378,44 +410,47 @@ impl InTable for Release {
     }
     fn fields() -> Vec<&'static str> {
         vec![
-            "mbid",
-            "release_group_mbid",
-            "asin",
-            "title",
-            "discs",
-            "media",
-            "tracks",
-            "country",
-            "label",
-            "catalog_no",
-            "status",
-            "release_type",
-            "date",
-            "original_date",
-            "script",
+            "mbid AS r_mbid",
+            "release_group_mbid AS r_release_group_mbid",
+            "asin AS r_asin",
+            "title AS r_title",
+            "discs AS r_discs",
+            "media AS r_media",
+            "tracks AS r_tracks",
+            "country AS r_country",
+            "label AS r_label",
+            "catalog_no AS r_catalog_no",
+            "status AS r_status",
+            "release_type AS r_release_type",
+            "date AS r_date",
+            "original_date AS r_original_date",
+            "script AS r_script",
         ]
+    }
+    fn join() -> Option<&'static str> {
+        None
     }
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
     where
         Self: Sized,
     {
         Ok(Self {
-            mbid: row.try_get("mbid").ok(),
-            release_group_mbid: row.try_get("release_group_mbid").ok(),
-            asin: row.try_get("asin").ok(),
-            title: row.try_get("title")?,
+            mbid: row.try_get("r_mbid").ok(),
+            release_group_mbid: row.try_get("r_release_group_mbid").ok(),
+            asin: row.try_get("r_asin").ok(),
+            title: row.try_get("r_title")?,
             artists: vec![],
-            discs: row.try_get("discs").ok().map(|d: i64| d as u64),
-            media: row.try_get("media").ok(),
-            tracks: row.try_get("tracks").ok().map(|d: i64| d as u64),
-            country: row.try_get("country").ok(),
-            label: row.try_get("label").ok(),
-            catalog_no: row.try_get("catalog_no").ok(),
-            status: row.try_get("status").ok(),
-            release_type: row.try_get("release_type").ok(),
-            date: row.try_get("date").ok(),
-            original_date: row.try_get("original_date").ok(),
-            script: row.try_get("script").ok(),
+            discs: row.try_get("r_discs").ok().map(|d: i64| d as u64),
+            media: row.try_get("r_media").ok(),
+            tracks: row.try_get("r_tracks").ok().map(|d: i64| d as u64),
+            country: row.try_get("r_country").ok(),
+            label: row.try_get("r_label").ok(),
+            catalog_no: row.try_get("r_catalog_no").ok(),
+            status: row.try_get("r_status").ok(),
+            release_type: row.try_get("r_release_type").ok(),
+            date: row.try_get("r_date").ok(),
+            original_date: row.try_get("r_original_date").ok(),
+            script: row.try_get("r_script").ok(),
         })
     }
     async fn fill_relationships(&mut self, db: &Pool<Sqlite>) -> Result<()> {
