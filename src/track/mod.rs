@@ -9,6 +9,7 @@ pub mod mp4;
 
 pub mod file;
 pub mod format;
+pub mod key;
 pub mod map;
 pub mod picture;
 
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::path::{Path, PathBuf};
 
-use self::map::TagKey;
+use self::key::TagKey;
 use picture::Picture;
 
 pub enum TagError {

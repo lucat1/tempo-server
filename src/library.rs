@@ -1,5 +1,5 @@
-use crate::models::{Artist, Release, Track};
-use crate::track::format::Format;
+use crate::models::{Artist, Format, Release, Track};
+use crate::track::format::Format as TrackFormat;
 use crate::util::path_to_str;
 use crate::{DB, SETTINGS};
 use async_trait::async_trait;
@@ -14,93 +14,26 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-pub trait LibraryRelease {
-    fn paths(&self) -> Result<Vec<PathBuf>>;
-    fn path(&self) -> Result<PathBuf>;
-    fn other_paths(&self) -> Result<Vec<PathBuf>>;
-}
-
-impl LibraryRelease for Release {
-    fn paths(&self) -> Result<Vec<PathBuf>> {
-        let mut v = vec![];
-        let settings = SETTINGS
-            .get()
-            .ok_or(eyre!("Could not read settings"))
-            .wrap_err("While generating a path for the library")?;
-        for artist in self.artists.iter() {
-            let path_str = settings
-                .release_name
-                .replace("{release.artist}", artist.name.as_str())
-                .replace("{release.title}", self.title.as_str());
-            v.push(settings.library.join(PathBuf::from(path_str)))
-        }
-        Ok(v)
-    }
-
-    fn path(&self) -> Result<PathBuf> {
-        self.paths()?
-            .first()
-            .map_or(
-                Err(eyre!("Release does not have a path in the library, most definitely because the release has no artists")),
-                |p| Ok(p.clone())
-            )
-    }
-
-    fn other_paths(&self) -> Result<Vec<PathBuf>> {
-        let main = self.path()?;
-        Ok(self
-            .paths()?
-            .iter()
-            .filter_map(|p| -> Option<PathBuf> {
-                if *p != main {
-                    Some(p.clone())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>())
-    }
-}
-
 pub trait LibraryTrack {
     fn path(&self) -> Result<PathBuf>;
 }
 
 impl LibraryTrack for Track {
     fn path(&self) -> Result<PathBuf> {
-        let base = self
-            .release
-            .clone()
-            .ok_or(eyre!("This track doesn't belong to any release"))?
-            .path()?;
         let settings = SETTINGS
             .get()
             .ok_or(eyre!("Could not read settings"))
             .wrap_err("While generating a path for the library")?;
-        let mut extensionless = settings.track_name.clone();
-        extensionless.push('.');
-        extensionless.push_str(
+        let mut builder = self.fmt(settings.track_name.as_str())?;
+        builder.push('.');
+        builder.push_str(
             self.format
                 .ok_or(eyre!("The given Track doesn't have an associated format"))?
                 .ext(),
         );
-        let path_str = extensionless
-            .replace(
-                "{track.disc}",
-                self.disc
-                    .ok_or(eyre!("The track has no disc"))?
-                    .to_string()
-                    .as_str(),
-            )
-            .replace(
-                "{track.number}",
-                self.number
-                    .ok_or(eyre!("The track has no number"))?
-                    .to_string()
-                    .as_str(),
-            )
-            .replace("{track.title}", self.title.as_str());
-        Ok(base.join(path_str))
+        Ok(settings
+            .library
+            .join(PathBuf::from_str(builder.as_str()).map_err(|e| eyre!(e))?))
     }
 }
 
@@ -357,7 +290,7 @@ impl InTable for Track {
 
             format: row
                 .try_get("format")
-                .map_or(Ok(None), |f| Format::from_ext(f).map(|s| Some(s)))
+                .map_or(Ok(None), |f| TrackFormat::from_ext(f).map(|s| Some(s)))
                 .map_err(|e| sqlx::Error::Decode(e.into()))?,
             path: row
                 .try_get("path")

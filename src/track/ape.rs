@@ -1,6 +1,6 @@
 extern crate ape;
 
-use super::map::TagKey;
+use super::key::TagKey;
 use super::picture::{Picture, PictureType};
 use ape::{Item, ItemValue};
 use core::convert::AsRef;

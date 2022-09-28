@@ -10,6 +10,7 @@ use std::time::Duration;
 use strfmt::strfmt;
 
 use crate::track::format::Format as TrackFormat;
+use crate::track::key::TagKey;
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
@@ -80,6 +81,7 @@ pub trait Artists {
     fn ids(&self) -> Vec<String>;
     fn sort_order(&self) -> Vec<String>;
     fn joined(&self) -> String;
+    fn sort_order_joined(&self) -> String;
     fn instruments(&self) -> Vec<String>;
 }
 
@@ -110,6 +112,25 @@ impl Artists for Vec<Artist> {
             } else {
                 // TODO: configuration
                 res.push_str(", ");
+            }
+        }
+        res
+    }
+    fn sort_order_joined(&self) -> String {
+        let mut res = "".to_string();
+        for (i, artist) in self.into_iter().enumerate() {
+            if let Some(sort) = artist.sort_name.as_ref() {
+                res.push_str(sort.as_str());
+                if i >= self.len() - 1 {
+                    continue;
+                }
+
+                if let Some(join) = &artist.join_phrase {
+                    res.push_str(join.as_str());
+                } else {
+                    // TODO: configuration
+                    res.push_str(", ");
+                }
             }
         }
         res
@@ -161,48 +182,29 @@ impl Format for Artist {
 
 impl Format for Track {
     fn fmt(&self, template: &str) -> Result<String> {
-        let mut vars = HashMap::new();
+        let multiple_vars: HashMap<String, Vec<String>> = self.clone().try_into()?;
+        let mut vars: HashMap<String, String> = multiple_vars
+            .into_iter()
+            .map(|(k, v)| (k, v.join(", "))) // TODO
+            .collect();
+        // The artists field is different. The version held in the Track::artists
+        // data structure also holds the information for mergining the various
+        // artists into a single string. We therefore generate it from the
+        // original track instance
+        vars.insert(TagKey::Artist.to_string(), self.artists.joined());
+        vars.insert(TagKey::Artists.to_string(), self.artists.joined());
+        vars.insert(TagKey::OriginalArtist.to_string(), self.artists.joined());
         vars.insert(
-            "mbid".to_string(),
-            self.mbid.clone().unwrap_or("".to_string()),
+            TagKey::ArtistSortOrder.to_string(),
+            self.artists.sort_order_joined(),
         );
-        vars.insert("title".to_string(), self.title.clone());
-        vars.insert("artists".to_string(), self.artists.joined());
-        vars.insert(
-            "artists_sort".to_string(),
-            self.artists.sort_order().join(", "),
-        ); // TODO
-        vars.insert(
-            "length".to_string(),
-            self.length
-                .map_or("0".to_string(), |t| t.as_secs().to_string()),
-        );
-        vars.insert(
-            "disc".to_string(),
-            self.disc.map_or("0".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "disc_mbid".to_string(),
-            self.disc_mbid.clone().unwrap_or("".to_string()),
-        );
-        vars.insert(
-            "number".to_string(),
-            self.number.map_or("0".to_string(), |d| d.to_string()),
-        );
-        vars.insert(
-            "genres".to_string(),
-            self.genres.join(", "), // TODO
-        );
-        vars.insert(
-            "performers".to_string(),
-            self.performers.instruments().join(", "), // TODO
-        );
-        vars.insert("engigneers".to_string(), self.engigneers.joined());
-        vars.insert("mixers".to_string(), self.mixers.joined());
-        vars.insert("producers".to_string(), self.producers.joined());
-        vars.insert("lyricists".to_string(), self.lyricists.joined());
-        vars.insert("writers".to_string(), self.writers.joined());
-        vars.insert("composers".to_string(), self.composers.joined());
+        if let Some(release) = self.release.as_ref() {
+            vars.insert(TagKey::AlbumArtist.to_string(), release.artists.joined());
+            vars.insert(
+                TagKey::AlbumArtistSortOrder.to_string(),
+                release.artists.sort_order_joined(),
+            );
+        }
         strfmt(template, &vars).map_err(|e| eyre!(e))
     }
 }

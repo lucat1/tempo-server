@@ -3,6 +3,13 @@ name = "tagger"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["flac"]
+ape = []
+flac = []
+id3 = []
+mp4 = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

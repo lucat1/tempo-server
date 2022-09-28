@@ -1,12 +1,9 @@
-use eyre::{bail, Result};
-
-use crate::library::LibraryRelease;
-use crate::models::Release;
 use crate::SETTINGS;
 use eyre::eyre;
+use eyre::{bail, Result};
 use mime::Mime;
 use std::fs::write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,7 +49,10 @@ impl std::fmt::Debug for Picture {
     }
 }
 
-pub fn write_picture(picture: &Picture, release: &Release) -> Result<()> {
+pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
     let cover_name = &SETTINGS
         .get()
         .ok_or(eyre!("Could not read settings"))?
@@ -64,6 +64,6 @@ pub fn write_picture(picture: &Picture, release: &Release) -> Result<()> {
     };
     let ext = picture.mime_type.subtype().as_str();
     let filename = PathBuf::from_str((name + "." + ext).as_str())?;
-    let path = release.path()?.join(filename);
+    let path = root.as_ref().join(filename);
     write(path, &picture.data).map_err(|e| eyre!(e))
 }

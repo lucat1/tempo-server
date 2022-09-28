@@ -1,6 +1,6 @@
 extern crate id3;
 
-use super::map::TagKey;
+use super::key::TagKey;
 use super::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
