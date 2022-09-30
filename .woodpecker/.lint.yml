@@ -1,0 +1,6 @@
+pipeline:
+  lint:
+    image: rust
+    commands:
+      - rustup component add clippy
+      - cargo clippy
