@@ -9,7 +9,7 @@ use crate::settings::ArtProvider;
 use crate::util::maybe_date;
 use crate::SETTINGS;
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
     // pub disambiguation: Option<String>,
     #[serde(rename = "label-info")]
@@ -44,7 +44,7 @@ pub struct Release {
     pub track_count: Option<usize>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Label {
     #[serde(rename = "sort-name")]
     pub sort_name: Option<String>,
@@ -57,7 +57,7 @@ pub struct Label {
     pub type_id: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReleaseGroup {
     #[serde(rename = "first-release-date")]
     pub first_release_date: Option<String>,
@@ -70,14 +70,14 @@ pub struct ReleaseGroup {
     pub primary_type: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ArtistCredit {
     pub name: String,
     pub joinphrase: Option<String>,
     pub artist: Artist,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Artist {
     #[serde(rename = "type-id")]
     pub type_id: Option<String>,
@@ -90,7 +90,7 @@ pub struct Artist {
     pub sort_name: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Area {
     #[serde(rename = "iso-3166-1-codes")]
     pub iso_3166_1_codes: Vec<String>,
@@ -101,7 +101,7 @@ pub struct Area {
     pub name: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Medium {
     pub id: Option<String>,
     pub position: Option<u64>,
@@ -110,7 +110,7 @@ pub struct Medium {
     pub format: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
     pub id: String,
     pub recording: Recording,
@@ -123,7 +123,7 @@ pub struct Track {
     pub release: Option<Arc<Release>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Recording {
     pub relations: Vec<Relation>,
     pub disambiguation: String,
@@ -172,7 +172,7 @@ impl From<String> for RelationType {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Relation {
     #[serde(rename = "type")]
     pub type_field: String,
@@ -181,12 +181,12 @@ pub struct Relation {
     pub attributes: Vec<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Work {
     pub relations: Option<Vec<Relation>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Genre {
     pub id: String,
     pub count: u64,
@@ -194,7 +194,7 @@ pub struct Genre {
     pub name: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReleaseSearch {
     pub created: String,
     pub count: i64,
@@ -202,20 +202,20 @@ pub struct ReleaseSearch {
     pub releases: Vec<Release>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TextRepresentation {
     pub language: Option<String>,
     pub script: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LabelInfo {
     #[serde(rename = "catalog-number")]
     pub catalog_number: Option<String>,
     pub label: Option<Label>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tag {
     pub count: i64,
     pub name: String,
@@ -407,7 +407,7 @@ impl GroupTracks for Arc<Release> {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoverArtArchive {
     pub images: Vec<Image>,
 }
@@ -432,7 +432,7 @@ impl CoverArtArchive {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cover {
     pub provider: ArtProvider,
     pub url: String,
@@ -440,12 +440,12 @@ pub struct Cover {
     pub artist: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Itunes {
     pub results: Vec<ItunesResult>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ItunesResult {
     #[serde(rename = "artistName")]
     pub artist_name: String,
@@ -469,14 +469,14 @@ impl From<Itunes> for Vec<Cover> {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Image {
     approved: bool,
     front: bool,
     image: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Thumbnails {
     #[serde(rename = "250")]
     the_250: String,

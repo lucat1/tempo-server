@@ -16,7 +16,7 @@ use super::structures::CoverArtArchive;
 use super::CLIENT;
 
 static DEFAULT_COUNTRY: &str = "US";
-static ITUNES_COUNTRIES: &'static [&'static str] = &[
+static ITUNES_COUNTRIES: &[&str] = &[
     "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", "AZ", "BB", "BE", "BF", "BG", "BH", "BJ",
     "BM", "BN", "BO", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CG", "CH", "CL", "CN", "CO", "CR",
     "CV", "CY", "CZ", "DE", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ES", "FI", "FJ", "FM", "FR",
@@ -31,11 +31,7 @@ static ITUNES_COUNTRIES: &'static [&'static str] = &[
 
 pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Result<Vec<Cover>> {
     let start = Instant::now();
-    let raw_country = release
-        .country
-        .as_ref()
-        .map(|s| s.as_str())
-        .unwrap_or(DEFAULT_COUNTRY);
+    let raw_country = release.country.as_deref().unwrap_or(DEFAULT_COUNTRY);
     let country = if ITUNES_COUNTRIES.contains(&raw_country) {
         raw_country
     } else {

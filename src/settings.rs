@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::{fmt::Display, path::PathBuf};
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Settings {
     pub library: PathBuf,
     pub db: PathBuf,
@@ -16,7 +16,7 @@ pub struct Settings {
     pub art: Art,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tagging {
     pub clear: bool,
     pub genre_limit: Option<usize>,
@@ -24,7 +24,7 @@ pub struct Tagging {
     pub use_release_group: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
@@ -39,7 +39,7 @@ impl Display for ArtProvider {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArtFormat {
     Png,
     #[default]
@@ -64,7 +64,7 @@ impl From<ArtFormat> for ImageOutputFormat {
     }
 }
 
-#[derive(SmartDefault, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(SmartDefault, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Art {
     #[default(_code = "vec![ArtProvider::Itunes, ArtProvider::CoverArtArchive]")]
     pub providers: Vec<ArtProvider>,

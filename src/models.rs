@@ -210,7 +210,7 @@ impl Format for Track {
             vars.insert("path".to_string(), path_to_str(path)?);
         }
         if let Some(format) = self.format.as_ref() {
-            vars.insert("format".to_string(), format.clone().into());
+            vars.insert("format".to_string(), (*format).into());
         }
         strfmt(template, &vars)
             .map_err(|e| eyre!(e))
