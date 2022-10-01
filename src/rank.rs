@@ -2,7 +2,7 @@ use crate::fetch::structures::Cover;
 use crate::models::{Track, Release, Artists};
 
 use levenshtein::levenshtein;
-use log::{debug, trace};
+use log::{debug};
 use eyre::{eyre, Result};
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
@@ -96,7 +96,6 @@ pub fn match_tracks(
                         })
                 }).unwrap_or(0);
 
-            trace!("Rated track compatibility {}", distance);
             matrix_vec.push(distance);
         }
     }

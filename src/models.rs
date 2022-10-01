@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use eyre::{eyre, Result};
+use eyre::{eyre, Context, Result};
 use sqlx::FromRow;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -9,6 +9,7 @@ use strfmt::strfmt;
 
 use crate::track::format::Format as TrackFormat;
 use crate::track::key::TagKey;
+use crate::util::path_to_str;
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
@@ -170,7 +171,9 @@ impl Format for Artist {
             "instruments".to_string(),
             self.instruments.join(", "), // TODO
         );
-        strfmt(template, &vars).map_err(|e| eyre!(e))
+        strfmt(template, &vars)
+            .map_err(|e| eyre!(e))
+            .wrap_err(eyre!("Error while formatting artist string"))
     }
 }
 
@@ -203,7 +206,15 @@ impl Format for Track {
                 release.artists.sort_order_joined(),
             );
         }
-        strfmt(template, &vars).map_err(|e| eyre!(e))
+        if let Some(path) = self.path.as_ref() {
+            vars.insert("path".to_string(), path_to_str(path)?);
+        }
+        if let Some(format) = self.format.as_ref() {
+            vars.insert("format".to_string(), format.clone().into());
+        }
+        strfmt(template, &vars)
+            .map_err(|e| eyre!(e))
+            .wrap_err(eyre!("Error while formatting track string"))
     }
 }
 
@@ -223,6 +234,8 @@ impl Format for Release {
             TagKey::AlbumArtistSortOrder.to_string(),
             self.artists.sort_order_joined(),
         );
-        strfmt(template, &vars).map_err(|e| eyre!(e))
+        strfmt(template, &vars)
+            .map_err(|e| eyre!(e))
+            .wrap_err(eyre!("Error while formatting release string"))
     }
 }

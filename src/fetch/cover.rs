@@ -16,16 +16,36 @@ use super::structures::CoverArtArchive;
 use super::CLIENT;
 
 static DEFAULT_COUNTRY: &str = "US";
+static ITUNES_COUNTRIES: &'static [&'static str] = &[
+    "AE", "AG", "AI", "AL", "AM", "AO", "AR", "AT", "AU", "AZ", "BB", "BE", "BF", "BG", "BH", "BJ",
+    "BM", "BN", "BO", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CG", "CH", "CL", "CN", "CO", "CR",
+    "CV", "CY", "CZ", "DE", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ES", "FI", "FJ", "FM", "FR",
+    "GB", "GD", "GH", "GM", "GR", "GT", "GW", "GY", "HK", "HN", "HR", "HU", "ID", "IE", "IL", "IN",
+    "IS", "IT", "JM", "JO", "JP", "KE", "KG", "KH", "KN", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
+    "LK", "LR", "LT", "LU", "LV", "MD", "MG", "MK", "ML", "MN", "MO", "MR", "MS", "MT", "MU", "MW",
+    "MX", "MY", "MZ", "NA", "NE", "NG", "NI", "NL", "NP", "NO", "NZ", "OM", "PA", "PE", "PG", "PH",
+    "PK", "PL", "PT", "PW", "PY", "QA", "RO", "RU", "SA", "SB", "SC", "SE", "SG", "SI", "SK", "SL",
+    "SN", "SR", "ST", "SV", "SZ", "TC", "TD", "TH", "TJ", "TM", "TN", "TR", "TT", "TW", "TZ", "UA",
+    "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
+];
 
 pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Result<Vec<Cover>> {
     let start = Instant::now();
+    let raw_country = release
+        .country
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_COUNTRY);
+    let country = if ITUNES_COUNTRIES.contains(&raw_country) {
+        raw_country
+    } else {
+        DEFAULT_COUNTRY
+    };
+
     let res = CLIENT
         .get(format!(
             "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
-            release
-                .country
-                .clone()
-                .unwrap_or_else(|| DEFAULT_COUNTRY.to_string()),
+            country,
             release.artists.joined() + " " + release.title.as_str()
         ))
         .send()
@@ -34,7 +54,7 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
     trace!("Itunes HTTP request took {:?}", req_time);
     if !res.status().is_success() {
         bail!(
-            "CoverArtArchive request returned non-success error code: {} {}",
+            "Itunes request returned non-success error code: {} {}",
             res.status(),
             res.text().await?
         );

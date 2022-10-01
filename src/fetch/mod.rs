@@ -3,7 +3,7 @@ pub mod structures;
 
 use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
 use const_format::formatcp;
-use eyre::{bail, eyre, Result};
+use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
 use log::trace;
 use reqwest::header::USER_AGENT;
@@ -45,7 +45,12 @@ pub async fn search(
             res.text().await?
         );
     }
-    let json = res.json::<ReleaseSearch>().await?;
+    let text = res
+        .text()
+        .await
+        .wrap_err(eyre!("Could not read response as text"))?;
+    let json: ReleaseSearch =
+        serde_json::from_str(text.as_str()).wrap_err(eyre!("Invalid JSON data: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
     Ok(json.releases.into_iter().map(|v| v.into()).collect())
@@ -90,7 +95,12 @@ pub async fn get(
             res.text().await?
         );
     }
-    let json = res.json::<Arc<Release>>().await?;
+    let text = res
+        .text()
+        .await
+        .wrap_err(eyre!("Could not read response as text"))?;
+    let json: Arc<Release> =
+        serde_json::from_str(text.as_str()).wrap_err(eyre!("Invalid JSON data: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
     json.group_tracks()

@@ -5,7 +5,7 @@ use log::info;
 use std::time::Instant;
 
 static DEFAULT_FORMAT_ARTIST: &str = "{name} {join_phrase}";
-static DEFAULT_FORMAT_TRACK: &str = "{disc_number} - {track_number} - {track_title}";
+static DEFAULT_FORMAT_TRACK: &str = "{album_artist} - {album} - {track_title}";
 static DEFAULT_FORMAT_RELEASE: &str = "{album_artist} - {album} ({release_year}) ({release_type})";
 
 pub async fn list(

@@ -11,35 +11,35 @@ use crate::SETTINGS;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Release {
-    pub disambiguation: Option<String>,
+    // pub disambiguation: Option<String>,
     #[serde(rename = "label-info")]
     #[serde(default)]
     pub label_info: Vec<LabelInfo>,
     pub status: Option<String>,
     #[serde(rename = "release-group")]
     pub release_group: Option<ReleaseGroup>,
-    #[serde(rename = "status-id")]
-    pub status_id: Option<String>,
-    pub packaging: Option<String>,
+    // #[serde(rename = "status-id")]
+    // pub status_id: Option<String>,
+    // pub packaging: Option<String>,
     #[serde(rename = "artist-credit")]
     pub artist_credit: Vec<ArtistCredit>,
     pub asin: Option<String>,
     pub date: Option<String>,
-    #[serde(rename = "release-events")]
-    #[serde(default)]
-    pub release_events: Vec<Event>,
+    // #[serde(rename = "release-events")]
+    // #[serde(default)]
+    // pub release_events: Vec<Event>,
     pub id: String,
-    pub barcode: Option<String>,
-    pub quality: Option<String>,
+    // pub barcode: Option<String>,
+    // pub quality: Option<String>,
     pub media: Vec<Medium>,
     pub country: Option<String>,
-    #[serde(rename = "packaging-id")]
-    pub packaging_id: Option<String>,
+    // #[serde(rename = "packaging-id")]
+    // pub packaging_id: Option<String>,
     #[serde(rename = "text-representation")]
     pub text_representation: Option<TextRepresentation>,
     pub title: String,
-    #[serde(default)]
-    pub tags: Vec<Tag>,
+    // #[serde(default)]
+    // pub tags: Vec<Tag>,
     #[serde(rename = "track-count")]
     pub track_count: Option<usize>,
 }
@@ -91,12 +91,6 @@ pub struct Artist {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Event {
-    pub area: Area,
-    pub date: String,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Area {
     #[serde(rename = "iso-3166-1-codes")]
     pub iso_3166_1_codes: Vec<String>,
@@ -134,7 +128,7 @@ pub struct Recording {
     pub relations: Vec<Relation>,
     pub disambiguation: String,
     pub id: String,
-    pub length: u64,
+    pub length: Option<u64>,
     pub video: bool,
     #[serde(rename = "first-release-date")]
     pub first_release_date: Option<String>,
@@ -294,7 +288,7 @@ impl From<Track> for crate::models::Track {
             }),
             length: track
                 .length
-                .or(Some(track.recording.length))
+                .or(track.recording.length)
                 .map(Duration::from_millis),
             disc: track.medium.clone().and_then(|m| m.position),
             disc_mbid: track.medium.and_then(|m| m.id.clone()),

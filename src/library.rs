@@ -43,6 +43,7 @@ pub trait Value<'args>: Encode<'args, Sqlite> + sqlx::Type<Sqlite> {}
 pub trait InTable {
     fn table() -> &'static str;
     fn fields() -> Vec<&'static str>;
+    fn store_fields() -> Vec<&'static str>;
     fn join() -> Option<&'static str>;
     fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
     where
@@ -119,9 +120,9 @@ where
         let mut qb = QueryBuilder::new("INSERT OR REPLACE INTO ");
         qb.push(Self::table());
         qb.push(" (");
-        qb.push(Self::fields().join(","));
+        qb.push(Self::store_fields().join(","));
         qb.push(") VALUES (");
-        qb.push(iter::repeat("?").take(Self::fields().len()).join(","));
+        qb.push(iter::repeat("?").take(Self::store_fields().len()).join(","));
         qb.push(")");
         trace!("Building query: {}", qb.sql());
         qb
@@ -179,6 +180,9 @@ impl InTable for Artist {
     }
     fn fields() -> Vec<&'static str> {
         vec!["mbid", "name", "sort_name", "instruments"]
+    }
+    fn store_fields() -> Vec<&'static str> {
+        Artist::fields()
     }
     fn join() -> Option<&'static str> {
         None
@@ -285,6 +289,20 @@ impl InTable for Track {
             "releases.script AS r_script",
         ]
     }
+    fn store_fields() -> Vec<&'static str> {
+        vec![
+            "mbid",
+            "title",
+            "length",
+            "disc",
+            "disc_mbid",
+            "number",
+            "genres",
+            "release",
+            "format",
+            "path",
+        ]
+    }
     fn join() -> Option<&'static str> {
         Some(" INNER JOIN releases ON releases.mbid = tracks.release")
     }
@@ -315,11 +333,11 @@ impl InTable for Track {
             composers: vec![],
 
             format: row
-                .try_get("format")
+                .try_get("t_format")
                 .map_or(Ok(None), |f| TrackFormat::from_ext(f).map(Some))
                 .map_err(|e| sqlx::Error::Decode(e.into()))?,
             path: row
-                .try_get("path")
+                .try_get("t_path")
                 .map_or(None, |p: &str| PathBuf::from_str(p).ok()),
 
             release: Some(Release::decode(row)?),
@@ -327,7 +345,7 @@ impl InTable for Track {
     }
     async fn fill_relationships(&mut self, db: &Pool<Sqlite>) -> Result<()> {
         if let Some(mut release) = self.release.as_mut() {
-            release.artists = resolve(db, "release_artists", self.mbid.as_ref()).await?;
+            release.artists = resolve(db, "release_artists", release.mbid.as_ref()).await?;
         }
         self.artists = resolve(db, "track_artists", self.mbid.as_ref()).await?;
         self.performers = resolve(db, "track_performers", self.mbid.as_ref()).await?;
@@ -426,6 +444,25 @@ impl InTable for Release {
             "script AS r_script",
         ]
     }
+    fn store_fields() -> Vec<&'static str> {
+        vec![
+            "mbid",
+            "release_group_mbid",
+            "asin",
+            "title",
+            "discs",
+            "media",
+            "tracks",
+            "country",
+            "label",
+            "catalog_no",
+            "status",
+            "release_type",
+            "date",
+            "original_date",
+            "script",
+        ]
+    }
     fn join() -> Option<&'static str> {
         None
     }
@@ -469,6 +506,7 @@ impl Store for Release {
             .bind(&self.asin)
             .bind(&self.title)
             .bind(&self.discs.map(|n| n as i64))
+            .bind(&self.media)
             .bind(&self.tracks.map(|n| n as i64))
             .bind(&self.country)
             .bind(&self.label)
