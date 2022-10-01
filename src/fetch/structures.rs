@@ -356,7 +356,7 @@ impl From<Release> for crate::models::Release {
             release_type: release
                 .release_group
                 .as_ref()
-                .map(|r| r.primary_type.clone()),
+                .map(|r| r.primary_type.to_lowercase().clone()),
             date: SETTINGS.get().and_then(|s| {
                 if s.tagging.use_original_date {
                     original_date
