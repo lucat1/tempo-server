@@ -17,7 +17,7 @@ use core::convert::AsRef;
 use eyre::{Report, Result};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use self::key::TagKey;
 use picture::Picture;
@@ -76,5 +76,5 @@ pub trait Tag: TagClone {
     fn str_to_key(&self, str: &str) -> Option<TagKey>;
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str>;
 
-    fn write_to_path(&mut self, path: &PathBuf) -> Result<()>;
+    fn write_to_path(&mut self, path: &Path) -> Result<()>;
 }

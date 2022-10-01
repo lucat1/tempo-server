@@ -99,7 +99,7 @@ impl Artists for Vec<Artist> {
     }
     fn joined(&self) -> String {
         let mut res = "".to_string();
-        for (i, artist) in self.into_iter().enumerate() {
+        for (i, artist) in self.iter().enumerate() {
             res.push_str(artist.name.as_str());
             if i >= self.len() - 1 {
                 continue;
@@ -116,7 +116,7 @@ impl Artists for Vec<Artist> {
     }
     fn sort_order_joined(&self) -> String {
         let mut res = "".to_string();
-        for (i, artist) in self.into_iter().enumerate() {
+        for (i, artist) in self.iter().enumerate() {
             if let Some(sort) = artist.sort_name.as_ref() {
                 res.push_str(sort.as_str());
                 if i >= self.len() - 1 {
@@ -135,8 +135,8 @@ impl Artists for Vec<Artist> {
     }
     fn instruments(&self) -> Vec<String> {
         self.iter()
-            .map(|s| {
-                if s.instruments.len() > 0 {
+            .flat_map(|s| {
+                if !s.instruments.is_empty() {
                     s.instruments
                         .iter()
                         .map(|i| format!("{} ({})", s.name, i))
@@ -145,7 +145,6 @@ impl Artists for Vec<Artist> {
                     vec![s.name.clone()]
                 }
             })
-            .flatten()
             .collect()
     }
 }
@@ -157,18 +156,15 @@ pub trait Format {
 impl Format for Artist {
     fn fmt(&self, template: &str) -> Result<String> {
         let mut vars = HashMap::new();
-        vars.insert(
-            "mbid".to_string(),
-            self.mbid.clone().unwrap_or("".to_string()),
-        );
+        vars.insert("mbid".to_string(), self.mbid.clone().unwrap_or_default());
         vars.insert("name".to_string(), self.name.clone());
         vars.insert(
             "join_phrase".to_string(),
-            self.join_phrase.clone().unwrap_or("".to_string()),
+            self.join_phrase.clone().unwrap_or_default(),
         );
         vars.insert(
             "sort_name".to_string(),
-            self.sort_name.clone().unwrap_or("".to_string()),
+            self.sort_name.clone().unwrap_or_default(),
         );
         vars.insert(
             "instruments".to_string(),

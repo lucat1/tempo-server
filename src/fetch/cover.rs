@@ -25,7 +25,7 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
             release
                 .country
                 .clone()
-                .unwrap_or(DEFAULT_COUNTRY.to_string()),
+                .unwrap_or_else(|| DEFAULT_COUNTRY.to_string()),
             release.artists.joined() + " " + release.title.as_str()
         ))
         .send()

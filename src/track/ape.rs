@@ -6,7 +6,7 @@ use ape::{Item, ItemValue};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Tag {
@@ -44,7 +44,7 @@ fn value_to_strings(value: &ItemValue, separator: &String) -> Option<Vec<String>
 impl crate::track::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
-        for key in map.keys().into_iter() {
+        for key in map.keys() {
             self.tag.remove_item(key);
         }
         self.set_pictures(vec![])?;
@@ -199,7 +199,7 @@ impl crate::track::Tag for Tag {
         }
     }
 
-    fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
+    fn write_to_path(&mut self, path: &Path) -> Result<()> {
         ape::write_to_path(&self.tag, path).map_err(|e| eyre!(e))
     }
 }

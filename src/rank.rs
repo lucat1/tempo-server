@@ -85,10 +85,10 @@ pub fn match_tracks(
                         + if_both_or_default(r1.status.clone(), r2.status.clone(), |status1, status2| {
                             levenshtein(status1.as_str(), status2.as_str()) as i64
                         })
-                        + if_both_or_default(r1.date.clone(), r2.date.clone(), |date1, date2| {
+                        + if_both_or_default(r1.date, r2.date, |date1, date2| {
                             date1.signed_duration_since(date2).num_days()
                         })
-                        + if_both_or_default(r1.original_date.clone(), r2.original_date.clone(), |date1, date2| {
+                        + if_both_or_default(r1.original_date, r2.original_date, |date1, date2| {
                             date1.signed_duration_since(date2).num_days()
                         })
                         + if_both_or_default(r1.script.clone(), r2.script.clone(), |script1, script2| {
@@ -100,7 +100,7 @@ pub fn match_tracks(
             matrix_vec.push(distance);
         }
     }
-    if matrix_vec.len() == 0 {
+    if matrix_vec.is_empty(){
         return (0, vec![]);
     }
     debug!("kuhn_munkers matrix is {}x{}", rows, columns);
@@ -118,7 +118,7 @@ pub fn match_tracks(
     kuhn_munkres_min(&matrix)
 }
 
-pub fn rank_covers(covers_by_provider: &mut Vec<Vec<Cover>>, release: &Release) -> Result<Cover> {
+pub fn rank_covers(covers_by_provider: &mut [Vec<Cover>], release: &Release) -> Result<Cover> {
     for covers in covers_by_provider.iter_mut() {
         let mut rank_to_index = covers.iter().enumerate().map(|(i, c)| (levenshtein(c.title.as_str(), release.title.as_str()) + levenshtein(c.artist.as_str(), release.artists.joined().as_str()), i)).collect::<Vec<_>>();
         rank_to_index.sort_by(|d1,d2| d1.0.cmp(&d2.0));

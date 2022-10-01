@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
             let filters = sub_matches
                 .get_many::<String>("FILTER")
                 .map(|i| i.into_iter().collect::<Vec<_>>())
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
             let format = sub_matches.get_one::<String>("FORMAT");
             let object = sub_matches.get_one::<String>("OBJECT");
             list::list(filters, format, object).await

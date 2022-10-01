@@ -146,34 +146,34 @@ pub struct Recording {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum RelationType {
-    ENGIGNEER,
-    INSTRUMENT,
-    PERFORMER,
-    MIX,
-    PRODUCER,
-    VOCAL,
-    LYRICIST,
-    WRITER,
-    COMPOSER,
+    Engigneer,
+    Instrument,
+    Performer,
+    Mix,
+    Producer,
+    Vocal,
+    Lyricist,
+    Writer,
+    Composer,
 
-    PERFORMANCE,
-    OTHER(String),
+    Performance,
+    Other(String),
 }
 
 impl From<String> for RelationType {
     fn from(str: String) -> Self {
         match str.as_str() {
-            "engigneer" => Self::ENGIGNEER,
-            "instrument" => Self::INSTRUMENT,
-            "performer" => Self::PERFORMER,
-            "mix" => Self::MIX,
-            "producer" => Self::PRODUCER,
-            "vocal" => Self::VOCAL,
-            "lyricist" => Self::LYRICIST,
-            "writer" => Self::WRITER,
-            "composer" => Self::COMPOSER,
-            "performance" => Self::PERFORMANCE,
-            _ => Self::OTHER(str),
+            "engigneer" => Self::Engigneer,
+            "instrument" => Self::Instrument,
+            "performer" => Self::Performer,
+            "mix" => Self::Mix,
+            "producer" => Self::Producer,
+            "vocal" => Self::Vocal,
+            "lyricist" => Self::Lyricist,
+            "writer" => Self::Writer,
+            "composer" => Self::Composer,
+            "performance" => Self::Performance,
+            _ => Self::Other(str),
         }
     }
 }
@@ -230,10 +230,10 @@ pub struct Tag {
 impl From<ArtistCredit> for crate::models::Artist {
     fn from(artist: ArtistCredit) -> Self {
         crate::models::Artist {
-            mbid: Some(artist.artist.id.clone()),
-            join_phrase: artist.joinphrase.clone(),
-            name: artist.name.clone(),
-            sort_name: Some(artist.artist.sort_name.clone()),
+            mbid: Some(artist.artist.id),
+            join_phrase: artist.joinphrase,
+            name: artist.name,
+            sort_name: Some(artist.artist.sort_name),
             instruments: vec![],
         }
     }
@@ -246,17 +246,17 @@ impl TryFrom<Relation> for crate::models::Artist {
             .artist
             .ok_or(eyre!("Relation doesn't contain an artist"))?;
         Ok(crate::models::Artist {
-            mbid: Some(artist.id.clone()),
+            mbid: Some(artist.id),
             join_phrase: None,
-            name: artist.name.clone(),
-            sort_name: Some(artist.sort_name.clone()),
+            name: artist.name,
+            sort_name: Some(artist.sort_name),
             instruments: relation.attributes,
         })
     }
 }
 
 fn artists_from_relationships(
-    rels: &Vec<Relation>,
+    rels: &[Relation],
     ok: Vec<RelationType>,
 ) -> Vec<crate::models::Artist> {
     rels.iter()
@@ -267,14 +267,14 @@ fn artists_from_relationships(
 
 impl From<Track> for crate::models::Track {
     fn from(track: Track) -> Self {
-        let mut sorted_genres = track.recording.genres.unwrap_or(vec![]);
+        let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
         let mut other_relations = track
             .recording
             .relations
             .iter()
             .filter_map(|rel| {
-                if RelationType::PERFORMANCE == rel.type_field.clone().into() {
+                if RelationType::Performance == rel.type_field.clone().into() {
                     rel.work.clone()
                 } else {
                     None
@@ -295,9 +295,9 @@ impl From<Track> for crate::models::Track {
             length: track
                 .length
                 .or(Some(track.recording.length))
-                .map(|d| Duration::from_millis(d)),
-            disc: track.medium.clone().map_or(None, |m| m.position),
-            disc_mbid: track.medium.map_or(None, |m| m.id.clone()),
+                .map(Duration::from_millis),
+            disc: track.medium.clone().and_then(|m| m.position),
+            disc_mbid: track.medium.and_then(|m| m.id.clone()),
             number: Some(track.position),
             genres: sorted_genres
                 .into_iter()
@@ -308,17 +308,17 @@ impl From<Track> for crate::models::Track {
             performers: artists_from_relationships(
                 &relations,
                 vec![
-                    RelationType::INSTRUMENT,
-                    RelationType::PERFORMER,
-                    RelationType::VOCAL,
+                    RelationType::Instrument,
+                    RelationType::Performer,
+                    RelationType::Vocal,
                 ],
             ),
-            engigneers: artists_from_relationships(&relations, vec![RelationType::ENGIGNEER]),
-            mixers: artists_from_relationships(&track.recording.relations, vec![RelationType::MIX]),
-            producers: artists_from_relationships(&relations, vec![RelationType::PRODUCER]),
-            lyricists: artists_from_relationships(&relations, vec![RelationType::LYRICIST]),
-            writers: artists_from_relationships(&relations, vec![RelationType::WRITER]),
-            composers: artists_from_relationships(&relations, vec![RelationType::COMPOSER]),
+            engigneers: artists_from_relationships(&relations, vec![RelationType::Engigneer]),
+            mixers: artists_from_relationships(&track.recording.relations, vec![RelationType::Mix]),
+            producers: artists_from_relationships(&relations, vec![RelationType::Producer]),
+            lyricists: artists_from_relationships(&relations, vec![RelationType::Lyricist]),
+            writers: artists_from_relationships(&relations, vec![RelationType::Writer]),
+            composers: artists_from_relationships(&relations, vec![RelationType::Composer]),
 
             format: None,
             path: None,
@@ -332,7 +332,7 @@ impl From<Release> for crate::models::Release {
             release
                 .release_group
                 .as_ref()
-                .map_or(None, |r| r.first_release_date.clone()),
+                .and_then(|r| r.first_release_date.clone()),
         );
         crate::models::Release {
             mbid: Some(release.id),
@@ -347,23 +347,23 @@ impl From<Release> for crate::models::Release {
                     .sum(),
             ),
             discs: Some(release.media.len() as u64),
-            media: release.media.first().map_or(None, |m| m.format.clone()),
+            media: release.media.first().and_then(|m| m.format.clone()),
             country: release.country,
             label: release
                 .label_info
                 .first()
-                .map_or(None, |li| li.label.as_ref())
+                .and_then(|li| li.label.as_ref())
                 .map(|l| l.name.clone()),
             catalog_no: release
                 .label_info
                 .first()
-                .map_or(None, |l| l.catalog_number.clone()),
+                .and_then(|l| l.catalog_number.clone()),
             status: release.status,
             release_type: release
                 .release_group
                 .as_ref()
                 .map(|r| r.primary_type.clone()),
-            date: SETTINGS.get().map_or(None, |s| {
+            date: SETTINGS.get().and_then(|s| {
                 if s.tagging.use_original_date {
                     original_date
                 } else {
@@ -371,7 +371,7 @@ impl From<Release> for crate::models::Release {
                 }
             }),
             original_date,
-            script: release.text_representation.map_or(None, |t| t.script),
+            script: release.text_representation.and_then(|t| t.script),
             artists: release
                 .artist_credit
                 .into_iter()
@@ -387,20 +387,19 @@ impl GroupTracks for Arc<Release> {
             .media
             .clone()
             .into_iter()
-            .map(|m| Arc::new(m))
-            .filter_map(|medium| match medium.tracks {
-                Some(ref tracks) => Some(
+            .map(Arc::new)
+            .filter_map(|medium| {
+                medium.tracks.as_ref().map(|tracks| {
                     tracks
-                        .into_iter()
+                        .iter()
                         .map(|t| {
                             let mut t_copy = t.clone();
                             t_copy.medium = Some(medium.clone());
                             t_copy.release = Some(self.clone());
                             t_copy
                         })
-                        .collect::<Vec<_>>(),
-                ),
-                None => None,
+                        .collect::<Vec<_>>()
+                })
             })
             .flatten()
             .map(|t| t.into())

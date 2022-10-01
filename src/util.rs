@@ -6,10 +6,9 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub fn path_to_str(path: &PathBuf) -> Result<String> {
-    Ok(String::from(path.to_str().ok_or(eyre!(
-        "Could not convert path to string: {:?}",
-        path
-    ))?))
+    Ok(String::from(path.to_str().ok_or_else(|| {
+        eyre!("Could not convert path to string: {:?}", path)
+    })?))
 }
 
 pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
@@ -28,9 +27,9 @@ pub fn mkdirp<P: AsRef<Path>>(path: &P) -> io::Result<()> {
 }
 
 pub fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
-    d.map_or(None, |s| {
+    d.and_then(|s| {
         NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
             .ok()
-            .or(NaiveDate::parse_from_str(s.as_str(), "%Y").ok())
+            .or_else(|| NaiveDate::parse_from_str(s.as_str(), "%Y").ok())
     })
 }

@@ -9,7 +9,7 @@ use id3::frame::Picture as ID3Picture;
 use id3::frame::PictureType as ID3PictureType;
 use id3::{Content, Frame, TagLike, Version};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Tag {
@@ -33,7 +33,7 @@ impl crate::track::TagFrom for Tag {
 impl crate::track::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
-        for key in map.keys().into_iter() {
+        for key in map.keys() {
             self.tag.remove(key);
         }
         self.set_pictures(vec![])?;
@@ -52,15 +52,13 @@ impl crate::track::Tag for Tag {
                         .collect::<Vec<_>>(),
                 );
             }
-            return None;
-        } else if let Some(t) = self.tag.get(key) {
-            if let Some(content) = t.content().text() {
-                Some(content.split(&self.separator).map(String::from).collect())
-            } else {
-                None
-            }
-        } else {
             None
+        } else {
+            self.tag.get(key).and_then(|t| {
+                t.content()
+                    .text()
+                    .map(|content| content.split(&self.separator).map(String::from).collect())
+            })
         }
     }
 
@@ -370,7 +368,7 @@ impl crate::track::Tag for Tag {
         }
     }
 
-    fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
+    fn write_to_path(&mut self, path: &Path) -> Result<()> {
         self.tag
             .write_to_path(path, Version::Id3v24)
             .map_err(|e| eyre!(e))

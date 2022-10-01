@@ -32,7 +32,7 @@ impl TryFrom<Track> for HashMap<TagKey, Vec<String>> {
             map.insert(TagKey::DiscNumber, vec![disc.to_string()]);
         }
         if let Some(disc_mbid) = track.disc_mbid {
-            map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid.to_string()]);
+            map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid]);
         }
         if let Some(number) = track.number {
             map.insert(TagKey::TrackNumber, vec![number.to_string()]);

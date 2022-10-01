@@ -36,10 +36,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let theme = DialoguerTheme::default();
 
     let files = all_files(&canonicalize(path)?)?;
-    let (tracks, errors): (Vec<_>, Vec<_>) = files
-        .iter()
-        .map(|f| TrackFile::open(f))
-        .partition(Result::is_ok);
+    let (tracks, errors): (Vec<_>, Vec<_>) =
+        files.iter().map(TrackFile::open).partition(Result::is_ok);
     let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
     let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
     debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
@@ -92,7 +90,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             .0
             .mbid
             .clone()
-            .unwrap_or("no mbid".to_string()),
+            .unwrap_or_else(|| "no mbid".to_string()),
     );
     let mut covers_by_provider = search_covers(&final_release.0).await?;
     let cover = rank_covers(&mut covers_by_provider, &final_release.0)?;
@@ -106,7 +104,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     }
 
     let mut final_tracks = tracks_map
-        .into_iter()
+        .iter()
         .enumerate()
         .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
         .collect::<Vec<_>>();

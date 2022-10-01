@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use eyre::{eyre, Result, WrapErr};
 use itertools::Itertools;
 use log::trace;
-use serde_json;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
 use std::fmt::Display;
@@ -96,7 +95,7 @@ where
         qb.push(Self::fields().join(","));
         qb.push(" FROM ");
         qb.push(Self::table());
-        if fields.len() > 0 {
+        if !fields.is_empty() {
             qb.push(" WHERE ");
             let len = fields.len();
             for (i, (key, val)) in fields.into_iter().enumerate() {
@@ -317,7 +316,7 @@ impl InTable for Track {
 
             format: row
                 .try_get("format")
-                .map_or(Ok(None), |f| TrackFormat::from_ext(f).map(|s| Some(s)))
+                .map_or(Ok(None), |f| TrackFormat::from_ext(f).map(Some))
                 .map_err(|e| sqlx::Error::Decode(e.into()))?,
             path: row
                 .try_get("path")
@@ -358,11 +357,11 @@ impl Store for Track {
             .bind(&self.disc_mbid)
             .bind(&self.number.map(|n| n as i64))
             .bind(serde_json::to_string(&self.genres)?)
-            .bind(self.release.as_ref().map_or(None, |r| r.mbid.as_ref()))
-            .bind(self.format.map(|f| String::from(f)))
+            .bind(self.release.as_ref().and_then(|r| r.mbid.as_ref()))
+            .bind(self.format.map(String::from))
             .bind(self.path.as_ref().map_or(
                 Err(eyre!("The given track doesn't have an associated path")),
-                |p| path_to_str(p),
+                path_to_str,
             )?)
             .execute(db)
             .await?;

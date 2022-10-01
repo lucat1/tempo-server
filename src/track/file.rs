@@ -36,13 +36,13 @@ impl TrackFile {
             .wrap_err(format!("Could not identify format for file: {:?}", path))?;
         let tag = match format {
             #[cfg(feature = "flac")]
-            Format::FLAC => flac::Tag::from_path(path),
+            Format::Flac => flac::Tag::from_path(path),
             #[cfg(feature = "mp4")]
-            Format::MP4 => mp4::Tag::from_path(path),
+            Format::Mp4 => mp4::Tag::from_path(path),
             #[cfg(feature = "id3")]
-            Format::ID3 => id3::Tag::from_path(path),
+            Format::Id3 => id3::Tag::from_path(path),
             #[cfg(feature = "ape")]
-            Format::APE => ape::Tag::from_path(path),
+            Format::Ape => ape::Tag::from_path(path),
             _ => bail!("Unsupported format {}", String::from(format)),
         }
         .wrap_err(format!("Could not read metadata from file: {:?}", path))?;
@@ -74,14 +74,11 @@ impl TrackFile {
         if keystrs.is_empty() {
             return Err(TagError::NotSupported);
         }
-        keystrs
-            .into_iter()
-            .map(|keystr| {
-                self.tag
-                    .set_str(keystr, values.clone())
-                    .map_err(|e| TagError::Other(e))
-            })
-            .collect()
+        keystrs.into_iter().try_for_each(|keystr| {
+            self.tag
+                .set_str(keystr, values.clone())
+                .map_err(TagError::Other)
+        })
     }
 
     pub fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {
@@ -93,13 +90,13 @@ impl TrackFile {
         self.path = path.to_path_buf();
         self.tag = match self.format {
             #[cfg(feature = "flac")]
-            Format::FLAC => flac::Tag::from_path(&self.path),
+            Format::Flac => flac::Tag::from_path(&self.path),
             #[cfg(feature = "mp4")]
-            Format::MP4 => mp4::Tag::from_path(&self.path),
+            Format::Mp4 => mp4::Tag::from_path(&self.path),
             #[cfg(feature = "id3")]
-            Format::ID3 => id3::Tag::from_path(&self.path),
+            Format::Id3 => id3::Tag::from_path(&self.path),
             #[cfg(feature = "ape")]
-            Format::APE => ape::Tag::from_path(&self.path),
+            Format::Ape => ape::Tag::from_path(&self.path),
             _ => bail!("Unsupported format {}", String::from(self.format)),
         }?;
         Ok(())
@@ -140,7 +137,7 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
     .into_iter()
     .map(|s| Artist {
         mbid: None,
-        name: s.to_string(),
+        name: s,
         join_phrase: sep.clone(),
         // TODO: take a look into artist sort order
         sort_name: None,
@@ -149,20 +146,19 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
     .collect()
 }
 
-fn artists_from_tag(tracks: &Vec<TrackFile>, tag: TagKey) -> Vec<Artist> {
+fn artists_from_tag(tracks: &[TrackFile], tag: TagKey) -> Vec<Artist> {
     let separator = match tracks.first() {
         Some(t) => t.tag.separator(),
         None => return vec![],
     };
-    dedup(tracks.iter().map(|t| t.get_tag(tag)).flatten().collect())
+    dedup(tracks.iter().flat_map(|t| t.get_tag(tag)).collect())
         .iter()
-        .map(|name| artists_with_name(name.to_string(), separator.clone()))
-        .flatten()
+        .flat_map(|name| artists_with_name(name.to_string(), separator.clone()))
         .collect()
 }
 
-fn first_tag(tracks: &Vec<TrackFile>, tag: TagKey) -> Option<String> {
-    let options = dedup(tracks.iter().map(|t| t.get_tag(tag)).flatten().collect());
+fn first_tag(tracks: &[TrackFile], tag: TagKey) -> Option<String> {
+    let options = dedup(tracks.iter().flat_map(|t| t.get_tag(tag)).collect());
     if options.len() > 1 {
         warn!(
             "Multiple ({}) unique tag values for {:?} in the given tracks ({})",
@@ -185,13 +181,13 @@ impl TryFrom<TrackFile> for Track {
                 .ok_or(eyre!("A track doesn't have any title"))?,
             artists: artists_from_tag(&file_singleton, TagKey::Artists),
             length: first_tag(&file_singleton, TagKey::Duration)
-                .map_or(None, |d| d.parse::<u64>().ok())
-                .map(|d| Duration::from_secs(d)),
+                .and_then(|d| d.parse::<u64>().ok())
+                .map(Duration::from_secs),
             disc: first_tag(&file_singleton, TagKey::DiscNumber)
-                .map_or(None, |d| d.parse::<u64>().ok()),
+                .and_then(|d| d.parse::<u64>().ok()),
             disc_mbid: first_tag(&file_singleton, TagKey::MusicBrainzDiscID),
             number: first_tag(&file_singleton, TagKey::TrackNumber)
-                .map_or(None, |d| d.parse::<u64>().ok()),
+                .and_then(|d| d.parse::<u64>().ok()),
             // TODO: fetch from tags, the eventual splitting should be handled track::Tag side
             genres: file_singleton[0].get_tag(TagKey::Genre),
             release: None,
@@ -216,22 +212,23 @@ impl TryFrom<Vec<TrackFile>> for Release {
             mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseID),
             release_group_mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseGroupID),
             asin: first_tag(&tracks, TagKey::ASIN),
-            title: first_tag(&tracks, TagKey::Album).unwrap_or(UNKNOWN_TITLE.to_string()),
+            title: first_tag(&tracks, TagKey::Album).unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists: artists_from_tag(&tracks, TagKey::AlbumArtist),
-            discs: first_tag(&tracks, TagKey::TotalDiscs).map_or(None, |d| d.parse::<u64>().ok()),
+            discs: first_tag(&tracks, TagKey::TotalDiscs).and_then(|d| d.parse::<u64>().ok()),
             media: first_tag(&tracks, TagKey::Media),
-            tracks: first_tag(&tracks, TagKey::TotalTracks).map_or(None, |d| d.parse::<u64>().ok()),
+            tracks: first_tag(&tracks, TagKey::TotalTracks).and_then(|d| d.parse::<u64>().ok()),
             country: first_tag(&tracks, TagKey::ReleaseCountry),
             label: first_tag(&tracks, TagKey::RecordLabel),
             catalog_no: first_tag(&tracks, TagKey::CatalogNumber),
             status: first_tag(&tracks, TagKey::ReleaseStatus),
             release_type: first_tag(&tracks, TagKey::ReleaseType),
             date: maybe_date(
-                first_tag(&tracks, TagKey::ReleaseDate).or(first_tag(&tracks, TagKey::ReleaseYear)),
+                first_tag(&tracks, TagKey::ReleaseDate)
+                    .or_else(|| first_tag(&tracks, TagKey::ReleaseYear)),
             ),
             original_date: maybe_date(
                 first_tag(&tracks, TagKey::OriginalReleaseDate)
-                    .or(first_tag(&tracks, TagKey::OriginalReleaseYear)),
+                    .or_else(|| first_tag(&tracks, TagKey::OriginalReleaseYear)),
             ),
             script: first_tag(&tracks, TagKey::Script),
         })

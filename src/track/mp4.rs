@@ -8,7 +8,7 @@ use mime::{BMP, IMAGE_BMP, IMAGE_JPEG, IMAGE_PNG, JPEG, PNG};
 use mp4ameta::ident::DataIdent;
 use mp4ameta::{Data, ImgFmt};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const MAGIC: u8 = 0xa9;
 
@@ -252,7 +252,7 @@ impl crate::track::Tag for Tag {
         }
     }
 
-    fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
+    fn write_to_path(&mut self, path: &Path) -> Result<()> {
         self.tag.write_to_path(path).map_err(|e| eyre!(e))
     }
 }

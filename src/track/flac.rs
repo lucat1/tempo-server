@@ -6,7 +6,7 @@ use core::convert::AsRef;
 use eyre::{eyre, Result};
 use metaflac::block::PictureType as FLACPictureType;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Tag {
@@ -27,7 +27,7 @@ impl crate::track::TagFrom for Tag {
 impl crate::track::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
-        for key in map.keys().into_iter() {
+        for key in map.keys() {
             self.tag.remove_vorbis(key);
         }
         self.set_pictures(vec![])?;
@@ -321,7 +321,7 @@ impl crate::track::Tag for Tag {
         }
     }
 
-    fn write_to_path(&mut self, path: &PathBuf) -> Result<()> {
+    fn write_to_path(&mut self, path: &Path) -> Result<()> {
         self.tag.write_to_path(path).map_err(|e| eyre!(e))
     }
 }

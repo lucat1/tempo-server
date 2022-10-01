@@ -41,16 +41,16 @@ impl Display for ArtProvider {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArtFormat {
-    PNG,
+    Png,
     #[default]
-    JPEG,
+    Jpeg,
 }
 
 impl ArtFormat {
     pub fn mime(&self) -> Mime {
         match self {
-            ArtFormat::PNG => IMAGE_PNG,
-            ArtFormat::JPEG => IMAGE_JPEG,
+            ArtFormat::Png => IMAGE_PNG,
+            ArtFormat::Jpeg => IMAGE_JPEG,
         }
     }
 }
@@ -58,8 +58,8 @@ impl ArtFormat {
 impl From<ArtFormat> for ImageOutputFormat {
     fn from(f: ArtFormat) -> Self {
         match f {
-            ArtFormat::PNG => ImageOutputFormat::Png,
-            ArtFormat::JPEG => ImageOutputFormat::Jpeg(100),
+            ArtFormat::Png => ImageOutputFormat::Png,
+            ArtFormat::Jpeg => ImageOutputFormat::Jpeg(100),
         }
     }
 }
