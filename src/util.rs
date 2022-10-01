@@ -17,7 +17,7 @@ pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
     vec
 }
 
-pub fn mkdirp<P: AsRef<Path>>(path: &P) -> io::Result<()> {
+pub fn mkdirp<P: AsRef<Path>>(path: P) -> io::Result<()> {
     if let Err(e) = create_dir_all(path) {
         if e.kind() != io::ErrorKind::AlreadyExists {
             return Err(e);

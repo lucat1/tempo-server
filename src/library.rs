@@ -60,6 +60,10 @@ pub trait Builder: InTable {
         B: 'args + Encode<'args, Sqlite> + Send + Type<Sqlite>,
         D: Display;
     fn store_builder<'args>() -> QueryBuilder<'args, Sqlite>;
+    fn delete_builder<'args, B, D>(fields: Vec<(D, B)>) -> QueryBuilder<'args, Sqlite>
+    where
+        B: 'args + Encode<'args, Sqlite> + Send + Type<Sqlite>,
+        D: Display;
 }
 
 #[async_trait]
@@ -81,6 +85,11 @@ pub trait Fetch: Builder {
 #[async_trait]
 pub trait Store: Builder {
     async fn store(&self) -> Result<()>;
+}
+
+#[async_trait]
+pub trait Delete: Builder {
+    async fn delete(&self) -> Result<()>;
 }
 
 impl<T> Builder for T
@@ -124,6 +133,27 @@ where
         qb.push(") VALUES (");
         qb.push(iter::repeat("?").take(Self::store_fields().len()).join(","));
         qb.push(")");
+        trace!("Building query: {}", qb.sql());
+        qb
+    }
+    fn delete_builder<'args, B, D>(fields: Vec<(D, B)>) -> QueryBuilder<'args, Sqlite>
+    where
+        B: 'args + Encode<'args, Sqlite> + Send + Type<Sqlite>,
+        D: Display,
+    {
+        let mut qb = QueryBuilder::new("DELETE FROM ");
+        qb.push(Self::table());
+        qb.push(" WHERE ");
+        if !fields.is_empty() {
+            let len = fields.len();
+            for (i, (key, val)) in fields.into_iter().enumerate() {
+                qb.push(format!("{} = ", key));
+                qb.push_bind(val);
+                if i < len - 1 {
+                    qb.push(" AND ");
+                }
+            }
+        }
         trace!("Building query: {}", qb.sql());
         qb
     }
@@ -220,6 +250,27 @@ impl Store for Artist {
     }
 }
 
+#[async_trait]
+impl Delete for Artist {
+    async fn delete(&self) -> Result<()> {
+        let db = DB.get().ok_or(eyre!("Could not get database"))?;
+        unlink(db, "track_artists", self.mbid.as_ref()).await?;
+        unlink(db, "track_performers", self.mbid.as_ref()).await?;
+        unlink(db, "track_engigneers", self.mbid.as_ref()).await?;
+        unlink(db, "track_mixers", self.mbid.as_ref()).await?;
+        unlink(db, "track_producers", self.mbid.as_ref()).await?;
+        unlink(db, "track_lyricists", self.mbid.as_ref()).await?;
+        unlink(db, "track_writers", self.mbid.as_ref()).await?;
+        unlink(db, "track_composers", self.mbid.as_ref()).await?;
+        unlink(db, "release_artists", self.mbid.as_ref()).await?;
+        Self::delete_builder(vec![("mbid", &self.mbid)])
+            .build()
+            .execute(db)
+            .await?;
+        Ok(())
+    }
+}
+
 async fn resolve(db: &Pool<Sqlite>, table: &str, mbid: Option<&String>) -> Result<Vec<Artist>> {
     Artist::query_builder::<String, String>(vec![], vec![])
         .push(format!(
@@ -252,6 +303,15 @@ async fn link(
     .bind(artist.mbid.as_ref())
     .execute(db)
     .await?;
+    Ok(())
+}
+
+async fn unlink(db: &Pool<Sqlite>, table: &str, mbid: Option<&String>) -> Result<()> {
+    sqlx::query(format!("DELETE FROM {} WHERE ref = ? OR artist = ?", table).as_str())
+        .bind(mbid)
+        .bind(mbid)
+        .execute(db)
+        .await?;
     Ok(())
 }
 
@@ -421,6 +481,26 @@ impl Store for Track {
 }
 
 #[async_trait]
+impl Delete for Track {
+    async fn delete(&self) -> Result<()> {
+        let db = DB.get().ok_or(eyre!("Could not get database"))?;
+        unlink(db, "track_artists", self.mbid.as_ref()).await?;
+        unlink(db, "track_performers", self.mbid.as_ref()).await?;
+        unlink(db, "track_engigneers", self.mbid.as_ref()).await?;
+        unlink(db, "track_mixers", self.mbid.as_ref()).await?;
+        unlink(db, "track_producers", self.mbid.as_ref()).await?;
+        unlink(db, "track_lyricists", self.mbid.as_ref()).await?;
+        unlink(db, "track_writers", self.mbid.as_ref()).await?;
+        unlink(db, "track_composers", self.mbid.as_ref()).await?;
+        Self::delete_builder(vec![("mbid", &self.mbid)])
+            .build()
+            .execute(db)
+            .await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
 impl InTable for Release {
     fn table() -> &'static str {
         "releases"
@@ -522,6 +602,19 @@ impl Store for Release {
             artist.store().await?;
             link(db, "release_artists", self.mbid.as_ref(), artist).await?;
         }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Delete for Release {
+    async fn delete(&self) -> Result<()> {
+        let db = DB.get().ok_or(eyre!("Could not get database"))?;
+        unlink(db, "release_artists", self.mbid.as_ref()).await?;
+        Self::delete_builder(vec![("mbid", &self.mbid)])
+            .build()
+            .execute(db)
+            .await?;
         Ok(())
     }
 }

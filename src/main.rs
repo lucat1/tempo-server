@@ -9,6 +9,7 @@ mod util;
 
 mod import;
 mod list;
+mod update;
 
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
@@ -50,10 +51,12 @@ fn cli() -> Command<'static> {
                 .arg(arg!(FILTER: [FILTER] ... "Filter the listing")),
         )
         .subcommand(
-            Command::new("fix")
+            Command::new("update")
+                .alias("up")
+                .alias("fix")
                 .about("Applies the needed changes to all the out-of-date tags of all files being tracked")
                 .arg_required_else_help(false)
-                .arg(arg!(FILTER: [FILTER] "Filter the part of your collection to fix")),
+                .arg(arg!(FILTER: [FILTER] ... "Filter the collection items to fix")),
         )
         .subcommand(
             Command::new("import")
@@ -105,11 +108,12 @@ async fn main() -> Result<()> {
             let object = sub_matches.get_one::<String>("OBJECT");
             list::list(filters, format, object).await
         }
-        Some(("fix", sub_matches)) => {
-            let _filter = sub_matches
-                .get_one::<String>("FILTER")
-                .ok_or(eyre!("Filter argument expected"))?;
-            Ok(())
+        Some(("update", sub_matches)) => {
+            let filters = sub_matches
+                .get_many::<String>("FILTER")
+                .map(|i| i.into_iter().collect::<Vec<_>>())
+                .unwrap_or_default();
+            update::update(filters).await
         }
         Some(("import", sub_matches)) => {
             let stream = sub_matches
