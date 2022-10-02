@@ -49,8 +49,11 @@ pub async fn search(
         .text()
         .await
         .wrap_err(eyre!("Could not read response as text"))?;
+
     let json: ReleaseSearch =
-        serde_json::from_str(text.as_str()).wrap_err(eyre!("Invalid JSON data: {}", text))?;
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(text.as_str()))
+            .map_err(|e| eyre!("Error {} at path {}", e, e.path().to_string()))
+            .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
     Ok(json.releases.into_iter().map(|v| v.into()).collect())
@@ -99,8 +102,11 @@ pub async fn get(
         .text()
         .await
         .wrap_err(eyre!("Could not read response as text"))?;
+
     let json: Arc<Release> =
-        serde_json::from_str(text.as_str()).wrap_err(eyre!("Invalid JSON data: {}", text))?;
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(text.as_str()))
+            .map_err(|e| eyre!("Error {} at path {}", e, e.path().to_string()))
+            .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
     json.group_tracks()

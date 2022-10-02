@@ -1,27 +1,59 @@
-use directories::UserDirs;
+use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
+use log::trace;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
-use smart_default::SmartDefault;
+use std::fs;
 use std::{fmt::Display, path::PathBuf};
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+static DEFAULT_DB_FILE: &str = "lib.db";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(default)]
     pub library: PathBuf,
+    #[serde(default)]
     pub db: PathBuf,
+    #[serde(default = "default_track_name")]
     pub track_name: String,
 
+    #[serde(default)]
     pub tagging: Tagging,
+    #[serde(default)]
     pub art: Art,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+fn default_track_name() -> String {
+    "{album_artist}/{album} ({release_year}) ({release_type})/{disc_number} - {track_number} - {track_title}"
+                    .to_string()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tagging {
+    #[serde(default = "default_true")]
     pub clear: bool,
+    #[serde(default)]
     pub genre_limit: Option<usize>,
+    #[serde(default = "default_true")]
     pub use_original_date: bool,
+    #[serde(default = "default_true")]
     pub use_release_group: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for Tagging {
+    fn default() -> Self {
+        Self {
+            clear: default_true(),
+            genre_limit: Option::default(),
+            use_original_date: default_true(),
+            use_release_group: default_true(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,39 +96,71 @@ impl From<ArtFormat> for ImageOutputFormat {
     }
 }
 
-#[derive(SmartDefault, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Art {
-    #[default(_code = "vec![ArtProvider::Itunes, ArtProvider::CoverArtArchive]")]
+    #[serde(default = "default_art_providers")]
     pub providers: Vec<ArtProvider>,
-    #[default = 1200]
+    #[serde(default = "default_art_width")]
     pub width: u32,
-    #[default = 1200]
+    #[serde(default = "default_art_height")]
     pub height: u32,
+    #[serde(default)]
     pub format: ArtFormat,
-    #[default(_code = "Some(\"cover\".to_string())")]
-    pub filename: Option<String>,
+    #[serde(default = "default_art_image_name")]
+    pub image_name: Option<String>,
 }
 
-impl Settings {
-    pub fn gen_default() -> Result<Self> {
-        let dirs = UserDirs::new().ok_or(eyre!("Could not locate user directories"))?;
-        let library = dirs
-            .audio_dir()
-            .ok_or(eyre!("Could not locate current user's Audio directory"))?;
+fn default_art_providers() -> Vec<ArtProvider> {
+    Vec::<ArtProvider>::default()
+}
 
-        Ok(Settings {
-            library: library.to_path_buf(),
-            db: library.join(PathBuf::from("lib.db")),
-            track_name:
-                "{album_artist}/{album} ({release_year}) ({release_type})/{disc_number} - {track_number} - {track_title}"
-                    .to_string(),
-            tagging: Tagging {
-                clear: true,
-                genre_limit: None,
-                use_original_date: true,
-                use_release_group: true,
-            },
-            art: Art::default(),
-        })
+fn default_art_width() -> u32 {
+    1200
+}
+
+fn default_art_height() -> u32 {
+    1200
+}
+
+fn default_art_image_name() -> Option<String> {
+    Some("cover".to_string())
+}
+
+impl Default for Art {
+    fn default() -> Self {
+        Self {
+            providers: default_art_providers(),
+            width: default_art_width(),
+            height: default_art_height(),
+            format: ArtFormat::default(),
+            image_name: default_art_image_name(),
+        }
     }
+}
+
+fn get_library() -> Result<PathBuf> {
+    UserDirs::new()
+        .ok_or(eyre!("Could not locate user directories"))
+        .and_then(|dirs| {
+            dirs.audio_dir()
+                .map(|audio| audio.to_path_buf())
+                .ok_or(eyre!("Could not locate current user's Audio directory"))
+        })
+}
+
+pub fn load() -> Result<Settings> {
+    let dirs = ProjectDirs::from("com", "github", crate::CLI_NAME)
+        .ok_or(eyre!("Could not locate program directories"))?;
+    let path = dirs.config_dir().join(PathBuf::from("config.toml"));
+    let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
+    let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
+    let lib = get_library()?;
+    if set.library == PathBuf::default() {
+        set.library = lib.clone();
+    }
+    if set.db == PathBuf::default() {
+        set.db = lib.join(DEFAULT_DB_FILE);
+    }
+    trace!("Loaded settings: {:?}", set);
+    Ok(set)
 }

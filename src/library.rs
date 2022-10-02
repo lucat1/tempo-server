@@ -405,7 +405,7 @@ impl InTable for Track {
     }
     async fn fill_relationships(&mut self, db: &Pool<Sqlite>) -> Result<()> {
         if let Some(mut release) = self.release.as_mut() {
-            release.artists = resolve(db, "release_artists", release.mbid.as_ref()).await?;
+            Release::fill_relationships(&mut release, db).await?;
         }
         self.artists = resolve(db, "track_artists", self.mbid.as_ref()).await?;
         self.performers = resolve(db, "track_performers", self.mbid.as_ref()).await?;

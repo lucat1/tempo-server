@@ -13,11 +13,9 @@ mod update;
 
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
-use directories::ProjectDirs;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -66,14 +64,18 @@ fn cli() -> Command<'static> {
         )
 }
 
-fn cfg() -> Result<Settings> {
-    let dirs = ProjectDirs::from("com", "github", CLI_NAME)
-        .ok_or(eyre!("Could not locate program directories"))?;
-    let path = dirs.config_dir().join(PathBuf::from("config.toml"));
-    match fs::read_to_string(path) {
-        Ok(str) => toml::from_str(str.as_str()).map_err(|e| eyre!(e)),
-        Err(_) => Settings::gen_default(),
-    }
+async fn db() -> Result<SqlitePool> {
+    SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(util::path_to_str(
+                    &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
+                )?)
+                .create_if_missing(true),
+        )
+        .await
+        .map_err(|e| eyre!(e))
 }
 
 #[tokio::main]
@@ -81,22 +83,8 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     theme::init_logger();
 
-    SETTINGS.get_or_try_init(async { cfg() }).await?;
-    let db = DB
-        .get_or_try_init(async {
-            SqlitePoolOptions::new()
-                .max_connections(1)
-                .connect_with(
-                    SqliteConnectOptions::new()
-                        .filename(util::path_to_str(
-                            &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
-                        )?)
-                        .create_if_missing(true),
-                )
-                .await
-                .map_err(|e| eyre!(e))
-        })
-        .await?;
+    SETTINGS.get_or_try_init(async { settings::load() }).await?;
+    let db = DB.get_or_try_init(db()).await?;
     sqlx::migrate!().run(db).await?;
 
     let matches = cli().get_matches();

@@ -57,7 +57,7 @@ where
         .get()
         .ok_or(eyre!("Could not read settings"))?
         .art
-        .filename;
+        .image_name;
     let name = match cover_name {
         Some(n) => n.to_string(),
         None => bail!("Picture write not required"),
