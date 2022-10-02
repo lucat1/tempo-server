@@ -7,6 +7,8 @@ use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use std::{fmt::Display, path::PathBuf};
 
+use crate::{CLI_NAME, SETTINGS};
+
 static DEFAULT_DB_FILE: &str = "lib.db";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,7 +151,7 @@ fn get_library() -> Result<PathBuf> {
 }
 
 pub fn load() -> Result<Settings> {
-    let dirs = ProjectDirs::from("com", "github", crate::CLI_NAME)
+    let dirs = ProjectDirs::from("com", "github", CLI_NAME)
         .ok_or(eyre!("Could not locate program directories"))?;
     let path = dirs.config_dir().join(PathBuf::from("config.toml"));
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
@@ -163,4 +165,10 @@ pub fn load() -> Result<Settings> {
     }
     trace!("Loaded settings: {:?}", set);
     Ok(set)
+}
+
+pub fn print() -> Result<()> {
+    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    print!("{}", toml::to_string(settings)?);
+    Ok(())
 }

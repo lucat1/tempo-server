@@ -49,6 +49,10 @@ fn cli() -> Command<'static> {
                 .arg(arg!(FILTER: [FILTER] ... "Filter the listing")),
         )
         .subcommand(
+            Command::new("config")
+                .about("Print the current configuration in TOML")
+        )
+        .subcommand(
             Command::new("update")
                 .alias("up")
                 .alias("fix")
@@ -98,6 +102,7 @@ async fn main() -> Result<()> {
             let object = sub_matches.get_one::<String>("OBJECT");
             list::list(filters, format, object).await
         }
+        Some(("config", _)) => settings::print(),
         Some(("update", sub_matches)) => {
             let filters = sub_matches
                 .get_many::<String>("FILTER")
