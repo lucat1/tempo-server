@@ -16,7 +16,7 @@ use clap::{arg, Command};
 use directories::ProjectDirs;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -84,15 +84,17 @@ async fn main() -> Result<()> {
     SETTINGS.get_or_try_init(async { cfg() }).await?;
     let db = DB
         .get_or_try_init(async {
-            SqlitePool::connect_with(
-                SqliteConnectOptions::new()
-                    .filename(util::path_to_str(
-                        &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
-                    )?)
-                    .create_if_missing(true),
-            )
-            .await
-            .map_err(|e| eyre!(e))
+            SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect_with(
+                    SqliteConnectOptions::new()
+                        .filename(util::path_to_str(
+                            &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
+                        )?)
+                        .create_if_missing(true),
+                )
+                .await
+                .map_err(|e| eyre!(e))
         })
         .await?;
     sqlx::migrate!().run(db).await?;

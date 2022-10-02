@@ -23,10 +23,7 @@ pub async fn update(_filters: Vec<&String>) -> Result<()> {
             .as_ref()
             .ok_or(eyre!("Track {:?} has no path", track.mbid))?;
         if !Path::new(path.as_os_str()).exists() {
-            warn!(
-                "Track \"{}\" has been deleted, purging the database",
-                track.fmt(FMT)?
-            );
+            warn!("Track \"{}\" has been deleted", track.fmt(FMT)?);
             track.delete().await?;
         }
         let new_path = track.path()?;
