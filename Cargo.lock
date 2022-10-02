@@ -1884,7 +1884,7 @@ dependencies = [
 
 [[package]]
 name = "tagger"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "ape",
  "async-once-cell",

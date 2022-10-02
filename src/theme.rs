@@ -8,11 +8,10 @@ use std::io::Write;
 
 pub fn init_logger() {
     let env = Env::default()
-        .filter(TAGGER_LOGLEVEL)
+        .filter_or(TAGGER_LOGLEVEL, "info")
         .write_style(TAGGER_STYLE);
 
     Builder::from_env(env)
-        .filter_level(LevelFilter::Info)
         .filter(Some("sqlx"), LevelFilter::Warn)
         .format(|buf, record| {
             let mut style = buf.style();
