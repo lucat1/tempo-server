@@ -5,6 +5,7 @@ use log::trace;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
+use std::str::FromStr;
 use std::{fmt::Display, path::PathBuf};
 
 use crate::{CLI_NAME, SETTINGS};
@@ -148,6 +149,7 @@ fn get_library() -> Result<PathBuf> {
                 .map(|audio| audio.to_path_buf())
                 .ok_or(eyre!("Could not locate current user's Audio directory"))
         })
+        .or_else(|_| PathBuf::from_str("/music").map_err(|e| eyre!(e)))
 }
 
 pub fn load() -> Result<Settings> {
