@@ -26,4 +26,6 @@ matrix:
 depends_on:
   - lint
 
-branches: main
+when:
+  event: tag
+  branches: main
