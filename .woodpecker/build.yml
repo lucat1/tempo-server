@@ -1,0 +1,29 @@
+pipeline:
+  build:
+    image: rust
+    commands:
+      - rustup target add ${PLATFORM}
+      - cargo build --release --target=${PLATFORM}
+  deploy: 
+    image: plugins/gitea-release
+    settings:
+      api_key:
+        from_secret: gitea_token
+      base_url: https://codeberg.org
+      files: target/${PLATFORM}/release/tagger
+
+matrix:
+  PLATFORM:
+    # - aarch64-unknown-linux-gnu
+    # - i686-pc-windows-gnu
+    # - i686-pc-windows-msvc
+    # - i686-unknown-linux-gnu
+    - x86_64-apple-darwin
+    # - x86_64-pc-windows-gnu
+    # - x86_64-pc-windows-msvc
+    - x86_64-unknown-linux-gnu
+
+depends_on:
+  - lint
+
+branches: main
