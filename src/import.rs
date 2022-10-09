@@ -58,7 +58,7 @@ async fn ask(
                 .interact()
                 .map_err(|_| eyre!("Aborted"))?;
             let (release, tracks) = get(id.as_str()).await?;
-            let (_, tracks_map) = match_tracks(&original_tracks, &tracks);
+            let (_, tracks_map) = match_tracks(original_tracks, &tracks);
             Ok((false, release, tracks, tracks_map))
         }
         v => {
