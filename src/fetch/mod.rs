@@ -59,13 +59,8 @@ pub async fn search(
     Ok(json.releases.into_iter().map(|v| v.into()).collect())
 }
 
-pub async fn get(
-    release: &crate::models::Release,
-) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
+pub async fn get(id: &str) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
     let start = Instant::now();
-    let id = release.mbid.clone().ok_or(eyre!(
-        "The given release doesn't have an ID associated with it, can not fetch specific metadata"
-    ))?;
     let res = CLIENT
         .get(format!(
             "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc={}",

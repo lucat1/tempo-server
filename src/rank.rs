@@ -99,6 +99,8 @@ pub fn match_tracks(
             matrix_vec.push(distance);
         }
     }
+    // TODO: balance
+    let pentality = original_tracks.len().abs_diff(candidate_tracks.len()) * 3000;
     if matrix_vec.is_empty(){
         return (0, vec![]);
     }
@@ -114,7 +116,8 @@ pub fn match_tracks(
         columns = rows
     }
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
-    kuhn_munkres_min(&matrix)
+    let (val, map) = kuhn_munkres_min(&matrix);
+    (val+pentality as i64, map)
 }
 
 pub fn rank_covers(covers_by_provider: &mut [Vec<Cover>], release: &Release) -> Result<Cover> {

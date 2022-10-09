@@ -1,6 +1,6 @@
-use dialoguer::Confirm;
+use dialoguer::Input;
 use eyre::{bail, eyre, Context, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
@@ -28,6 +28,44 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
             Some(e) => e,
             None => eyre!("No errors"),
         })
+}
+
+async fn ask(
+    theme: &DialoguerTheme,
+    original_tracks: &Vec<Track>,
+    candidate: (Release, Vec<Track>, Vec<usize>),
+) -> Result<(bool, Release, Vec<Track>, Vec<usize>)> {
+    info!(
+        "Tagging as {} - {} ({})",
+        candidate.0.artists.joined(),
+        candidate.0.title,
+        candidate
+            .0
+            .mbid
+            .clone()
+            .unwrap_or_else(|| "no mbid".to_string()),
+    );
+    let ch = Input::<char>::with_theme(theme)
+        .with_prompt("Proceed? [y]es, [n]o, [i]d")
+        .interact()
+        .map_err(|_| eyre!("Aborted"))?;
+    match ch {
+        'y' => Ok((true, candidate.0, candidate.1, candidate.2)),
+        'n' => Err(eyre!("Aborted")),
+        'i' => {
+            let id: String = Input::with_theme(theme)
+                .with_prompt("Enter the MusicBrainz Release ID")
+                .interact()
+                .map_err(|_| eyre!("Aborted"))?;
+            let (release, tracks) = get(id.as_str()).await?;
+            let (_, tracks_map) = match_tracks(&original_tracks, &tracks);
+            Ok((false, release, tracks, tracks_map))
+        }
+        v => {
+            warn!("Invalid choice: {}", v);
+            Ok((false, candidate.0, candidate.1, candidate.2))
+        }
+    }
 }
 
 pub async fn import(path: &PathBuf) -> Result<()> {
@@ -72,41 +110,41 @@ pub async fn import(path: &PathBuf) -> Result<()> {
 
     let mut expanded_releases: Vec<(Release, Vec<Track>)> = vec![];
     for release in releases.into_iter() {
-        expanded_releases.push(get(&release).await?);
+        let id = release.mbid.clone().ok_or(eyre!(
+            "The given release doesn't have an ID associated with it, can not fetch specific metadata"
+        ))?;
+        expanded_releases.push(get(id.as_str()).await?);
     }
     let mut rated_expanded_releases = expanded_releases
         .into_iter()
-        .map(|(r, tracks)| (match_tracks(&choice_tracks, &tracks), (r, tracks)))
+        .map(|(r, tracks)| {
+            let (val, map) = match_tracks(&choice_tracks, &tracks);
+            (r, tracks, map, val)
+        })
         .collect::<Vec<_>>();
-    rated_expanded_releases.sort_by(|a, b| a.0 .0.partial_cmp(&b.0 .0).unwrap_or(Ordering::Equal));
-    let ((_diff, tracks_map), final_release) = rated_expanded_releases
+    rated_expanded_releases.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(Ordering::Equal));
+    let (mut final_release, mut final_tracks, mut tracks_map, _) = rated_expanded_releases
         .first()
-        .ok_or(eyre!("No release available for given tracks"))?;
-    info!(
-        "Tagging as {} - {} ({})",
-        final_release.0.artists.joined(),
-        final_release.0.title,
-        final_release
-            .0
-            .mbid
-            .clone()
-            .unwrap_or_else(|| "no mbid".to_string()),
-    );
-    let mut covers_by_provider = search_covers(&final_release.0).await?;
-    let cover = rank_covers(&mut covers_by_provider, &final_release.0)?;
-    info!("Found cover art from {}, converting...", cover.provider);
-    let (image, mime) = get_cover(cover.url).await?;
-    if !Confirm::with_theme(&theme)
-        .with_prompt("Proceed?")
-        .interact()?
-    {
-        bail!("Aborted")
+        .ok_or(eyre!("No release available for given tracks"))?
+        .clone();
+    let mut proceed = false;
+    while !proceed {
+        (proceed, final_release, final_tracks, tracks_map) = ask(
+            &theme,
+            &choice_tracks,
+            (final_release, final_tracks, tracks_map),
+        )
+        .await?;
     }
 
+    let mut covers_by_provider = search_covers(&final_release).await?;
+    let cover = rank_covers(&mut covers_by_provider, &final_release)?;
+    info!("Found cover art from {}, converting...", cover.provider);
+    let (image, mime) = get_cover(cover.url).await?;
     let mut final_tracks = tracks_map
         .iter()
         .enumerate()
-        .map(|(i, map)| (tracks[i].clone(), final_release.1[*map].clone()))
+        .map(|(i, map)| (tracks[i].clone(), final_tracks[*map].clone()))
         .collect::<Vec<_>>();
     for (src, dest) in final_tracks.iter_mut() {
         dest.format = Some(src.format);
