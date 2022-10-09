@@ -114,7 +114,7 @@ pub struct Art {
 }
 
 fn default_art_providers() -> Vec<ArtProvider> {
-    Vec::<ArtProvider>::default()
+    vec![ArtProvider::Itunes, ArtProvider::CoverArtArchive]
 }
 
 fn default_art_width() -> u32 {
