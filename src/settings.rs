@@ -12,7 +12,7 @@ use crate::{CLI_NAME, SETTINGS};
 
 static DEFAULT_DB_FILE: &str = "lib.db";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
     pub library: PathBuf,
@@ -99,7 +99,7 @@ impl From<ArtFormat> for ImageOutputFormat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Art {
     #[serde(default = "default_art_providers")]
     pub providers: Vec<ArtProvider>,
@@ -111,6 +111,13 @@ pub struct Art {
     pub format: ArtFormat,
     #[serde(default = "default_art_image_name")]
     pub image_name: Option<String>,
+
+    #[serde(default = "default_provider_relevance")]
+    pub provider_relevance: f64,
+    #[serde(default = "default_match_relevance")]
+    pub match_relevance: f64,
+    #[serde(default = "default_size_relevance")]
+    pub size_relevance: f64,
 }
 
 fn default_art_providers() -> Vec<ArtProvider> {
@@ -129,6 +136,18 @@ fn default_art_image_name() -> Option<String> {
     Some("cover".to_string())
 }
 
+fn default_provider_relevance() -> f64 {
+    2.0 / 8.0
+}
+
+fn default_match_relevance() -> f64 {
+    2.0 / 8.0
+}
+
+fn default_size_relevance() -> f64 {
+    4.0 / 8.0
+}
+
 impl Default for Art {
     fn default() -> Self {
         Self {
@@ -137,6 +156,9 @@ impl Default for Art {
             height: default_art_height(),
             format: ArtFormat::default(),
             image_name: default_art_image_name(),
+            provider_relevance: default_provider_relevance(),
+            match_relevance: default_match_relevance(),
+            size_relevance: default_size_relevance(),
         }
     }
 }

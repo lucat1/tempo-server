@@ -3,7 +3,6 @@ use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
-use std::cmp::Reverse;
 use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -14,6 +13,7 @@ use crate::fetch::{get, search};
 use crate::library::LibraryTrack;
 use crate::library::Store;
 use crate::models::{Artists, GroupTracks, Release, Track};
+use crate::rank::CoverRating;
 use crate::rank::{match_tracks, rank_covers};
 use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
@@ -70,23 +70,22 @@ async fn ask(
     }
 }
 
-fn ask_cover(theme: &DialoguerTheme, covers: Vec<(Reverse<usize>, Cover)>) -> Option<Cover> {
-    let (match_rank, mut cover) = covers.first()?.clone();
+fn ask_cover(theme: &DialoguerTheme, covers: Vec<CoverRating>) -> Option<Cover> {
+    let CoverRating(match_rank, mut cover) = covers.first()?.clone();
     let mut index: usize = 0;
     info!(
         "Using cover art for release {} - {} from {} ({}x{}, diff: {})",
-        cover.artist, cover.title, cover.provider, cover.width, cover.height, match_rank.0
+        cover.artist, cover.title, cover.provider, cover.width, cover.height, match_rank
     );
     let covers_strs: Vec<String> = covers
         .iter()
-        .map(|(r, c)| {
+        .map(|CoverRating(r, c)| {
             format!(
                 "{}x{} for release {} - {} from {} (diff: {})",
-                c.width, c.height, c.artist, c.title, c.provider, r.0
+                c.width, c.height, c.artist, c.title, c.provider, r
             )
         })
         .collect();
-    println!("{:?}", covers_strs);
     loop {
         if Confirm::with_theme(theme)
             .with_prompt("Proceed?")
