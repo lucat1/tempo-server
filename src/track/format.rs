@@ -41,7 +41,7 @@ impl Format {
         match ext {
             "flac" => Ok(Format::Flac),
             "mp4" => Ok(Format::Mp4),
-            "mp3" => Ok(Format::Id3),
+            "id3" => Ok(Format::Id3),
             "ape" => Ok(Format::Ape),
             _ => Err(eyre!("Unkown extension format with extension {}", ext)),
         }
