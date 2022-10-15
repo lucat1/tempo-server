@@ -69,7 +69,8 @@ fn cli() -> Command<'static> {
 }
 
 async fn db() -> Result<SqlitePool> {
-    SqlitePoolOptions::new()
+    let pool = SqlitePoolOptions::new()
+        // TODO: should not be needed
         .max_connections(1)
         .connect_with(
             SqliteConnectOptions::new()
@@ -79,7 +80,14 @@ async fn db() -> Result<SqlitePool> {
                 .create_if_missing(true),
         )
         .await
-        .map_err(|e| eyre!(e))
+        .map_err(|e| eyre!(e))?;
+    sqlx::query("PRAGMA journal_mode=WAL")
+        .execute(&pool)
+        .await?;
+    sqlx::query("PRAGMA busy_timeout=60000")
+        .execute(&pool)
+        .await?;
+    Ok(pool)
 }
 
 #[tokio::main]

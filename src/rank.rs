@@ -1,11 +1,13 @@
-use crate::fetch::structures::Cover;
-use crate::models::{Track, Release, Artists};
-
 use levenshtein::levenshtein;
-use log::{debug};
-use eyre::{eyre, Result};
+use std::collections::BinaryHeap;
+use std::cmp::Reverse;
+use log::debug;
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
+
+use crate::fetch::structures::Cover;
+use crate::models::{Track, Release, Artists};
+use crate::settings::ArtProvider;
 
 static TRACK_TITLE_FACTOR: usize = 1000;
 static RELEASE_TITLE_FACTOR: usize = 10000;
@@ -120,13 +122,17 @@ pub fn match_tracks(
     (val+pentality as i64, map)
 }
 
-pub fn rank_covers(covers_by_provider: &mut [Vec<Cover>], release: &Release) -> Result<Cover> {
-    for covers in covers_by_provider.iter_mut() {
-        let mut rank_to_index = covers.iter().enumerate().map(|(i, c)| (levenshtein(c.title.as_str(), release.title.as_str()) + levenshtein(c.artist.as_str(), release.artists.joined().as_str()), i)).collect::<Vec<_>>();
-        rank_to_index.sort_by(|d1,d2| d1.0.cmp(&d2.0));
-        if let Some(c) = rank_to_index.first() {
-                return Ok(covers[c.1].clone());
+pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &Release) -> Vec<(Reverse<usize>, Cover)> {
+    let mut heap = BinaryHeap::new();
+    for covers in covers_by_provider.into_iter() {
+        for cover in covers.into_iter() {
+            let mut rating = levenshtein(cover.title.as_str(), release.title.as_str()) + levenshtein(cover.artist.as_str(), release.artists.joined().as_str());
+            if cover.provider == ArtProvider::CoverArtArchive {
+                rating += 5; // TODO: better way? otherwise art from the CoverArtArchive always
+                // achieves the best score
+            }
+            heap.push((Reverse(rating), cover));
         }
     }
-    Err(eyre!("No cover art found"))
+    heap.into_sorted_vec()
 }

@@ -29,6 +29,10 @@ static ITUNES_COUNTRIES: &[&str] = &[
     "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
 ];
 
+pub async fn probe(url: String) -> Option<()> {
+    CLIENT.head(url).send().await.ok().map(|_| ())
+}
+
 pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Result<Vec<Cover>> {
     let start = Instant::now();
     let raw_country = release.country.as_deref().unwrap_or(DEFAULT_COUNTRY);
@@ -55,7 +59,21 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
             res.text().await?
         );
     }
-    let json = res.json::<Itunes>().await?;
+    let mut json = res.json::<Itunes>().await?;
+    for item in json.results.iter_mut() {
+        for size in [5000, 1200, 600] {
+            let url = item
+                .artwork_url_100
+                .replace("100x100", format!("{}x{}", size, size).as_str());
+            match probe(url).await {
+                Some(_) => {
+                    item.max_size = Some(size);
+                    break;
+                }
+                None => continue,
+            }
+        }
+    }
     let json_time = start.elapsed();
     trace!("Itunes JSON parse took {:?}", json_time - req_time);
     Ok(json.into())

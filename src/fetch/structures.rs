@@ -1,6 +1,7 @@
 use eyre::{eyre, Report, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -418,11 +419,20 @@ impl CoverArtArchive {
             .into_iter()
             .filter_map(|i| {
                 if i.front {
-                    Some(Cover {
-                        provider: ArtProvider::CoverArtArchive,
-                        url: i.image,
-                        title: title.clone(),
-                        artist: artist.clone(),
+                    let sizes: HashMap<usize, String> = i
+                        .thumbnails
+                        .into_iter()
+                        .filter_map(|(k, v)| k.parse::<usize>().ok().map(|d| (d, v)))
+                        .collect();
+                    sizes.keys().max().and_then(|size| {
+                        sizes.get(size).map(|url| Cover {
+                            provider: ArtProvider::CoverArtArchive,
+                            url: url.to_string(),
+                            width: *size,
+                            height: *size,
+                            title: title.clone(),
+                            artist: artist.clone(),
+                        })
                     })
                 } else {
                     None
@@ -432,13 +442,37 @@ impl CoverArtArchive {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cover {
     pub provider: ArtProvider,
     pub url: String,
+    pub width: usize,
+    pub height: usize,
     pub title: String,
     pub artist: String,
 }
+
+// Covers are sorted by picture size
+impl Ord for Cover {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s1 = self.width * self.height;
+        let s2 = other.width * other.height;
+        s1.cmp(&s2)
+    }
+}
+
+impl PartialOrd for Cover {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Cover {
+    fn eq(&self, other: &Self) -> bool {
+        self.width * self.height == other.width * other.height
+    }
+}
+impl Eq for Cover {}
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Itunes {
@@ -453,17 +487,24 @@ pub struct ItunesResult {
     pub collection_name: String,
     #[serde(rename = "artworkUrl100")]
     pub artwork_url_100: String,
+    pub max_size: Option<usize>,
 }
 
 impl From<Itunes> for Vec<Cover> {
     fn from(caa: Itunes) -> Self {
         caa.results
             .into_iter()
-            .map(|i| Cover {
-                provider: ArtProvider::Itunes,
-                url: i.artwork_url_100.replace("100x100", "1200x1200"),
-                title: i.collection_name,
-                artist: i.artist_name,
+            .filter_map(|i| {
+                i.max_size.map(|s| Cover {
+                    provider: ArtProvider::Itunes,
+                    url: i
+                        .artwork_url_100
+                        .replace("100x100", format!("{}x{}", s, s).as_str()),
+                    width: s,
+                    height: s,
+                    title: i.collection_name,
+                    artist: i.artist_name,
+                })
             })
             .collect()
     }
@@ -473,7 +514,7 @@ impl From<Itunes> for Vec<Cover> {
 pub struct Image {
     approved: bool,
     front: bool,
-    image: String,
+    thumbnails: HashMap<String, String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

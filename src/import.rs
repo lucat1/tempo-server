@@ -1,13 +1,15 @@
-use dialoguer::Input;
+use dialoguer::{Confirm, Input, Select};
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
+use std::cmp::Reverse;
 use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::fetch::cover::{get_cover, search_covers};
+use crate::fetch::structures::Cover;
 use crate::fetch::{get, search};
 use crate::library::LibraryTrack;
 use crate::library::Store;
@@ -66,6 +68,42 @@ async fn ask(
             Ok((false, candidate.0, candidate.1, candidate.2))
         }
     }
+}
+
+fn ask_cover(theme: &DialoguerTheme, covers: Vec<(Reverse<usize>, Cover)>) -> Option<Cover> {
+    let (match_rank, mut cover) = covers.first()?.clone();
+    let mut index: usize = 0;
+    info!(
+        "Using cover art for release {} - {} from {} ({}x{}, diff: {})",
+        cover.artist, cover.title, cover.provider, cover.width, cover.height, match_rank.0
+    );
+    let covers_strs: Vec<String> = covers
+        .iter()
+        .map(|(r, c)| {
+            format!(
+                "{}x{} for release {} - {} from {} (diff: {})",
+                c.width, c.height, c.artist, c.title, c.provider, r.0
+            )
+        })
+        .collect();
+    println!("{:?}", covers_strs);
+    loop {
+        if Confirm::with_theme(theme)
+            .with_prompt("Proceed?")
+            .interact()
+            .ok()?
+        {
+            break;
+        }
+
+        index = Select::with_theme(theme)
+            .items(&covers_strs)
+            .default(index)
+            .interact()
+            .ok()?;
+        cover = covers[index].1.clone();
+    }
+    Some(cover)
 }
 
 pub async fn import(path: &PathBuf) -> Result<()> {
@@ -137,9 +175,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .await?;
     }
 
-    let mut covers_by_provider = search_covers(&final_release).await?;
-    let cover = rank_covers(&mut covers_by_provider, &final_release)?;
-    info!("Found cover art from {}, converting...", cover.provider);
+    let covers_by_provider = search_covers(&final_release).await?;
+    let covers = rank_covers(covers_by_provider, &final_release);
+    let cover = ask_cover(&theme, covers).ok_or(eyre!("No album art found"))?;
     let (image, mime) = get_cover(cover.url).await?;
     let mut final_tracks = tracks_map
         .iter()

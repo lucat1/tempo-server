@@ -7,7 +7,7 @@ use eyre::{eyre, Result, WrapErr};
 use itertools::Itertools;
 use log::trace;
 use sqlx::sqlite::SqliteRow;
-use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Transaction, Type};
+use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
 use std::fmt::Display;
 use std::iter;
 use std::path::PathBuf;
@@ -287,7 +287,7 @@ async fn resolve(db: &Pool<Sqlite>, table: &str, mbid: Option<&String>) -> Resul
 }
 
 async fn link(
-    db: &mut Transaction<'_, Sqlite>,
+    db: &Pool<Sqlite>,
     table: &str,
     mbid: Option<&String>,
     artist: &Artist,
@@ -425,8 +425,7 @@ impl Store for Track {
         if let Some(rel) = &self.release {
             rel.store().await?;
         }
-        let db = DB.get().ok_or(eyre!("Could not get database"))?;
-        let mut tx = db.begin().await?;
+        let mut db = DB.get().ok_or(eyre!("Could not get database"))?;
         Track::store_builder()
             .build()
             .bind(&self.mbid)
@@ -442,42 +441,41 @@ impl Store for Track {
                 Err(eyre!("The given track doesn't have an associated path")),
                 path_to_str,
             )?)
-            .execute(&mut tx)
+            .execute(db)
             .await?;
 
         for artist in self.artists.iter() {
             artist.store().await?;
-            link(&mut tx, "track_artists", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_artists", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.performers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_performers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_performers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.engigneers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_engigneers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_engigneers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.mixers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_mixers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_mixers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.producers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_producers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_producers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.lyricists.iter() {
             artist.store().await?;
-            link(&mut tx, "track_lyricists", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_lyricists", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.writers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_writers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_writers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.composers.iter() {
             artist.store().await?;
-            link(&mut tx, "track_composers", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "track_composers", self.mbid.as_ref(), artist).await?;
         }
-        tx.commit().await?;
         Ok(())
     }
 }
@@ -580,8 +578,7 @@ impl InTable for Release {
 #[async_trait]
 impl Store for Release {
     async fn store(&self) -> Result<()> {
-        let db = DB.get().ok_or(eyre!("Could not get database"))?;
-        let mut tx = db.begin().await?;
+        let mut db = DB.get().ok_or(eyre!("Could not get database"))?;
         Release::store_builder()
             .build()
             .bind(&self.mbid)
@@ -599,13 +596,12 @@ impl Store for Release {
             .bind(self.date)
             .bind(self.original_date)
             .bind(&self.script)
-            .execute(&mut tx)
+            .execute(db)
             .await?;
         for artist in self.artists.iter() {
             artist.store().await?;
-            link(&mut tx, "release_artists", self.mbid.as_ref(), artist).await?;
+            link(&mut db, "release_artists", self.mbid.as_ref(), artist).await?;
         }
-        tx.commit().await?;
         Ok(())
     }
 }
