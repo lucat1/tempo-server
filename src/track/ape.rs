@@ -99,9 +99,6 @@ impl crate::track::Tag for Tag {
         unimplemented!()
     }
 
-    fn str_to_key(&self, str: &str) -> Option<TagKey> {
-        unimplemented!()
-    }
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str> {
         match key {
             // TODO

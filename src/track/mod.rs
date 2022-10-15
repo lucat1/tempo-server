@@ -73,7 +73,6 @@ pub trait Tag: TagClone {
     fn get_pictures(&self) -> Result<Vec<Picture>>;
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()>;
 
-    fn str_to_key(&self, str: &str) -> Option<TagKey>;
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str>;
 
     fn write_to_path(&mut self, path: &Path) -> Result<()>;

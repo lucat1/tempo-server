@@ -161,9 +161,6 @@ impl crate::track::Tag for Tag {
         Ok(())
     }
 
-    fn str_to_key(&self, str: &str) -> Option<TagKey> {
-        unimplemented!();
-    }
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str> {
         match key {
             TagKey::AcoustidID => vec!["Acoustid Id"],
