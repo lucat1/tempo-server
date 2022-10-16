@@ -1,12 +1,14 @@
 extern crate ape;
 
-use super::key::TagKey;
-use super::picture::{Picture, PictureType};
 use ape::{Item, ItemValue};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use std::collections::HashMap;
 use std::path::Path;
+
+use super::format::Format;
+use super::key::TagKey;
+use super::picture::{Picture, PictureType};
 
 #[derive(Clone)]
 pub struct Tag {
@@ -23,8 +25,12 @@ impl crate::track::TagFrom for Tag {
     {
         Ok(Box::new(Tag {
             tag: ape::read_from_path(path)?,
-            // TODO:
-            separator: ",".to_string(),
+            separator: SETTINGS
+                .get()
+                .ok_or(eyre!("Could not obtain settings"))?
+                .tagging
+                .ape_separator
+                .to_string(),
         }))
     }
 }
@@ -49,6 +55,9 @@ impl crate::track::Tag for Tag {
         }
         self.set_pictures(vec![])?;
         Ok(())
+    }
+    fn separator(&self) -> Format {
+        Format::Ape
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())

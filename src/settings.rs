@@ -40,12 +40,21 @@ pub struct Tagging {
     pub genre_limit: Option<usize>,
     #[serde(default = "default_true")]
     pub use_original_date: bool,
-    #[serde(default = "default_true")]
-    pub use_release_group: bool,
+
+    #[serde(default = "default_separator")]
+    pub id3_separator: String,
+    #[serde(default = "default_separator")]
+    pub mp4_separator: String,
+    #[serde(default = "default_separator")]
+    pub ape_separator: String,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_separator() -> String {
+    ";".to_string()
 }
 
 impl Default for Tagging {
@@ -54,7 +63,9 @@ impl Default for Tagging {
             clear: default_true(),
             genre_limit: Option::default(),
             use_original_date: default_true(),
-            use_release_group: default_true(),
+            id3_separator: default_separator(),
+            mp4_separator: default_separator(),
+            ape_separator: default_separator(),
         }
     }
 }
@@ -118,6 +129,9 @@ pub struct Art {
     pub match_relevance: f64,
     #[serde(default = "default_size_relevance")]
     pub size_relevance: f64,
+
+    #[serde(default = "default_true")]
+    pub cover_art_archive_use_release_group: bool,
 }
 
 fn default_art_providers() -> Vec<ArtProvider> {
@@ -159,6 +173,7 @@ impl Default for Art {
             provider_relevance: default_provider_relevance(),
             match_relevance: default_match_relevance(),
             size_relevance: default_size_relevance(),
+            cover_art_archive_use_release_group: default_true(),
         }
     }
 }

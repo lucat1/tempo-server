@@ -15,10 +15,12 @@ pub mod picture;
 
 use core::convert::AsRef;
 use eyre::{Report, Result};
+use log::debug;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::path::Path;
 
+use self::format::Format;
 use self::key::TagKey;
 use picture::Picture;
 
@@ -64,16 +66,43 @@ impl Debug for Box<dyn Tag> {
 }
 
 pub trait Tag: TagClone {
+    fn format(&self) -> Format;
     fn separator(&self) -> Option<String>;
 
     fn clear(&mut self) -> Result<()>;
-    fn get_str(&self, key: &str) -> Option<Vec<String>>;
-    fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn get_all(&self) -> HashMap<String, Vec<String>>;
     fn get_pictures(&self) -> Result<Vec<Picture>>;
     fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()>;
 
+    fn get_str(&self, key: &str) -> Option<Vec<String>>;
+    fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()>;
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str>;
+    fn get_tag(&self, key: TagKey) -> Vec<String> {
+        let keystrs = self.key_to_str(key);
+        if keystrs.is_empty() {
+            debug!(
+                "The {:?} key is not supported in the output format {:?}",
+                key,
+                self.format()
+            );
+            return vec![];
+        }
+        keystrs
+            .into_iter()
+            .filter_map(|keystr| self.get_str(keystr))
+            .flatten()
+            .collect()
+    }
+    fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<(), TagError> {
+        let keystrs = self.key_to_str(key);
+        if keystrs.is_empty() {
+            return Err(TagError::NotSupported);
+        }
+        keystrs.into_iter().try_for_each(|keystr| {
+            self.set_str(keystr, values.clone())
+                .map_err(TagError::Other)
+        })
+    }
 
     fn write_to_path(&mut self, path: &Path) -> Result<()>;
 }

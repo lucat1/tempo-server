@@ -87,12 +87,12 @@ pub async fn fetch_cover_art_archive(
     let res = CLIENT
         .get(format!(
             "http://coverartarchive.org/{}/{}",
-            if settings.tagging.use_release_group {
+            if settings.art.cover_art_archive_use_release_group {
                 "release-group"
             } else {
                 "release"
             },
-            if settings.tagging.use_release_group {
+            if settings.art.cover_art_archive_use_release_group {
                 release.release_group_mbid.clone().ok_or(eyre!(
                     "The given release doesn't have an associated MusicBrainz relese-group id"
                 ))?

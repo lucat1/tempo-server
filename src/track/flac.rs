@@ -8,6 +8,8 @@ use metaflac::block::PictureType as FLACPictureType;
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::format::Format;
+
 #[derive(Clone)]
 pub struct Tag {
     tag: metaflac::Tag,
@@ -32,6 +34,9 @@ impl crate::track::Tag for Tag {
         }
         self.set_pictures(vec![])?;
         Ok(())
+    }
+    fn format(&self) -> Format {
+        Format::Flac
     }
     fn separator(&self) -> Option<String> {
         None

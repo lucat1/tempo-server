@@ -8,8 +8,21 @@ use id3::frame::ExtendedText;
 use id3::frame::Picture as ID3Picture;
 use id3::frame::PictureType as ID3PictureType;
 use id3::{Content, Frame, TagLike, Version};
+use itertools::Itertools;
+use log::debug;
 use std::collections::HashMap;
 use std::path::Path;
+
+use super::format::Format;
+use super::Tag as TagTrait;
+use super::TagError;
+use crate::SETTINGS;
+
+static SECOND_VALUE_KEYS: [TagKey; 3] = [
+    TagKey::MovementCount,
+    TagKey::TotalTracks,
+    TagKey::TotalDiscs,
+];
 
 #[derive(Clone)]
 pub struct Tag {
@@ -17,20 +30,24 @@ pub struct Tag {
     separator: String,
 }
 
-impl crate::track::TagFrom for Tag {
+impl super::TagFrom for Tag {
     fn from_path<P>(path: P) -> Result<Box<dyn crate::track::Tag>>
     where
         P: AsRef<Path>,
     {
         Ok(Box::new(Tag {
             tag: id3::Tag::read_from_path(path)?,
-            // TODO
-            separator: ",".to_string(),
+            separator: SETTINGS
+                .get()
+                .ok_or(eyre!("Could not obtain settings"))?
+                .tagging
+                .id3_separator
+                .to_string(),
         }))
     }
 }
 
-impl crate::track::Tag for Tag {
+impl super::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
         for key in map.keys() {
@@ -38,6 +55,9 @@ impl crate::track::Tag for Tag {
         }
         self.set_pictures(vec![])?;
         Ok(())
+    }
+    fn format(&self) -> Format {
+        Format::Id3
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())
@@ -87,7 +107,6 @@ impl crate::track::Tag for Tag {
                 );
             }
         }
-        // Add TXXX
         for extended in self.tag.extended_texts() {
             tags.insert(
                 extended.description.to_string(),
@@ -200,7 +219,9 @@ impl crate::track::Tag for Tag {
             TagKey::Conductor => vec!["TPE3"],
             TagKey::Copyright => vec!["TCOP"],
             TagKey::Director => vec!["TXXX:DIRECTOR"],
+            // NOTE: this hold both DiscNumber and TotalDiscs in a "../.." string
             TagKey::DiscNumber => vec!["TPOS"],
+            TagKey::TotalDiscs => vec!["TPOS"],
             TagKey::DiscSubtitle => vec!["TSST"],
             TagKey::EncodedBy => vec!["TENC"],
             TagKey::EncoderSettings => vec!["TSSE"],
@@ -217,7 +238,9 @@ impl crate::track::Tag for Tag {
             TagKey::MixDJ => vec!["TIPL:DJ-mix", "IPLS:DJ-mix"],
             TagKey::Mixer => vec!["TIPL:mix", "IPLS:mix"],
             TagKey::Mood => vec!["TMOO"],
-            // NOTE: this hold both MovementNumber and MovementTotal in a "../.." string
+            // NOTE: this hold both MovementNumber and MovementCount in a "../.." string
+            TagKey::MovementNumber => vec!["MVIN"],
+            TagKey::MovementCount => vec!["MVIN"],
             TagKey::Movement => vec!["MVNM"],
             TagKey::MusicBrainzArtistID => vec!["TXXX:MusicBrainz Artist Id"],
             TagKey::MusicBrainzDiscID => vec!["TXXX:MusicBrainz Disc Id"],
@@ -255,8 +278,9 @@ impl crate::track::Tag for Tag {
             TagKey::Script => vec!["TXXX:SCRIPT"],
             TagKey::ShowWorkAndMovement => vec!["TXXX:SHOWMOVEMENT"],
             TagKey::Subtitle => vec!["TIT3"],
-            // NOTE: this hold both MovementNumber and MovementTotal in a "../.." string
+            // NOTE: this hold both TrackNumber and TotalTracks in a "../.." string
             TagKey::TrackNumber => vec!["TRCK"],
+            TagKey::TotalTracks => vec!["TRCK"],
             TagKey::TrackTitle => vec!["TIT2"],
             TagKey::TrackTitleSortOrder => vec!["TSOT"],
             TagKey::Website => vec!["WOAR"],
@@ -271,9 +295,108 @@ impl crate::track::Tag for Tag {
         }
     }
 
+    fn get_tag(&self, key: TagKey) -> Vec<String> {
+        match key {
+            TagKey::MovementNumber
+            | TagKey::MovementCount
+            | TagKey::TrackNumber
+            | TagKey::TotalTracks
+            | TagKey::DiscNumber
+            | TagKey::TotalDiscs => self
+                .original_get_tag(key)
+                .into_iter()
+                .map(|val| {
+                    if val.contains('/') {
+                        let mut iter = val.split('/').take(2);
+                        let mut item = iter.next();
+                        if SECOND_VALUE_KEYS.contains(&key) {
+                            item = iter.next();
+                        }
+                        item.map_or("0".to_string(), |n| n.to_string())
+                    } else {
+                        val
+                    }
+                })
+                .collect(),
+            k => self.original_get_tag(k),
+        }
+    }
+    fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<(), TagError> {
+        match key {
+            TagKey::MovementNumber
+            | TagKey::MovementCount
+            | TagKey::TrackNumber
+            | TagKey::TotalTracks
+            | TagKey::DiscNumber
+            | TagKey::TotalDiscs => {
+                let original_value = self.original_get_tag(key);
+                let mut keys = original_value
+                    .iter()
+                    .filter_map(|val| {
+                        val.split('/')
+                            .take(2)
+                            .collect_tuple()
+                            .or(Some((val.as_str(), "0")))
+                    })
+                    .collect::<Vec<_>>();
+                for _ in keys.len()..values.len() {
+                    keys.push(("0", "0"));
+                }
+                let mut final_values = vec![];
+                for (i, value) in values.iter().enumerate() {
+                    let (mut n, mut tot) = keys[i];
+                    if SECOND_VALUE_KEYS.contains(&key) {
+                        tot = value.as_str();
+                    } else {
+                        n = value.as_str();
+                    }
+                    let mut computed_val = n.to_string();
+                    computed_val.push('/');
+                    computed_val.push_str(tot);
+                    final_values.push(computed_val);
+                }
+                println!("final_values {:?}", final_values);
+                self.original_set_tag(key, final_values)
+            }
+            k => self.original_set_tag(k, values),
+        }
+    }
+
     fn write_to_path(&mut self, path: &Path) -> Result<()> {
         self.tag
             .write_to_path(path, Version::Id3v24)
             .map_err(|e| eyre!(e))
+    }
+}
+
+// Due to rust inability to call the default implementation of a trait method
+// these have to be copied from the crate::track::Tag definition
+impl Tag {
+    fn original_get_tag(&self, key: TagKey) -> Vec<String> {
+        let keystrs = self.key_to_str(key);
+        if keystrs.is_empty() {
+            debug!(
+                "The {:?} key is not supported in the output format {:?}",
+                key,
+                self.format()
+            );
+            return vec![];
+        }
+        keystrs
+            .into_iter()
+            .filter_map(|keystr| self.get_str(keystr))
+            .flatten()
+            .collect()
+    }
+
+    fn original_set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<(), TagError> {
+        let keystrs = self.key_to_str(key);
+        if keystrs.is_empty() {
+            return Err(TagError::NotSupported);
+        }
+        keystrs.into_iter().try_for_each(|keystr| {
+            self.set_str(keystr, values.clone())
+                .map_err(TagError::Other)
+        })
     }
 }

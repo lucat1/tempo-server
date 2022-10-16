@@ -1,6 +1,6 @@
 use eyre::{bail, eyre, Report, Result, WrapErr};
 use itertools::Itertools;
-use log::{debug, warn};
+use log::warn;
 use std::collections::HashMap;
 use std::fs::copy;
 use std::path::PathBuf;
@@ -54,31 +54,10 @@ impl TrackFile {
     }
 
     pub fn get_tag(&self, key: TagKey) -> Vec<String> {
-        let keystrs = self.tag.key_to_str(key);
-        if keystrs.is_empty() {
-            debug!(
-                "The {:?} key is not supported in the output format {:?}",
-                key, self.format
-            );
-            return vec![];
-        }
-        keystrs
-            .into_iter()
-            .filter_map(|keystr| self.tag.get_str(keystr))
-            .flatten()
-            .collect()
+        self.tag.get_tag(key)
     }
-
     pub fn set_tag(&mut self, key: TagKey, values: Vec<String>) -> Result<(), TagError> {
-        let keystrs = self.tag.key_to_str(key);
-        if keystrs.is_empty() {
-            return Err(TagError::NotSupported);
-        }
-        keystrs.into_iter().try_for_each(|keystr| {
-            self.tag
-                .set_str(keystr, values.clone())
-                .map_err(TagError::Other)
-        })
+        self.tag.set_tag(key, values)
     }
 
     pub fn set_pictures(&mut self, pictures: Vec<Picture>) -> Result<()> {

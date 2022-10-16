@@ -1,7 +1,5 @@
 extern crate mp4ameta;
 
-use super::key::TagKey;
-use super::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{bail, eyre, Result};
 use mime::{BMP, IMAGE_BMP, IMAGE_JPEG, IMAGE_PNG, JPEG, PNG};
@@ -9,6 +7,10 @@ use mp4ameta::ident::DataIdent;
 use mp4ameta::{Data, ImgFmt};
 use std::collections::HashMap;
 use std::path::Path;
+
+use super::format::Format;
+use super::key::TagKey;
+use super::picture::{Picture, PictureType};
 
 const MAGIC: u8 = 0xa9;
 
@@ -25,8 +27,12 @@ impl crate::track::TagFrom for Tag {
     {
         Ok(Box::new(Tag {
             tag: mp4ameta::Tag::read_from_path(path)?,
-            // TODO
-            separator: ",".to_string(),
+            separator: SETTINGS
+                .get()
+                .ok_or(eyre!("Could not obtain settings"))?
+                .tagging
+                .mp4_separator
+                .to_string(),
         }))
     }
 }
@@ -68,6 +74,9 @@ impl crate::track::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         self.tag.clear();
         Ok(())
+    }
+    fn format(&self) -> Option<String> {
+        Format::Mp4
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())
