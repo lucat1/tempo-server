@@ -355,7 +355,6 @@ impl super::Tag for Tag {
                     computed_val.push_str(tot);
                     final_values.push(computed_val);
                 }
-                println!("final_values {:?}", final_values);
                 self.original_set_tag(key, final_values)
             }
             k => self.original_set_tag(k, values),
