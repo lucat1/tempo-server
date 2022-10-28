@@ -140,7 +140,7 @@ impl PartialOrd for CoverRating {
 }
 impl Ord for CoverRating {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap_or(Ordering::Equal)
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
@@ -159,7 +159,7 @@ fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
 }
 
 pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &Release) -> Vec<CoverRating> {
-    let mut vec: Vec<CoverRating> = covers_by_provider.into_iter().map(|covers| covers.into_iter().map(|cover| {
+    let mut vec: Vec<CoverRating> = covers_by_provider.into_iter().flat_map(|covers| covers.into_iter().map(|cover| {
             let mut distance = 1.0 - ((levenshtein(cover.title.as_str(), release.title.as_str()) + levenshtein(cover.artist.as_str(), release.artists.joined().as_str())) as f64/
                 (cover.title.len().max(release.title.len()) + cover.artist.len().max(release.artists.joined().len())) as f64);
             if cover.provider == ArtProvider::CoverArtArchive {
@@ -167,7 +167,7 @@ pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &Release) -> Ve
                 // achieves the best score
             }
             CoverRating(valuate_cover(distance, &cover), cover)
-    })).flatten().collect();
+    })).collect();
     vec.sort();
     vec.reverse();
     vec

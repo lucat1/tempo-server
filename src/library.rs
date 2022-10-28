@@ -425,7 +425,7 @@ impl Store for Track {
         if let Some(rel) = &self.release {
             rel.store().await?;
         }
-        let mut db = DB.get().ok_or(eyre!("Could not get database"))?;
+        let db = DB.get().ok_or(eyre!("Could not get database"))?;
         Track::store_builder()
             .build()
             .bind(&self.mbid)
@@ -446,35 +446,35 @@ impl Store for Track {
 
         for artist in self.artists.iter() {
             artist.store().await?;
-            link(&mut db, "track_artists", self.mbid.as_ref(), artist).await?;
+            link(db, "track_artists", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.performers.iter() {
             artist.store().await?;
-            link(&mut db, "track_performers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_performers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.engigneers.iter() {
             artist.store().await?;
-            link(&mut db, "track_engigneers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_engigneers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.mixers.iter() {
             artist.store().await?;
-            link(&mut db, "track_mixers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_mixers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.producers.iter() {
             artist.store().await?;
-            link(&mut db, "track_producers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_producers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.lyricists.iter() {
             artist.store().await?;
-            link(&mut db, "track_lyricists", self.mbid.as_ref(), artist).await?;
+            link(db, "track_lyricists", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.writers.iter() {
             artist.store().await?;
-            link(&mut db, "track_writers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_writers", self.mbid.as_ref(), artist).await?;
         }
         for artist in self.composers.iter() {
             artist.store().await?;
-            link(&mut db, "track_composers", self.mbid.as_ref(), artist).await?;
+            link(db, "track_composers", self.mbid.as_ref(), artist).await?;
         }
         Ok(())
     }
@@ -578,7 +578,7 @@ impl InTable for Release {
 #[async_trait]
 impl Store for Release {
     async fn store(&self) -> Result<()> {
-        let mut db = DB.get().ok_or(eyre!("Could not get database"))?;
+        let db = DB.get().ok_or(eyre!("Could not get database"))?;
         Release::store_builder()
             .build()
             .bind(&self.mbid)
@@ -600,7 +600,7 @@ impl Store for Release {
             .await?;
         for artist in self.artists.iter() {
             artist.store().await?;
-            link(&mut db, "release_artists", self.mbid.as_ref(), artist).await?;
+            link(db, "release_artists", self.mbid.as_ref(), artist).await?;
         }
         Ok(())
     }

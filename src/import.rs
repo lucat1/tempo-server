@@ -176,8 +176,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
 
     let covers_by_provider = search_covers(&final_release).await?;
     let covers = rank_covers(covers_by_provider, &final_release);
-    let cover = ask_cover(&theme, covers).ok_or(eyre!("No album art found"))?;
-    let (image, mime) = get_cover(cover.url).await?;
+    let maybe_cover = ask_cover(&theme, covers);
+    let mut maybe_picture: Option<Picture> = None;
     let mut final_tracks = tracks_map
         .iter()
         .enumerate()
@@ -199,15 +199,23 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
     folders.sort();
     folders.dedup();
-    let picture = Picture {
-        mime_type: mime,
-        picture_type: PictureType::CoverFront,
-        description: "Front".to_string(),
-        data: image.clone(),
-    };
-    for dest in folders.into_iter() {
-        mkdirp(&dest)?;
-        write_picture(&picture, &dest)?;
+    for dest in folders.iter() {
+        mkdirp(dest)?;
+    }
+    if let Some(cover) = maybe_cover {
+        let (image, mime) = get_cover(cover.url).await?;
+        let picture = Picture {
+            mime_type: mime,
+            picture_type: PictureType::CoverFront,
+            description: "Front".to_string(),
+            data: image,
+        };
+        for dest in folders.into_iter() {
+            write_picture(&picture, &dest)?;
+        }
+        maybe_picture = Some(picture)
+    } else {
+        warn!("No album art found")
     }
     for (src, dest) in final_tracks.iter_mut() {
         debug!("Beofre tagging {:?}", src);
@@ -226,7 +234,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }
         src.apply(dest.clone().try_into()?)
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
-        src.set_pictures(vec![picture.clone()])?;
+        if let Some(ref picture) = maybe_picture {
+            src.set_pictures(vec![picture.clone()])?;
+        }
         src.write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         dest.store().await?;
