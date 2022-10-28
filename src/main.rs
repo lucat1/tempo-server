@@ -15,6 +15,7 @@ use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
+use log::error;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -129,6 +130,18 @@ async fn main() -> Result<()> {
             }
             Ok(())
         }
-        _ => unreachable!(),
+        Some((cmd, _)) => {
+            error!(
+                "Invalid command {}, use `help` to see all available subcommands",
+                cmd
+            );
+            Ok(())
+        }
+        None => {
+            error!(
+                "A subcommand is required. Use `help` to get a list of all available subcommands"
+            );
+            Ok(())
+        }
     }
 }
