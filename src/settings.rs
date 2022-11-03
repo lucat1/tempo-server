@@ -41,7 +41,7 @@ pub struct Tagging {
     #[serde(default = "default_true")]
     pub use_original_date: bool,
 
-    #[serde(default = "default_separator")]
+    #[serde(default = "default_id3_separator")]
     pub id3_separator: String,
     #[serde(default = "default_separator")]
     pub mp4_separator: String,
@@ -51,6 +51,10 @@ pub struct Tagging {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_id3_separator() -> String {
+    "\0".to_string()
 }
 
 fn default_separator() -> String {
@@ -63,7 +67,7 @@ impl Default for Tagging {
             clear: default_true(),
             genre_limit: Option::default(),
             use_original_date: default_true(),
-            id3_separator: default_separator(),
+            id3_separator: default_id3_separator(),
             mp4_separator: default_separator(),
             ape_separator: default_separator(),
         }
@@ -193,6 +197,7 @@ pub fn load() -> Result<Settings> {
     let dirs = ProjectDirs::from("com", "github", CLI_NAME)
         .ok_or(eyre!("Could not locate program directories"))?;
     let path = dirs.config_dir().join(PathBuf::from("config.toml"));
+    trace!("Loading config file: {:?}", path);
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
     let lib = get_library()?;
