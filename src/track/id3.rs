@@ -4,9 +4,8 @@ use super::key::TagKey;
 use super::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
-use id3::frame::ExtendedText;
-use id3::frame::Picture as ID3Picture;
 use id3::frame::PictureType as ID3PictureType;
+use id3::frame::{ExtendedText, Picture as ID3Picture};
 use id3::{Content, Frame, TagLike, Version};
 use itertools::Itertools;
 use log::debug;
@@ -64,34 +63,33 @@ impl super::Tag for Tag {
     }
     fn get_str(&self, key: &str) -> Option<Vec<String>> {
         if key.len() != 4 {
-            if let Some(t) = self.tag.extended_texts().find(|t| t.description == key) {
-                return Some(
+            self.tag
+                .extended_texts()
+                .find(|t| t.description == key)
+                .map(|t| {
                     t.value
-                        .split(&self.separator)
+                        .split(self.separator.as_str())
                         .map(|s| s.to_string())
-                        .collect::<Vec<_>>(),
-                );
-            }
-            None
+                        .collect()
+                })
         } else {
             self.tag.get(key).and_then(|t| {
                 t.content()
-                    .text()
-                    .map(|content| content.split(&self.separator).map(String::from).collect())
+                    .text_values()
+                    .map(|i| i.map(|s| s.to_string()).collect())
             })
         }
     }
 
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()> {
-        let val = values.join(&self.separator);
         let frame = if key.len() != 4 {
             ExtendedText {
                 description: key.to_string(),
-                value: val,
+                value: values.join(&self.separator),
             }
             .into()
         } else {
-            Frame::text(key, val)
+            Frame::with_content(key, Content::new_text_values(values))
         };
         self.tag.add_frame(frame);
         Ok(())
@@ -100,10 +98,10 @@ impl super::Tag for Tag {
     fn get_all(&self) -> HashMap<String, Vec<String>> {
         let mut tags = HashMap::new();
         for frame in self.tag.frames() {
-            if let Content::Text(v) = frame.content() {
+            if let Some(vals) = frame.content().text_values() {
                 tags.insert(
                     frame.id().to_owned(),
-                    v.split(&self.separator).map(String::from).collect(),
+                    vals.map(|s| s.to_string()).collect::<Vec<_>>(),
                 );
             }
         }
