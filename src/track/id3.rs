@@ -29,6 +29,8 @@ pub struct Tag {
     separator: String,
 }
 
+static EXTENDED_LEN_4: [&str; 1] = ["ASIN"];
+
 impl super::TagFrom for Tag {
     fn from_path<P>(path: P) -> Result<Box<dyn crate::track::Tag>>
     where
@@ -62,7 +64,7 @@ impl super::Tag for Tag {
         Some(self.separator.clone())
     }
     fn get_str(&self, key: &str) -> Option<Vec<String>> {
-        if key.len() != 4 {
+        if key.len() != 4 || EXTENDED_LEN_4.contains(&key) {
             self.tag
                 .extended_texts()
                 .find(|t| t.description == key)
@@ -82,7 +84,7 @@ impl super::Tag for Tag {
     }
 
     fn set_str(&mut self, key: &str, values: Vec<String>) -> Result<()> {
-        let frame = if key.len() != 4 {
+        let frame = if key.len() != 4 || EXTENDED_LEN_4.contains(&key) {
             ExtendedText {
                 description: key.to_string(),
                 value: values.join(&self.separator),
@@ -196,8 +198,8 @@ impl super::Tag for Tag {
 
     fn key_to_str(&self, key: TagKey) -> Vec<&'static str> {
         match key {
-            TagKey::AcoustidID => vec!["TXXX:Acoustid Id"],
-            TagKey::AcoustidIDFingerprint => vec!["TXXX:Acoustid Fingerprint"],
+            TagKey::AcoustidID => vec!["Acoustid Id"],
+            TagKey::AcoustidIDFingerprint => vec!["Acoustid Fingerprint"],
             TagKey::Album => vec!["TALB"],
             TagKey::AlbumArtist => vec!["TPE2"],
             TagKey::AlbumArtistSortOrder => vec!["TSO2"],
@@ -205,18 +207,18 @@ impl super::Tag for Tag {
             TagKey::Arranger => vec!["TIPL:arranger", "IPLS:arranger"],
             TagKey::Artist => vec!["TPE1"],
             TagKey::ArtistSortOrder => vec!["TSOP"],
-            TagKey::Artists => vec!["TXXX:ARTISTS"],
-            TagKey::ASIN => vec!["TXXX:ASIN"],
-            TagKey::Barcode => vec!["TXXX:BARCODE"],
+            TagKey::Artists => vec!["ARTISTS"],
+            TagKey::ASIN => vec!["ASIN"],
+            TagKey::Barcode => vec!["BARCODE"],
             TagKey::BPM => vec!["TBPM"],
-            TagKey::CatalogNumber => vec!["TXXX:CATALOGNUMBER"],
+            TagKey::CatalogNumber => vec!["CATALOGNUMBER"],
             TagKey::Comment => vec!["COMM:description"],
             TagKey::Compilation => vec!["TCMP"],
             TagKey::Composer => vec!["TCOM"],
-            TagKey::ComposerSortOrder => vec!["TSOC", "TXXX:COMPOSERSORT"],
+            TagKey::ComposerSortOrder => vec!["TSOC", "COMPOSERSORT"],
             TagKey::Conductor => vec!["TPE3"],
             TagKey::Copyright => vec!["TCOP"],
-            TagKey::Director => vec!["TXXX:DIRECTOR"],
+            TagKey::Director => vec!["DIRECTOR"],
             // NOTE: this hold both DiscNumber and TotalDiscs in a "../.." string
             TagKey::DiscNumber => vec!["TPOS"],
             TagKey::TotalDiscs => vec!["TPOS"],
@@ -229,7 +231,7 @@ impl super::Tag for Tag {
             TagKey::InitialKey => vec!["TKEY"],
             TagKey::ISRC => vec!["TSRC"],
             TagKey::Language => vec!["TLAN"],
-            TagKey::License => vec!["WCOP", "TXXX:LICENSE"],
+            TagKey::License => vec!["WCOP", "LICENSE"],
             TagKey::Lyricist => vec!["TEXT"],
             TagKey::Lyrics => vec!["USLT:description"],
             TagKey::Media => vec!["TMED"],
@@ -240,19 +242,19 @@ impl super::Tag for Tag {
             TagKey::MovementNumber => vec!["MVIN"],
             TagKey::MovementCount => vec!["MVIN"],
             TagKey::Movement => vec!["MVNM"],
-            TagKey::MusicBrainzArtistID => vec!["TXXX:MusicBrainz Artist Id"],
-            TagKey::MusicBrainzDiscID => vec!["TXXX:MusicBrainz Disc Id"],
-            TagKey::MusicBrainzOriginalArtistID => vec!["TXXX:MusicBrainz Original Artist Id"],
-            TagKey::MusicBrainzOriginalReleaseID => vec!["TXXX:MusicBrainz Original Album Id"],
+            TagKey::MusicBrainzArtistID => vec!["MusicBrainz Artist Id"],
+            TagKey::MusicBrainzDiscID => vec!["MusicBrainz Disc Id"],
+            TagKey::MusicBrainzOriginalArtistID => vec!["MusicBrainz Original Artist Id"],
+            TagKey::MusicBrainzOriginalReleaseID => vec!["MusicBrainz Original Album Id"],
             TagKey::MusicBrainzRecordingID => vec!["UFID:http://musicbrainz.org"],
-            TagKey::MusicBrainzReleaseArtistID => vec!["TXXX:MusicBrainz Album Artist Id"],
-            TagKey::MusicBrainzReleaseGroupID => vec!["TXXX:MusicBrainz Release Group Id"],
-            TagKey::MusicBrainzReleaseID => vec!["TXXX:MusicBrainz Album Id"],
-            TagKey::MusicBrainzTrackID => vec!["TXXX:MusicBrainz Release Track Id"],
-            TagKey::MusicBrainzTRMID => vec!["TXXX:MusicBrainz TRM Id"],
-            TagKey::MusicBrainzWorkID => vec!["TXXX:MusicBrainz Work Id"],
-            TagKey::MusicIPFingerprint => vec!["TXXX:MusicMagic Fingerprint"],
-            TagKey::MusicIPPUID => vec!["TXXX:MusicIP PUID"],
+            TagKey::MusicBrainzReleaseArtistID => vec!["MusicBrainz Album Artist Id"],
+            TagKey::MusicBrainzReleaseGroupID => vec!["MusicBrainz Release Group Id"],
+            TagKey::MusicBrainzReleaseID => vec!["MusicBrainz Album Id"],
+            TagKey::MusicBrainzTrackID => vec!["MusicBrainz Release Track Id"],
+            TagKey::MusicBrainzTRMID => vec!["MusicBrainz TRM Id"],
+            TagKey::MusicBrainzWorkID => vec!["MusicBrainz Work Id"],
+            TagKey::MusicIPFingerprint => vec!["MusicMagic Fingerprint"],
+            TagKey::MusicIPPUID => vec!["MusicIP PUID"],
             TagKey::OriginalAlbum => vec!["TOAL"],
             TagKey::OriginalArtist => vec!["TOPE"],
             TagKey::OriginalFilename => vec!["TOFN"],
@@ -263,18 +265,18 @@ impl super::Tag for Tag {
             TagKey::RecordLabel => vec!["TPUB"],
             TagKey::ReleaseCountry => vec!["MusicBrainz Album Release Country"],
             TagKey::ReleaseDate => vec!["TDRC", "TYER", "TDAT"],
-            TagKey::ReleaseStatus => vec!["TXXX:MusicBrainz Album Status"],
-            TagKey::ReleaseType => vec!["TXXX:MusicBrainz Album Type"],
+            TagKey::ReleaseStatus => vec!["MusicBrainz Album Status"],
+            TagKey::ReleaseType => vec!["MusicBrainz Album Type"],
             TagKey::Remixer => vec!["TPE4"],
-            TagKey::ReplayGainAlbumGain => vec!["TXXX:REPLAYGAIN_ALBUM_GAIN"],
-            TagKey::ReplayGainAlbumPeak => vec!["TXXX:REPLAYGAIN_ALBUM_PEAK"],
-            TagKey::ReplayGainAlbumRange => vec!["TXXX:REPLAYGAIN_ALBUM_RANGE"],
-            TagKey::ReplayGainReferenceLoudness => vec!["TXXX:REPLAYGAIN_REFERENCE_LOUDNESS"],
-            TagKey::ReplayGainTrackGain => vec!["TXXX:REPLAYGAIN_TRACK_GAIN"],
-            TagKey::ReplayGainTrackPeak => vec!["TXXX:REPLAYGAIN_TRACK_PEAK"],
-            TagKey::ReplayGainTrackRange => vec!["TXXX:REPLAYGAIN_TRACK_RANGE"],
-            TagKey::Script => vec!["TXXX:SCRIPT"],
-            TagKey::ShowWorkAndMovement => vec!["TXXX:SHOWMOVEMENT"],
+            TagKey::ReplayGainAlbumGain => vec!["REPLAYGAIN_ALBUM_GAIN"],
+            TagKey::ReplayGainAlbumPeak => vec!["REPLAYGAIN_ALBUM_PEAK"],
+            TagKey::ReplayGainAlbumRange => vec!["REPLAYGAIN_ALBUM_RANGE"],
+            TagKey::ReplayGainReferenceLoudness => vec!["REPLAYGAIN_REFERENCE_LOUDNESS"],
+            TagKey::ReplayGainTrackGain => vec!["REPLAYGAIN_TRACK_GAIN"],
+            TagKey::ReplayGainTrackPeak => vec!["REPLAYGAIN_TRACK_PEAK"],
+            TagKey::ReplayGainTrackRange => vec!["REPLAYGAIN_TRACK_RANGE"],
+            TagKey::Script => vec!["SCRIPT"],
+            TagKey::ShowWorkAndMovement => vec!["SHOWMOVEMENT"],
             TagKey::Subtitle => vec!["TIT3"],
             // NOTE: this hold both TrackNumber and TotalTracks in a "../.." string
             TagKey::TrackNumber => vec!["TRCK"],
@@ -284,8 +286,8 @@ impl super::Tag for Tag {
             TagKey::Website => vec!["WOAR"],
             // NOTE: WorkTitle is also found as TIT1 but it's not included here
             // in order not to overwrite the Grouping tag
-            TagKey::WorkTitle => vec!["TXXX:WORK", "TIT1"],
-            TagKey::Writer => vec!["TXXX:Writer"],
+            TagKey::WorkTitle => vec!["WORK", "TIT1"],
+            TagKey::Writer => vec!["Writer"],
 
             // Internal, not mapped from picard
             TagKey::Duration => vec!["TLEN"],
