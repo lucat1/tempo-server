@@ -187,12 +187,23 @@ impl TryFrom<TrackFile> for Track {
 impl TryFrom<Vec<TrackFile>> for Release {
     type Error = Report;
     fn try_from(tracks: Vec<TrackFile>) -> Result<Self, Self::Error> {
+        let artists = if first_tag(&tracks, TagKey::AlbumArtist).is_some() {
+            // Use the AlbumArtist to search if we have one available
+            artists_from_tag(&tracks, TagKey::AlbumArtist)
+        } else {
+            // Otherwise use the Artist tag
+            let mut v1 = artists_from_tag(&tracks, TagKey::Artist);
+            let mut v2 = artists_from_tag(&tracks, TagKey::Artists);
+            v1.append(&mut v2);
+            v1
+        };
+
         Ok(Release {
             mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseID),
             release_group_mbid: first_tag(&tracks, TagKey::MusicBrainzReleaseGroupID),
             asin: first_tag(&tracks, TagKey::ASIN),
             title: first_tag(&tracks, TagKey::Album).unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
-            artists: artists_from_tag(&tracks, TagKey::AlbumArtist),
+            artists,
             discs: first_tag(&tracks, TagKey::TotalDiscs).and_then(|d| d.parse::<u64>().ok()),
             media: first_tag(&tracks, TagKey::Media),
             tracks: first_tag(&tracks, TagKey::TotalTracks).and_then(|d| d.parse::<u64>().ok()),
