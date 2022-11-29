@@ -63,8 +63,6 @@ pub struct ReleaseGroup {
     #[serde(rename = "first-release-date")]
     pub first_release_date: Option<String>,
     pub title: String,
-    #[serde(rename = "primary-type-id")]
-    pub primary_type_id: String,
     pub id: String,
     pub disambiguation: Option<String>,
     #[serde(rename = "primary-type")]
