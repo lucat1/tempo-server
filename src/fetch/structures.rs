@@ -66,7 +66,7 @@ pub struct ReleaseGroup {
     pub id: String,
     pub disambiguation: Option<String>,
     #[serde(rename = "primary-type")]
-    pub primary_type: String,
+    pub primary_type: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -355,7 +355,8 @@ impl From<Release> for crate::models::Release {
             release_type: release
                 .release_group
                 .as_ref()
-                .map(|r| r.primary_type.to_lowercase()),
+                .and_then(|r| r.primary_type.as_ref())
+                .map(|pt| pt.to_lowercase()),
             date: SETTINGS.get().and_then(|s| {
                 if s.tagging.use_original_date {
                     original_date
