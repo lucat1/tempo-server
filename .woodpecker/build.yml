@@ -4,13 +4,17 @@ pipeline:
     commands:
       - rustup target add ${PLATFORM}
       - cargo build --release --target=${PLATFORM}
+  build:
+    image: alpine
+    commands:
+      - mv target/${PLATFORM}/release/tagger target/tagger-${PLATFORM}
   deploy: 
     image: plugins/gitea-release
     settings:
       api_key:
         from_secret: gitea_token
       base_url: https://codeberg.org
-      files: target/${PLATFORM}/release/tagger
+      files: target/tagger-${PLATFORM}
 
 matrix:
   PLATFORM:
