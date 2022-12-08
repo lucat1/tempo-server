@@ -1,12 +1,9 @@
 pipeline:
   build:
-    image: rust
+    image: messense/rust-musl-cross:${IMAGE}
     commands:
-      - rustup target add ${PLATFORM}
       - cargo build --release --target=${PLATFORM}
-  build:
-    image: alpine
-    commands:
+      - musl-strip target/${PLATFORM}/release/tagger
       - mv target/${PLATFORM}/release/tagger target/tagger-${PLATFORM}
   deploy: 
     image: plugins/gitea-release
@@ -17,15 +14,17 @@ pipeline:
       files: target/tagger-${PLATFORM}
 
 matrix:
-  PLATFORM:
-    - aarch64-unknown-linux-gnu
-    - i686-pc-windows-gnu
-    # - i686-pc-windows-msvc
-    - i686-unknown-linux-gnu
-    - x86_64-apple-darwin
-    - x86_64-pc-windows-gnu
-    # - x86_64-pc-windows-msvc
-    - x86_64-unknown-linux-gnu
+  include:
+    - PLATFORM: aarch64-unknown-linux-musl
+      IMAGE: aarch64-musl
+    - PLATFORM: i686-unknown-linux-musl
+      IMAGE: i686-musl
+    - PLATFORM: x86_64-unknown-linux-musl
+      IMAGE: x86_64-musl
+    - PLATFORM: x86_64-unknown-linux-musl
+      IMAGE: x86_64-musl
+    # - x86_64-apple-darwin
+    # - x86_64-pc-windows-gnu
 
 depends_on:
   - lint
