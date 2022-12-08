@@ -1,0 +1,20 @@
+A music tagger pulling metadata from MusicBrainz and album arts from a iTunes
+and CoverArtArchive (more to come). Multi-valued tags support is a first-class
+citizen along with speedy performance (compared to Beets).
+
+You can find prebuild releases for Linux x86_64 on the Releases page. If you are
+on a different platform (for now) compiling from source is the only option:
+
+$ cargo build --release
+
+A list of all available commands can be obtained by running the program with no
+arguments. Some of the most frequently used include:
+- import [path]: recursively scans the `path` and tries to import all music
+  files as a single release in your music library
+- list: lists all music files in your library currently being managed by the
+  tagger
+- config: prints the current config. The output can be piped in the default 
+  configuration path, in order to generate a starting config:
+
+  $ mkdir -p "${XDG_DATA_HOME:-$HOME}"/.config/tagger
+  $ tagger config > "${XDG_DATA_HOME:-$HOME}"/.config/tagger/config.toml
