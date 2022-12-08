@@ -31,6 +31,10 @@ pub fn maybe_date(d: Option<String>) -> Option<NaiveDate> {
         NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
             .ok()
             .or_else(|| NaiveDate::parse_from_str(format!("{}-1", s).as_str(), "%Y-%m-%d").ok())
-            .or_else(|| s.parse::<i32>().ok().map(|y| NaiveDate::from_ymd(y, 1, 1)))
+            .or_else(|| {
+                s.parse::<i32>()
+                    .ok()
+                    .and_then(|y| NaiveDate::from_ymd_opt(y, 1, 1))
+            })
     })
 }
