@@ -4,25 +4,26 @@ pipeline:
     commands:
       - cargo build --release --target=${PLATFORM}
       - musl-strip target/${PLATFORM}/release/tagger
-      - mv target/${PLATFORM}/release/tagger target/tagger-${PLATFORM}
+      - mv target/${PLATFORM}/release/tagger target/tagger-${ARCH}
   deploy: 
     image: plugins/gitea-release
     settings:
       api_key:
         from_secret: gitea_token
       base_url: https://codeberg.org
-      files: target/tagger-${PLATFORM}
+      files: target/tagger-${ARCH}
 
 matrix:
   include:
     - PLATFORM: aarch64-unknown-linux-musl
       IMAGE: aarch64-musl
+      ARCH: aarch64
     - PLATFORM: i686-unknown-linux-musl
       IMAGE: i686-musl
+      ARCH: i686
     - PLATFORM: x86_64-unknown-linux-musl
       IMAGE: x86_64-musl
-    - PLATFORM: x86_64-unknown-linux-musl
-      IMAGE: x86_64-musl
+      ARCH: x86_64
     # - x86_64-apple-darwin
     # - x86_64-pc-windows-gnu
 
