@@ -11,7 +11,6 @@ id3 = []
 mp4 = []
 
 [dependencies]
-openssl = { version = "0.10", features = ["vendored"] }
 clap = "3.2"
 directories = "4.0"
 toml = "0.5"
@@ -31,14 +30,14 @@ indicatif = "0.17.0"
 dialoguer = "0.10.2"
 chrono = "0.4.22"
 async-trait = "0.1"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 futures = "0.3"
 serde = { version = "1.0", features = ["rc"] }
 itertools = "0.10.4"
 serde_derive = { version = "1.0" }
-sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-native-tls", "chrono"] }
+sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-rustls", "chrono"] }
 
 metaflac = "0.2"
 mp4ameta = "0.11"
