@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-default = ["flac","id3"]
+default = ["flac", "id3"]
 ape = []
 flac = []
 id3 = []
@@ -38,6 +38,7 @@ serde = { version = "1.0", features = ["rc"] }
 itertools = "0.10.4"
 serde_derive = { version = "1.0" }
 sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-rustls", "chrono"] }
+sqlx-migrate = { git = "https://github.com/lucat1/sqlx-migrate", features = ["sqlite"] }
 
 metaflac = "0.2"
 mp4ameta = "0.11"
@@ -49,3 +50,6 @@ regex = "1.6.0"
 strfmt = "0.2.2"
 serde_path_to_error = "0.1.8"
 # ape = "0.4"
+
+[build-dependencies]
+sqlx-migrate = { git = "https://github.com/lucat1/sqlx-migrate", features = ["generate"] }

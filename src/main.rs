@@ -11,12 +11,17 @@ mod import;
 mod list;
 mod update;
 
+// automatically generated sql migrations
+mod generated;
+
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use log::error;
+use log::{error, info};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
+use sqlx::Sqlite;
+use sqlx_migrate::Migrator;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -91,51 +96,76 @@ async fn db() -> Result<SqlitePool> {
     Ok(pool)
 }
 
+async fn migrate() -> Result<()> {
+    let db = DB.get().ok_or(eyre!("Database connection not found"))?;
+    let conn = db.acquire().await?;
+    let mut migrator: Migrator<Sqlite> = Migrator::new(conn.detach());
+    migrator.add_migrations(generated::migrations());
+
+    migrator.verify().await?;
+    let summary = migrator.migrate_all().await?;
+    let diff = summary.new_version.unwrap_or_default() - summary.old_version.unwrap_or_default();
+    if diff > 0 {
+        info!(
+            "Applied {} mirgation{}",
+            diff,
+            if diff > 1 { 's' } else { '\0' }
+        );
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     theme::init_logger();
 
     SETTINGS.get_or_try_init(async { settings::load() }).await?;
-    let db = DB.get_or_try_init(db()).await?;
-    sqlx::migrate!().run(db).await?;
 
     let matches = cli().get_matches();
     match matches.subcommand() {
-        Some(("list", sub_matches)) => {
-            let filters = sub_matches
-                .get_many::<String>("FILTER")
-                .map(|i| i.into_iter().collect::<Vec<_>>())
-                .unwrap_or_default();
-            let format = sub_matches.get_one::<String>("FORMAT");
-            let object = sub_matches.get_one::<String>("OBJECT");
-            list::list(filters, format, object).await
-        }
         Some(("config", _)) => settings::print(),
-        Some(("update", sub_matches)) => {
-            let filters = sub_matches
-                .get_many::<String>("FILTER")
-                .map(|i| i.into_iter().collect::<Vec<_>>())
-                .unwrap_or_default();
-            update::update(filters).await
-        }
-        Some(("import", sub_matches)) => {
-            let stream = sub_matches
-                .get_many::<PathBuf>("PATH")
-                .ok_or(eyre!("Expected at least one path argument to import"))?
-                .into_iter()
-                .collect::<Vec<_>>();
-            for p in stream.iter() {
-                import::import(p).await?;
+        Some((a, b)) => {
+            // all subcommands that require a database connection go in here
+            DB.get_or_try_init(db()).await?;
+            migrate().await?;
+
+            match (a, b) {
+                ("list", sub_matches) => {
+                    let filters = sub_matches
+                        .get_many::<String>("FILTER")
+                        .map(|i| i.into_iter().collect::<Vec<_>>())
+                        .unwrap_or_default();
+                    let format = sub_matches.get_one::<String>("FORMAT");
+                    let object = sub_matches.get_one::<String>("OBJECT");
+                    list::list(filters, format, object).await
+                }
+                ("update", sub_matches) => {
+                    let filters = sub_matches
+                        .get_many::<String>("FILTER")
+                        .map(|i| i.into_iter().collect::<Vec<_>>())
+                        .unwrap_or_default();
+                    update::update(filters).await
+                }
+                ("import", sub_matches) => {
+                    let stream = sub_matches
+                        .get_many::<PathBuf>("PATH")
+                        .ok_or(eyre!("Expected at least one path argument to import"))?
+                        .into_iter()
+                        .collect::<Vec<_>>();
+                    for p in stream.iter() {
+                        import::import(p).await?;
+                    }
+                    Ok(())
+                }
+                (cmd, _) => {
+                    error!(
+                        "Invalid command {}, use `help` to see all available subcommands",
+                        cmd
+                    );
+                    Ok(())
+                }
             }
-            Ok(())
-        }
-        Some((cmd, _)) => {
-            error!(
-                "Invalid command {}, use `help` to see all available subcommands",
-                cmd
-            );
-            Ok(())
         }
         None => {
             error!(

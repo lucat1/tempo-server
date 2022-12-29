@@ -1,11 +1,10 @@
-CREATE TABLE artists (
+CREATE TABLE IF NOT EXISTS artists (
   mbid BLOB PRIMARY KEY,
   name TEXT NOT NULL,
   sort_name TEXT,
   instruments TEXT
 );
-
-CREATE TABLE releases (
+CREATE TABLE IF NOT EXISTS releases (
   mbid BLOB PRIMARY KEY,
   release_group_mbid BLOB,
   asin TEXT,
@@ -24,7 +23,7 @@ CREATE TABLE releases (
   UNIQUE(mbid)
 );
 
-CREATE TABLE release_artists (
+CREATE TABLE IF NOT EXISTS release_artists (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES releases(mbid),
@@ -32,7 +31,7 @@ CREATE TABLE release_artists (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE tracks (
+CREATE TABLE IF NOT EXISTS tracks (
 	mbid BLOB PRIMARY KEY,
   title TEXT NOT NULL,
   length INTEGER,
@@ -46,7 +45,7 @@ CREATE TABLE tracks (
   FOREIGN KEY(release) REFERENCES releases(mbid)
 );
 
-CREATE TABLE track_artists (
+CREATE TABLE IF NOT EXISTS track_artists (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -54,7 +53,7 @@ CREATE TABLE track_artists (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_performers (
+CREATE TABLE IF NOT EXISTS track_performers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -62,7 +61,7 @@ CREATE TABLE track_performers (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_engigneers (
+CREATE TABLE IF NOT EXISTS track_engigneers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -70,7 +69,7 @@ CREATE TABLE track_engigneers (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_mixers (
+CREATE TABLE IF NOT EXISTS track_mixers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -78,7 +77,7 @@ CREATE TABLE track_mixers (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_producers (
+CREATE TABLE IF NOT EXISTS track_producers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -86,7 +85,7 @@ CREATE TABLE track_producers (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_lyricists (
+CREATE TABLE IF NOT EXISTS track_lyricists (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -94,7 +93,7 @@ CREATE TABLE track_lyricists (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_writers (
+CREATE TABLE IF NOT EXISTS track_writers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),
@@ -102,7 +101,7 @@ CREATE TABLE track_writers (
   UNIQUE(ref,artist)
 );
 
-CREATE TABLE track_composers (
+CREATE TABLE IF NOT EXISTS track_composers (
   ref BLOB,
   artist BLOB,
   FOREIGN KEY(ref) REFERENCES tracks(mbid),

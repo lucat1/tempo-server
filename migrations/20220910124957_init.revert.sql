@@ -1,0 +1,12 @@
+DROP TABLE artists;
+DROP TABLE releases;
+DROP TABLE release_artists;
+DROP TABLE tracks;
+DROP TABLE track_artists;
+DROP TABLE track_performers;
+DROP TABLE track_engigneers;
+DROP TABLE track_mixers;
+DROP TABLE track_producers;
+DROP TABLE track_lyricists;
+DROP TABLE track_writers;
+DROP TABLE track_composers;
