@@ -19,7 +19,7 @@ use super::Picture;
 use super::TagFrom;
 use super::{Tag, TagError};
 use crate::models::UNKNOWN_TITLE;
-use crate::models::{Artist, GroupTracks, Release, Track};
+use crate::models::{Artist, ArtistCredit, GroupTracks, Release, Track};
 use crate::track::TagKey;
 use crate::util::{dedup, maybe_date};
 
@@ -108,19 +108,21 @@ impl TrackFile {
     }
 }
 
-fn artists_with_name(name: String, sep: Option<String>) -> Vec<Artist> {
+fn artists_with_name(name: String, sep: Option<String>) -> Vec<ArtistCredit> {
     match sep {
         Some(ref s) => name.split(s.as_str()).map(|s| s.to_string()).collect_vec(),
         None => vec![name],
     }
     .into_iter()
-    .map(|s| Artist {
-        mbid: None,
-        name: s,
+    .map(|s| ArtistCredit {
         join_phrase: sep.clone(),
-        // TODO: take a look into artist sort order
-        sort_name: None,
-        instruments: vec![],
+        artist: Artist {
+            mbid: None,
+            name: s,
+            // TODO: take a look at how to generate artist sort order
+            sort_name: None,
+            instruments: vec![],
+        },
     })
     .collect()
 }

@@ -18,16 +18,21 @@ pub const UNKNOWN_TITLE: &str = "(unkown title)";
 pub struct Artist {
     pub mbid: Option<String>,
     pub name: String,
-    pub join_phrase: Option<String>,
     pub sort_name: Option<String>,
     pub instruments: Vec<String>,
+}
+
+#[derive(Clone, Debug, FromRow)]
+pub struct ArtistCredit {
+    pub join_phrase: Option<String>,
+    pub artist: Artist,
 }
 
 #[derive(Clone, Debug, FromRow)]
 pub struct Track {
     pub mbid: Option<String>,
     pub title: String,
-    pub artists: Vec<Artist>,
+    pub artists: Vec<ArtistCredit>,
     pub length: Option<Duration>,
     pub disc: Option<u64>,
     pub disc_mbid: Option<String>,
@@ -39,13 +44,13 @@ pub struct Track {
     pub release: Option<Release>,
 
     // Performer, Vocal, Instrument
-    pub performers: Vec<Artist>,
-    pub engigneers: Vec<Artist>,
-    pub mixers: Vec<Artist>,
-    pub producers: Vec<Artist>,
-    pub lyricists: Vec<Artist>,
-    pub writers: Vec<Artist>,
-    pub composers: Vec<Artist>,
+    pub performers: Vec<ArtistCredit>,
+    pub engigneers: Vec<ArtistCredit>,
+    pub mixers: Vec<ArtistCredit>,
+    pub producers: Vec<ArtistCredit>,
+    pub lyricists: Vec<ArtistCredit>,
+    pub writers: Vec<ArtistCredit>,
+    pub composers: Vec<ArtistCredit>,
 
     pub format: Option<TrackFormat>,
     pub path: Option<PathBuf>,
@@ -57,7 +62,7 @@ pub struct Release {
     pub release_group_mbid: Option<String>,
     pub asin: Option<String>,
     pub title: String,
-    pub artists: Vec<Artist>,
+    pub artists: Vec<ArtistCredit>,
     pub discs: Option<u64>,
     pub media: Option<String>,
     pub tracks: Option<u64>,
@@ -84,29 +89,31 @@ pub trait Artists {
     fn instruments(&self) -> Vec<String>;
 }
 
-impl Artists for Vec<Artist> {
+impl Artists for Vec<ArtistCredit> {
     fn names(&self) -> Vec<String> {
-        self.iter().map(|s| s.name.clone()).collect::<Vec<_>>()
+        self.iter()
+            .map(|c| c.artist.name.clone())
+            .collect::<Vec<_>>()
     }
     fn ids(&self) -> Vec<String> {
         self.iter()
-            .filter_map(|s| s.mbid.clone())
+            .filter_map(|c| c.artist.mbid.clone())
             .collect::<Vec<_>>()
     }
     fn sort_order(&self) -> Vec<String> {
         self.iter()
-            .filter_map(|s| s.sort_name.clone())
+            .filter_map(|c| c.artist.sort_name.clone())
             .collect::<Vec<_>>()
     }
     fn joined(&self) -> String {
         let mut res = "".to_string();
-        for (i, artist) in self.iter().enumerate() {
-            res.push_str(artist.name.as_str());
+        for (i, artist_credit) in self.iter().enumerate() {
+            res.push_str(artist_credit.artist.name.as_str());
             if i >= self.len() - 1 {
                 continue;
             }
 
-            if let Some(join) = &artist.join_phrase {
+            if let Some(join) = &artist_credit.join_phrase {
                 res.push_str(join.as_str());
             } else {
                 // TODO: configuration
@@ -117,14 +124,14 @@ impl Artists for Vec<Artist> {
     }
     fn sort_order_joined(&self) -> String {
         let mut res = "".to_string();
-        for (i, artist) in self.iter().enumerate() {
-            if let Some(sort) = artist.sort_name.as_ref() {
+        for (i, artist_credit) in self.iter().enumerate() {
+            if let Some(sort) = artist_credit.artist.sort_name.as_ref() {
                 res.push_str(sort.as_str());
                 if i >= self.len() - 1 {
                     continue;
                 }
 
-                if let Some(join) = &artist.join_phrase {
+                if let Some(join) = &artist_credit.join_phrase {
                     res.push_str(join.as_str());
                 } else {
                     // TODO: configuration
@@ -136,14 +143,16 @@ impl Artists for Vec<Artist> {
     }
     fn instruments(&self) -> Vec<String> {
         self.iter()
-            .flat_map(|s| {
-                if !s.instruments.is_empty() {
-                    s.instruments
+            .flat_map(|artist_credit| {
+                if !artist_credit.artist.instruments.is_empty() {
+                    artist_credit
+                        .artist
+                        .instruments
                         .iter()
-                        .map(|i| format!("{} ({})", s.name, i))
+                        .map(|i| format!("{} ({})", artist_credit.artist.name, i))
                         .collect()
                 } else {
-                    vec![s.name.clone()]
+                    vec![artist_credit.artist.name.clone()]
                 }
             })
             .collect()
@@ -154,22 +163,25 @@ pub trait Format {
     fn fmt(&self, template: &str) -> Result<String>;
 }
 
-impl Format for Artist {
+impl Format for ArtistCredit {
     fn fmt(&self, template: &str) -> Result<String> {
         let mut vars = HashMap::new();
-        vars.insert("mbid".to_string(), self.mbid.clone().unwrap_or_default());
-        vars.insert("name".to_string(), self.name.clone());
+        vars.insert(
+            "mbid".to_string(),
+            self.artist.mbid.clone().unwrap_or_default(),
+        );
+        vars.insert("name".to_string(), self.artist.name.clone());
         vars.insert(
             "join_phrase".to_string(),
             self.join_phrase.clone().unwrap_or_default(),
         );
         vars.insert(
             "sort_name".to_string(),
-            self.sort_name.clone().unwrap_or_default(),
+            self.artist.sort_name.clone().unwrap_or_default(),
         );
         vars.insert(
             "instruments".to_string(),
-            self.instruments.join(", "), // TODO
+            self.artist.instruments.join(", "), // TODO
         );
         strfmt(template, &vars)
             .map_err(|e| eyre!(e))
