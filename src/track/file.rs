@@ -115,6 +115,7 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<ArtistCredit> {
     }
     .into_iter()
     .map(|s| ArtistCredit {
+        id: None,
         join_phrase: sep.clone(),
         artist: Artist {
             mbid: None,
@@ -127,7 +128,7 @@ fn artists_with_name(name: String, sep: Option<String>) -> Vec<ArtistCredit> {
     .collect()
 }
 
-fn artists_from_tag(tracks: &[TrackFile], tag: TagKey) -> Vec<Artist> {
+fn artists_from_tag(tracks: &[TrackFile], tag: TagKey) -> Vec<ArtistCredit> {
     let separator = match tracks.first() {
         Some(t) => t.tag.separator(),
         None => return vec![],

@@ -220,30 +220,36 @@ pub struct Tag {
     pub name: String,
 }
 
-impl From<ArtistCredit> for crate::models::Artist {
+impl From<ArtistCredit> for crate::models::ArtistCredit {
     fn from(artist: ArtistCredit) -> Self {
-        crate::models::Artist {
-            mbid: Some(artist.artist.id),
+        crate::models::ArtistCredit {
+            id: None,
             join_phrase: artist.joinphrase,
-            name: artist.name,
-            sort_name: Some(artist.artist.sort_name),
-            instruments: vec![],
+            artist: crate::models::Artist {
+                mbid: Some(artist.artist.id),
+                name: artist.name,
+                sort_name: Some(artist.artist.sort_name),
+                instruments: vec![],
+            },
         }
     }
 }
 
-impl TryFrom<Relation> for crate::models::Artist {
+impl TryFrom<Relation> for crate::models::ArtistCredit {
     type Error = Report;
     fn try_from(relation: Relation) -> Result<Self> {
         let artist = relation
             .artist
             .ok_or(eyre!("Relation doesn't contain an artist"))?;
-        Ok(crate::models::Artist {
-            mbid: Some(artist.id),
+        Ok(crate::models::ArtistCredit {
+            id: None,
             join_phrase: None,
-            name: artist.name,
-            sort_name: Some(artist.sort_name),
-            instruments: relation.attributes,
+            artist: crate::models::Artist {
+                mbid: Some(artist.id),
+                name: artist.name,
+                sort_name: Some(artist.sort_name),
+                instruments: relation.attributes,
+            },
         })
     }
 }
@@ -251,7 +257,7 @@ impl TryFrom<Relation> for crate::models::Artist {
 fn artists_from_relationships(
     rels: &[Relation],
     ok: Vec<RelationType>,
-) -> Vec<crate::models::Artist> {
+) -> Vec<crate::models::ArtistCredit> {
     rels.iter()
         .filter(|r| ok.contains(&r.type_field.clone().into()))
         .filter_map(|a| a.clone().try_into().ok())

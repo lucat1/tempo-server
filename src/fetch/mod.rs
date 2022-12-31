@@ -4,9 +4,14 @@ pub mod structures;
 use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
 use const_format::formatcp;
 use eyre::{bail, eyre, Context, Result};
+use governor::{
+    clock::DefaultClock, middleware::NoOpMiddleware, state::InMemoryState, state::NotKeyed, Quota,
+    RateLimiter,
+};
 use lazy_static::lazy_static;
 use log::trace;
 use reqwest::header::USER_AGENT;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Instant;
 use structures::{Release, ReleaseSearch};
@@ -16,6 +21,8 @@ static MB_USER_AGENT: &str =
     formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
 lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
+    pub static ref RATE_LIMIT: RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware> =
+        RateLimiter::direct(Quota::per_second(NonZeroU32::new(300u32).unwrap()));
 }
 
 pub async fn search(
@@ -28,6 +35,7 @@ pub async fn search(
         UNKNOWN_ARTIST => "",
         s => s,
     };
+    RATE_LIMIT.until_ready().await;
     let res = CLIENT
         .get(format!(
             "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{} tracks:{}&fmt=json&limit={}",
@@ -61,6 +69,7 @@ pub async fn search(
 
 pub async fn get(id: &str) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
     let start = Instant::now();
+    RATE_LIMIT.until_ready().await;
     let res = CLIENT
         .get(format!(
             "http://musicbrainz.org/ws/2/release/{}?fmt=json&inc={}",

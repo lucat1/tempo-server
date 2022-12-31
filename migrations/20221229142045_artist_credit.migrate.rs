@@ -1,6 +1,6 @@
-use crate::fetch::{get, CLIENT, MB_USER_AGENT};
-use reqwest::header::USER_AGENT;
-use sqlx::{Executor, FromRow, Sqlite};
+use crate::fetch::get;
+use anyhow::Error;
+use sqlx::{FromRow, Sqlite};
 use sqlx_migrate::prelude::*;
 
 #[derive(FromRow)]
@@ -12,20 +12,9 @@ pub struct Artist {
     pub instruments: Vec<String>,
 }
 
-pub async fn migrate_artist_group(
-    mut ctx: MigrationContext<'_, Sqlite>,
-) -> Result<(), MigrationError> {
-    let copy_client = CLIENT.clone();
-
-    let limited_client = tower::ServiceBuilder::new()
-        .rate_limit(10, Duration::from_secs())
-        .service(CLIENT);
-
-    CLIENT = limited_client;
-
-    let (release, tracks) = get("test").await?;
+pub async fn artist_credit(mut ctx: MigrationContext<'_, Sqlite>) -> Result<(), MigrationError> {
+    let (release, tracks) = get("test").await.map_err(Error::msg)?;
     println!("{:?} {:?}", release, tracks);
 
-    CLIENT = copy_client;
     Ok(())
 }

@@ -14,7 +14,7 @@ use crate::util::path_to_str;
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
 
-#[derive(Clone, Debug, FromRow)]
+#[derive(Clone, Debug, FromRow, Default)]
 pub struct Artist {
     pub mbid: Option<String>,
     pub name: String,
@@ -22,13 +22,14 @@ pub struct Artist {
     pub instruments: Vec<String>,
 }
 
-#[derive(Clone, Debug, FromRow)]
+#[derive(Clone, Debug, FromRow, Default)]
 pub struct ArtistCredit {
+    pub id: Option<u32>,
     pub join_phrase: Option<String>,
     pub artist: Artist,
 }
 
-#[derive(Clone, Debug, FromRow)]
+#[derive(Clone, Debug, FromRow, Default)]
 pub struct Track {
     pub mbid: Option<String>,
     pub title: String,
@@ -56,7 +57,7 @@ pub struct Track {
     pub path: Option<PathBuf>,
 }
 
-#[derive(Clone, Debug, FromRow)]
+#[derive(Clone, Debug, FromRow, Default)]
 pub struct Release {
     pub mbid: Option<String>,
     pub release_group_mbid: Option<String>,
@@ -182,6 +183,25 @@ impl Format for ArtistCredit {
         vars.insert(
             "instruments".to_string(),
             self.artist.instruments.join(", "), // TODO
+        );
+        strfmt(template, &vars)
+            .map_err(|e| eyre!(e))
+            .wrap_err(eyre!("Error while formatting artist string"))
+    }
+}
+
+impl Format for Artist {
+    fn fmt(&self, template: &str) -> Result<String> {
+        let mut vars = HashMap::new();
+        vars.insert("mbid".to_string(), self.mbid.clone().unwrap_or_default());
+        vars.insert("name".to_string(), self.name.clone());
+        vars.insert(
+            "sort_name".to_string(),
+            self.sort_name.clone().unwrap_or_default(),
+        );
+        vars.insert(
+            "instruments".to_string(),
+            self.instruments.join(", "), // TODO
         );
         strfmt(template, &vars)
             .map_err(|e| eyre!(e))

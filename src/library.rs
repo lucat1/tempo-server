@@ -1,4 +1,4 @@
-use crate::models::{Artist, Format, Release, Track};
+use crate::models::{Artist, ArtistCredit, Format, Release, Track};
 use crate::track::format::Format as TrackFormat;
 use crate::util::path_to_str;
 use crate::{DB, SETTINGS};
@@ -204,15 +204,68 @@ where
 }
 
 #[async_trait]
+impl InTable for ArtistCredit {
+    fn table() -> &'static str {
+        "artist_credits"
+    }
+    fn fields() -> Vec<&'static str> {
+        let mut res = vec![
+            "artist_credits.id AS ac.id",
+            "artist_credits.artist AS ac.id",
+            "artist_credits.join_phrase as AC.join_phrase",
+        ];
+        res.append(&mut Artist::fields().clone());
+        res
+    }
+    fn store_fields() -> Vec<&'static str> {
+        vec!["artist", "join_phrase"]
+    }
+    fn join() -> Option<&'static str> {
+        Some(" INNER JOIN artists ON artists.mbid = artist_credits.artist")
+    }
+    fn decode(row: SqliteRow) -> Result<Self, sqlx::Error>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            id: row.try_get("id")?,
+            join_phrase: row.try_get("join_phrase").ok(),
+            artist: Artist::decode(row)?,
+        })
+    }
+    async fn fill_relationships(&mut self, _: &Pool<Sqlite>) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Store for ArtistCredit {
+    async fn store(&self) -> Result<()> {
+        Self::store_builder()
+            .build()
+            .bind(&self.artist.mbid)
+            .bind(&self.join_phrase)
+            .execute(DB.get().ok_or(eyre!("Could not get database"))?)
+            .await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
 impl InTable for Artist {
     fn table() -> &'static str {
         "artists"
     }
     fn fields() -> Vec<&'static str> {
-        vec!["mbid", "name", "sort_name", "instruments"]
+        vec![
+            "artists.mbid AS a.mbid",
+            "artists.name AS a.mbid",
+            "artists.sort_name AS a.sort_name",
+            "artists.instruments AS a.instruments",
+        ]
     }
     fn store_fields() -> Vec<&'static str> {
-        Artist::fields()
+        vec!["mbid", "name", "sort_name", "instruments"]
     }
     fn join() -> Option<&'static str> {
         None
@@ -222,11 +275,10 @@ impl InTable for Artist {
         Self: Sized,
     {
         Ok(Self {
-            mbid: row.try_get("mbid").ok(),
-            name: row.try_get("name")?,
-            join_phrase: None,
-            sort_name: row.try_get("sort_name").ok(),
-            instruments: serde_json::from_str(row.try_get("instruments")?)
+            mbid: row.try_get("a.mbid").ok(),
+            name: row.try_get("a.name")?,
+            sort_name: row.try_get("a.sort_name").ok(),
+            instruments: serde_json::from_str(row.try_get("a.instruments")?)
                 .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
         })
     }
@@ -271,16 +323,20 @@ impl Delete for Artist {
     }
 }
 
-async fn resolve(db: &Pool<Sqlite>, table: &str, mbid: Option<&String>) -> Result<Vec<Artist>> {
-    Artist::query_builder::<String, String>(vec![], vec![])
+async fn resolve(
+    db: &Pool<Sqlite>,
+    table: &str,
+    mbid: Option<&String>,
+) -> Result<Vec<ArtistCredit>> {
+    ArtistCredit::query_builder::<String, String>(vec![], vec![])
         .push(format!(
-            " WHERE mbid = (SELECT artist FROM {} WHERE ref =",
+            " WHERE id = (SELECT artist_credit FROM {} WHERE ref =",
             table
         ))
         .push_bind(mbid)
         .push(")")
         .build()
-        .try_map(Artist::decode)
+        .try_map(ArtistCredit::decode)
         .fetch_all(db)
         .await
         .map_err(|e| eyre!(e))
@@ -290,24 +346,24 @@ async fn link(
     db: &Pool<Sqlite>,
     table: &str,
     mbid: Option<&String>,
-    artist: &Artist,
+    ac: &ArtistCredit,
 ) -> Result<()> {
     sqlx::query(
         format!(
-            "INSERT OR REPLACE INTO {} (ref, artist) VALUES (?, ?)",
+            "INSERT OR REPLACE INTO {} (ref, artist_credit) VALUES (?, ?)",
             table
         )
         .as_str(),
     )
     .bind(mbid)
-    .bind(artist.mbid.as_ref())
+    .bind(ac.id.as_ref())
     .execute(db)
     .await?;
     Ok(())
 }
 
 async fn unlink(db: &Pool<Sqlite>, table: &str, mbid: Option<&String>) -> Result<()> {
-    sqlx::query(format!("DELETE FROM {} WHERE ref = ? OR artist = ?", table).as_str())
+    sqlx::query(format!("DELETE FROM {} WHERE ref = ? OR artist_credit = ?", table).as_str())
         .bind(mbid)
         .bind(mbid)
         .execute(db)
@@ -329,7 +385,6 @@ impl InTable for Track {
             "tracks.disc_mbid AS t_disc_mbid",
             "tracks.number AS t_number",
             "tracks.genres AS t_genres",
-            // "tracks.release AS t_release",
             "tracks.format AS t_format",
             "tracks.path AS t_path",
             "releases.mbid AS r_mbid",
@@ -444,37 +499,37 @@ impl Store for Track {
             .execute(db)
             .await?;
 
-        for artist in self.artists.iter() {
-            artist.store().await?;
-            link(db, "track_artists", self.mbid.as_ref(), artist).await?;
+        for ac in self.artists.iter() {
+            ac.store().await?;
+            link(db, "track_artists", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.performers.iter() {
-            artist.store().await?;
-            link(db, "track_performers", self.mbid.as_ref(), artist).await?;
+        for ac in self.performers.iter() {
+            ac.store().await?;
+            link(db, "track_performers", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.engigneers.iter() {
-            artist.store().await?;
-            link(db, "track_engigneers", self.mbid.as_ref(), artist).await?;
+        for ac in self.engigneers.iter() {
+            ac.store().await?;
+            link(db, "track_engigneers", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.mixers.iter() {
-            artist.store().await?;
-            link(db, "track_mixers", self.mbid.as_ref(), artist).await?;
+        for ac in self.mixers.iter() {
+            ac.store().await?;
+            link(db, "track_mixers", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.producers.iter() {
-            artist.store().await?;
-            link(db, "track_producers", self.mbid.as_ref(), artist).await?;
+        for ac in self.producers.iter() {
+            ac.store().await?;
+            link(db, "track_producers", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.lyricists.iter() {
-            artist.store().await?;
-            link(db, "track_lyricists", self.mbid.as_ref(), artist).await?;
+        for ac in self.lyricists.iter() {
+            ac.store().await?;
+            link(db, "track_lyricists", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.writers.iter() {
-            artist.store().await?;
-            link(db, "track_writers", self.mbid.as_ref(), artist).await?;
+        for ac in self.writers.iter() {
+            ac.store().await?;
+            link(db, "track_writers", self.mbid.as_ref(), ac).await?;
         }
-        for artist in self.composers.iter() {
-            artist.store().await?;
-            link(db, "track_composers", self.mbid.as_ref(), artist).await?;
+        for ac in self.composers.iter() {
+            ac.store().await?;
+            link(db, "track_composers", self.mbid.as_ref(), ac).await?;
         }
         Ok(())
     }
@@ -598,9 +653,9 @@ impl Store for Release {
             .bind(&self.script)
             .execute(db)
             .await?;
-        for artist in self.artists.iter() {
-            artist.store().await?;
-            link(db, "release_artists", self.mbid.as_ref(), artist).await?;
+        for ac in self.artists.iter() {
+            ac.store().await?;
+            link(db, "release_artists", self.mbid.as_ref(), ac).await?;
         }
         Ok(())
     }
