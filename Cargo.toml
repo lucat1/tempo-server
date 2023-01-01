@@ -51,6 +51,8 @@ strfmt = "0.2.2"
 serde_path_to_error = "0.1.8"
 governor = "0.5.1"
 anyhow = "1.0.68"
+rayon = "1.6.1"
+tokio-retry = "0.3.0"
 # ape = "0.4"
 
 [build-dependencies]

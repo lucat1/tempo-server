@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 mod fetch;
 mod library;
 mod models;
@@ -20,10 +22,11 @@ use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use log::{error, info};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
-use sqlx::Sqlite;
+use sqlx::{ConnectOptions, Sqlite};
 use sqlx_migrate::Migrator;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use settings::Settings;
 
@@ -76,23 +79,23 @@ fn cli() -> Command<'static> {
 
 async fn db() -> Result<SqlitePool> {
     let pool = SqlitePoolOptions::new()
-        // TODO: should not be needed
-        .max_connections(1)
         .connect_with(
             SqliteConnectOptions::new()
                 .filename(util::path_to_str(
                     &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
                 )?)
-                .create_if_missing(true),
+                .create_if_missing(true)
+                .log_slow_statements(log::LevelFilter::Trace, Duration::from_secs(10))
+                .clone(),
         )
         .await
         .map_err(|e| eyre!(e))?;
-    sqlx::query("PRAGMA journal_mode=WAL")
-        .execute(&pool)
-        .await?;
-    sqlx::query("PRAGMA busy_timeout=60000")
-        .execute(&pool)
-        .await?;
+    // sqlx::query("PRAGMA journal_mode=WAL")
+    //     .execute(&pool)
+    //     .await?;
+    // sqlx::query("PRAGMA busy_timeout=60000")
+    //     .execute(&pool)
+    //     .await?;
     Ok(pool)
 }
 

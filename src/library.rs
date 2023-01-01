@@ -241,6 +241,7 @@ impl InTable for ArtistCredit {
 #[async_trait]
 impl Store for ArtistCredit {
     async fn store(&self) -> Result<()> {
+        self.artist.store().await?;
         Self::store_builder()
             .build()
             .bind(&self.artist.mbid)
