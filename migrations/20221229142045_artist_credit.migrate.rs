@@ -10,8 +10,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use tokio_retry::strategy::FixedInterval;
-use tokio_retry::Retry;
 
 static MUTATE: &str = "
 DROP TABLE release_artists;
@@ -185,29 +183,23 @@ pub async fn artist_credit(mut ctx: MigrationContext<'_, Sqlite>) -> Result<(), 
     let bar = progress.as_ref();
 
     for rel in releases {
-        // println!("{:?}", rel.mbid);
-        let action = async || -> Result<()> {
-            let (_, mut tracks) = get(&rel.mbid).await?;
-            for track in tracks.iter_mut() {
-                let id = track.mbid.as_ref().unwrap();
-                track.path = match paths.get(id) {
-                    Some(p) => PathBuf::from_str(p).ok(),
-                    None => {
-                        warn!(
-                            "Track \"{}\" has changed mbid, the filepath will be reset",
-                            id
-                        );
-                        track.path().ok()
-                    }
-                };
-                track.store().await?;
-            }
-            Ok(())
-        };
+        let (_, mut tracks) = get(&rel.mbid).await.map_err(Error::msg)?;
+        for track in tracks.iter_mut() {
+            let id = track.mbid.as_ref().unwrap();
+            track.path = match paths.get(id) {
+                Some(p) => PathBuf::from_str(p).ok(),
+                None => {
+                    warn!(
+                        "Track \"{}\" has changed mbid, the filepath will be reset",
+                        id
+                    );
+                    track.path().ok()
+                }
+            };
+            println!("storing track {:?}", track.mbid);
+            track.store(ctx.tx()).await.map_err(Error::msg)?;
+        }
 
-        Retry::spawn(FixedInterval::from_millis(2000).take(3), action)
-            .await
-            .map_err(Error::msg)?;
         bar.lock().unwrap().inc(1);
     }
     bar.lock().unwrap().finish();

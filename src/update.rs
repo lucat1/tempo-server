@@ -1,6 +1,7 @@
 use crate::library::{Delete, Filter, LibraryTrack, Store};
 use crate::models::{Format, Track};
 use crate::util::mkdirp;
+use crate::DB;
 use eyre::{eyre, Result};
 use log::{info, trace, warn};
 use std::path::Path;
@@ -9,6 +10,7 @@ use std::time::Instant;
 static FMT: &str = "{album_artist} - {track_title}";
 
 pub async fn update(_filters: Vec<&String>) -> Result<()> {
+    let db = DB.get().ok_or(eyre!("Could not get database"))?;
     let start = Instant::now();
     let mut tracks = Track::filter::<String, String>(
         vec![],
@@ -40,7 +42,7 @@ pub async fn update(_filters: Vec<&String>) -> Result<()> {
             // TODO move covers when album folders change
         }
         if updated {
-            track.store().await?;
+            track.store(db).await?;
         }
     }
     info!("Done, took {:?}", start.elapsed());

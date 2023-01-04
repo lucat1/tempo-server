@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 mod fetch;
 mod library;
 mod models;
@@ -84,18 +82,14 @@ async fn db() -> Result<SqlitePool> {
                 .filename(util::path_to_str(
                     &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
                 )?)
+                .pragma("journal_mode", "WAL")
+                .pragma("busy_timeout", "60000")
                 .create_if_missing(true)
                 .log_slow_statements(log::LevelFilter::Trace, Duration::from_secs(10))
                 .clone(),
         )
         .await
         .map_err(|e| eyre!(e))?;
-    // sqlx::query("PRAGMA journal_mode=WAL")
-    //     .execute(&pool)
-    //     .await?;
-    // sqlx::query("PRAGMA busy_timeout=60000")
-    //     .execute(&pool)
-    //     .await?;
     Ok(pool)
 }
 

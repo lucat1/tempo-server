@@ -7,7 +7,7 @@ use eyre::{eyre, Result, WrapErr};
 use itertools::Itertools;
 use log::trace;
 use sqlx::sqlite::SqliteRow;
-use sqlx::{Encode, Pool, QueryBuilder, Row, Sqlite, Type};
+use sqlx::{Encode, Executor, Pool, QueryBuilder, Row, Sqlite, Type};
 use std::fmt::Display;
 use std::iter;
 use std::path::PathBuf;
@@ -36,8 +36,6 @@ impl LibraryTrack for Track {
             .join(PathBuf::from_str(builder.as_str()).map_err(|e| eyre!(e))?))
     }
 }
-
-pub trait Value<'args>: Encode<'args, Sqlite> + sqlx::Type<Sqlite> {}
 
 #[async_trait]
 pub trait InTable {
@@ -84,7 +82,9 @@ pub trait Fetch: Builder {
 
 #[async_trait]
 pub trait Store: Builder {
-    async fn store(&self) -> Result<()>;
+    async fn store<'e, E>(&self, executor: E) -> Result<()>
+    where
+        E: Executor<'e, Database = Sqlite>;
 }
 
 #[async_trait]
@@ -240,13 +240,16 @@ impl InTable for ArtistCredit {
 
 #[async_trait]
 impl Store for ArtistCredit {
-    async fn store(&self) -> Result<()> {
-        self.artist.store().await?;
+    async fn store<'e, E>(&self, executor: E) -> Result<()>
+    where
+        E: Executor<'e, Database = Sqlite>,
+    {
+        self.artist.store(executor).await?;
         Self::store_builder()
             .build()
             .bind(&self.artist.mbid)
             .bind(&self.join_phrase)
-            .execute(DB.get().ok_or(eyre!("Could not get database"))?)
+            .execute(executor)
             .await?;
         Ok(())
     }
@@ -290,14 +293,17 @@ impl InTable for Artist {
 
 #[async_trait]
 impl Store for Artist {
-    async fn store(&self) -> Result<()> {
+    async fn store<'e, E>(&self, executor: E) -> Result<()>
+    where
+        E: Executor<'e, Database = Sqlite>,
+    {
         Self::store_builder()
             .build()
             .bind(&self.mbid)
             .bind(&self.name)
             .bind(&self.sort_name)
             .bind(serde_json::to_string(&self.instruments)?)
-            .execute(DB.get().ok_or(eyre!("Could not get database"))?)
+            .execute(executor)
             .await?;
         Ok(())
     }
@@ -343,12 +349,15 @@ async fn resolve(
         .map_err(|e| eyre!(e))
 }
 
-async fn link(
-    db: &Pool<Sqlite>,
+async fn link<'e, E>(
+    executor: E,
     table: &str,
     mbid: Option<&String>,
     ac: &ArtistCredit,
-) -> Result<()> {
+) -> Result<()>
+where
+    E: Executor<'e, Database = Sqlite>,
+{
     sqlx::query(
         format!(
             "INSERT OR REPLACE INTO {} (ref, artist_credit) VALUES (?, ?)",
@@ -358,7 +367,7 @@ async fn link(
     )
     .bind(mbid)
     .bind(ac.id.as_ref())
-    .execute(db)
+    .execute(executor)
     .await?;
     Ok(())
 }
@@ -477,11 +486,13 @@ impl InTable for Track {
 
 #[async_trait]
 impl Store for Track {
-    async fn store(&self) -> Result<()> {
+    async fn store<'e, E>(&self, executor: E) -> Result<()>
+    where
+        E: Executor<'e, Database = Sqlite>,
+    {
         if let Some(rel) = &self.release {
-            rel.store().await?;
+            rel.store(executor).await?;
         }
-        let db = DB.get().ok_or(eyre!("Could not get database"))?;
         Track::store_builder()
             .build()
             .bind(&self.mbid)
@@ -497,40 +508,40 @@ impl Store for Track {
                 Err(eyre!("The given track doesn't have an associated path")),
                 path_to_str,
             )?)
-            .execute(db)
+            .execute(executor)
             .await?;
 
         for ac in self.artists.iter() {
-            ac.store().await?;
-            link(db, "track_artists", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_artists", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.performers.iter() {
-            ac.store().await?;
-            link(db, "track_performers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_performers", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.engigneers.iter() {
-            ac.store().await?;
-            link(db, "track_engigneers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_engigneers", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.mixers.iter() {
-            ac.store().await?;
-            link(db, "track_mixers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_mixers", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.producers.iter() {
-            ac.store().await?;
-            link(db, "track_producers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_producers", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.lyricists.iter() {
-            ac.store().await?;
-            link(db, "track_lyricists", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_lyricists", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.writers.iter() {
-            ac.store().await?;
-            link(db, "track_writers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_writers", self.mbid.as_ref(), ac).await?;
         }
         for ac in self.composers.iter() {
-            ac.store().await?;
-            link(db, "track_composers", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "track_composers", self.mbid.as_ref(), ac).await?;
         }
         Ok(())
     }
@@ -633,8 +644,10 @@ impl InTable for Release {
 
 #[async_trait]
 impl Store for Release {
-    async fn store(&self) -> Result<()> {
-        let db = DB.get().ok_or(eyre!("Could not get database"))?;
+    async fn store<'e, E>(&self, executor: E) -> Result<()>
+    where
+        E: Executor<'e, Database = Sqlite>,
+    {
         Release::store_builder()
             .build()
             .bind(&self.mbid)
@@ -652,11 +665,11 @@ impl Store for Release {
             .bind(self.date)
             .bind(self.original_date)
             .bind(&self.script)
-            .execute(db)
+            .execute(executor)
             .await?;
         for ac in self.artists.iter() {
-            ac.store().await?;
-            link(db, "release_artists", self.mbid.as_ref(), ac).await?;
+            ac.store(executor).await?;
+            link(executor, "release_artists", self.mbid.as_ref(), ac).await?;
         }
         Ok(())
     }

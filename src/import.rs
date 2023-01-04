@@ -19,7 +19,7 @@ use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
 use crate::track::picture::{write_picture, Picture, PictureType};
 use crate::util::{mkdirp, path_to_str};
-use crate::SETTINGS;
+use crate::{DB, SETTINGS};
 
 fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
     ScanDir::files()
@@ -109,6 +109,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let start = Instant::now();
     let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
     let theme = DialoguerTheme::default();
+    let db = DB.get().ok_or(eyre!("Could not get database"))?;
 
     let files = all_files(&canonicalize(path)?)?;
     let (tracks, errors): (Vec<_>, Vec<_>) =
@@ -239,7 +240,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }
         src.write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
-        dest.store().await?;
+        dest.store(db).await?;
         debug!("After tagging {:?}", src);
     }
 

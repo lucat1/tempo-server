@@ -12,7 +12,7 @@ pub fn init_logger() {
         .write_style(TAGGER_STYLE);
 
     Builder::from_env(env)
-        .filter(Some("sqlx"), LevelFilter::Warn)
+        .filter(Some("sqlx"), LevelFilter::Trace)
         .format(|buf, record| {
             let mut style = buf.style();
             let level = match record.level() {
