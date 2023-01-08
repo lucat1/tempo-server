@@ -10,7 +10,13 @@ flac = []
 id3 = []
 mp4 = []
 
+[workspace]
+members = [".", "entity", "migration"]
+
 [dependencies]
+entity = { path = "entity" }
+migration = { path = "migration" }
+
 clap = "3.2"
 directories = "4.0"
 toml = "0.5"
@@ -37,8 +43,7 @@ futures = "0.3"
 serde = { version = "1.0", features = ["rc"] }
 itertools = "0.10.4"
 serde_derive = { version = "1.0" }
-sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-rustls", "chrono"] }
-sqlx-migrate = { git = "https://github.com/lucat1/sqlx-migrate", features = ["sqlite"] }
+sea-orm = { version = "^0", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros" ] }
 
 metaflac = "0.2"
 mp4ameta = "0.11"

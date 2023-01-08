@@ -11,17 +11,13 @@ mod import;
 mod list;
 mod update;
 
-// automatically generated sql migrations
-mod generated;
-
 use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use log::{error, info};
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
-use sqlx::Sqlite;
-use sqlx_migrate::Migrator;
+use migration::MigratorTrait;
+use sea_orm::{Database, DatabaseConnection};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -74,45 +70,19 @@ fn cli() -> Command<'static> {
         )
 }
 
-async fn db() -> Result<SqlitePool> {
-    let pool = SqlitePoolOptions::new()
-        // TODO: should not be needed
-        .max_connections(1)
-        .connect_with(
-            SqliteConnectOptions::new()
-                .filename(util::path_to_str(
-                    &SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db,
-                )?)
-                .create_if_missing(true),
-        )
+async fn open_database() -> Result<DatabaseConnection> {
+    let path = util::path_to_str(&SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db)?;
+    let conn = Database::connect(format!("sqlite://{}", path))
         .await
         .map_err(|e| eyre!(e))?;
-    sqlx::query("PRAGMA journal_mode=WAL")
-        .execute(&pool)
-        .await?;
-    sqlx::query("PRAGMA busy_timeout=60000")
-        .execute(&pool)
-        .await?;
-    Ok(pool)
-}
-
-async fn migrate() -> Result<()> {
-    let db = DB.get().ok_or(eyre!("Database connection not found"))?;
-    let conn = db.acquire().await?;
-    let mut migrator: Migrator<Sqlite> = Migrator::new(conn.detach());
-    migrator.add_migrations(generated::migrations());
-
-    migrator.verify().await?;
-    let summary = migrator.migrate_all().await?;
-    let diff = summary.new_version.unwrap_or_default() - summary.old_version.unwrap_or_default();
-    if diff > 0 {
-        info!(
-            "Applied {} mirgation{}",
-            diff,
-            if diff > 1 { 's' } else { '\0' }
-        );
-    }
-    Ok(())
+    migration::Migrator::up(&conn, None).await?;
+    // sqlx::query("PRAGMA journal_mode=WAL")
+    //     .execute(&pool)
+    //     .await?;
+    // sqlx::query("PRAGMA busy_timeout=60000")
+    //     .execute(&pool)
+    //     .await?;
+    Ok(conn)
 }
 
 #[tokio::main]
@@ -127,8 +97,7 @@ async fn main() -> Result<()> {
         Some(("config", _)) => settings::print(),
         Some((a, b)) => {
             // all subcommands that require a database connection go in here
-            DB.get_or_try_init(db()).await?;
-            migrate().await?;
+            DB.get_or_try_init(open_database()).await?;
 
             match (a, b) {
                 ("list", sub_matches) => {
