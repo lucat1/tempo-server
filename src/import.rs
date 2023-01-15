@@ -11,7 +11,6 @@ use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::structures::Cover;
 use crate::fetch::{get, search};
 use crate::library::LibraryTrack;
-use crate::library::Store;
 use crate::models::{Artists, GroupTracks, Release, Track};
 use crate::rank::CoverRating;
 use crate::rank::{match_tracks, rank_covers};

@@ -1,6 +1,5 @@
 use chrono::NaiveDate;
 use eyre::{eyre, Context, Result};
-use sqlx::FromRow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;

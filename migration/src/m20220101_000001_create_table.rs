@@ -1,14 +1,8 @@
+use entity::{ArtistColumn, ArtistEntity};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
-
-#[derive(Iden)]
-enum Artist {
-    Table,
-    #[iden = "mbid"]
-    Id,
-}
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -16,10 +10,10 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Artist::Table)
+                    .table(ArtistEntity)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Artist::Id)
+                        ColumnDef::new(ArtistColumn::Mbid)
                             .blob(BlobSize::Tiny)
                             .not_null()
                             .primary_key(),
