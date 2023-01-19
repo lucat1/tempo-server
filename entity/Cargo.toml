@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+chrono = "0.4.23"
 sea-orm = { version = "^0" }
 sea-query = "0.28.2"
 serde = "1.0.152"

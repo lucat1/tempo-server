@@ -1,4 +1,4 @@
-use entity::ArtistEntity;
+use entity::{ArtistEntity, ArtistReleaseEntity, ReleaseEntity};
 use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
@@ -12,6 +12,13 @@ impl MigrationTrait for Migration {
         let schema = Schema::new(builder);
         manager
             .exec_stmt(schema.create_table_from_entity(ArtistEntity))
-            .await
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(ReleaseEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(ArtistReleaseEntity))
+            .await?;
+        Ok(())
     }
 }
