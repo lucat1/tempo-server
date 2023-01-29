@@ -1,5 +1,4 @@
-use crate::library::Filter;
-use crate::models::{Artist, Format, Release, Track};
+use crate::models::Format;
 use eyre::{bail, Result};
 use log::info;
 use std::time::Instant;

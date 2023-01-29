@@ -6,7 +6,6 @@ use pathfinding::matrix::Matrix;
 
 use crate::fetch::structures::Cover;
 use crate::SETTINGS;
-use crate::models::{Track, Release, Artists};
 use crate::settings::ArtProvider;
 
 static TRACK_TITLE_FACTOR: usize = 1000;

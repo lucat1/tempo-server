@@ -2,12 +2,12 @@ use sea_orm::entity::prelude::*;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "artists_releases")]
+#[sea_orm(table_name = "artists_tracks")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub artist_id: Uuid,
     #[sea_orm(primary_key)]
-    pub release_id: Uuid,
+    pub track_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -19,11 +19,11 @@ pub enum Relation {
     )]
     Artist,
     #[sea_orm(
-        belongs_to = "super::release::Entity",
-        from = "Column::ReleaseId",
-        to = "super::release::Column::Id"
+        belongs_to = "super::track::Entity",
+        from = "Column::TrackId",
+        to = "super::track::Column::Id"
     )]
-    Release,
+    Track,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

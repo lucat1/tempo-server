@@ -1,4 +1,3 @@
-use crate::models::{Format, Track};
 use crate::SETTINGS;
 use eyre::{eyre, Result, WrapErr};
 use std::path::PathBuf;

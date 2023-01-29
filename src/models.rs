@@ -6,69 +6,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 use strfmt::strfmt;
 
-use crate::track::format::Format as TrackFormat;
 use crate::track::key::TagKey;
 use crate::util::path_to_str;
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
-
-#[derive(Clone, Debug, FromRow)]
-pub struct Artist {
-    pub mbid: Option<String>,
-    pub name: String,
-    pub join_phrase: Option<String>,
-    pub sort_name: Option<String>,
-    pub instruments: Vec<String>,
-}
-
-#[derive(Clone, Debug, FromRow)]
-pub struct Track {
-    pub mbid: Option<String>,
-    pub title: String,
-    pub artists: Vec<Artist>,
-    pub length: Option<Duration>,
-    pub disc: Option<u64>,
-    pub disc_mbid: Option<String>,
-    // TODO: discids, consider referencing a medium as well as the release
-    // would include things like numbering and disc data in a more appropriate
-    // structure. Con: would increase memory management complexity
-    pub number: Option<u64>,
-    pub genres: Vec<String>,
-    pub release: Option<Release>,
-
-    // Performer, Vocal, Instrument
-    pub performers: Vec<Artist>,
-    pub engigneers: Vec<Artist>,
-    pub mixers: Vec<Artist>,
-    pub producers: Vec<Artist>,
-    pub lyricists: Vec<Artist>,
-    pub writers: Vec<Artist>,
-    pub composers: Vec<Artist>,
-
-    pub format: Option<TrackFormat>,
-    pub path: Option<PathBuf>,
-}
-
-#[derive(Clone, Debug, FromRow)]
-pub struct Release {
-    pub mbid: Option<String>,
-    pub release_group_mbid: Option<String>,
-    pub asin: Option<String>,
-    pub title: String,
-    pub artists: Vec<Artist>,
-    pub discs: Option<u64>,
-    pub media: Option<String>,
-    pub tracks: Option<u64>,
-    pub country: Option<String>,
-    pub label: Option<String>,
-    pub catalog_no: Option<String>,
-    pub status: Option<String>,
-    pub release_type: Option<String>,
-    pub date: Option<NaiveDate>,
-    pub original_date: Option<NaiveDate>,
-    pub script: Option<String>,
-}
 
 pub trait GroupTracks {
     fn group_tracks(self) -> Result<(Release, Vec<Track>)>;

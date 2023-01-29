@@ -5,8 +5,8 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "releases")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub mbid: Uuid,
-    pub release_group_mbid: Option<String>,
+    pub id: Uuid,
+    pub release_group_id: Option<String>,
     pub release_type: Option<String>,
     pub asin: Option<String>,
     pub title: String,
@@ -23,7 +23,16 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::medium::Entity")]
+    Medium,
+}
+
+impl Related<super::medium::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Medium.def()
+    }
+}
 
 impl Related<super::artist::Entity> for Entity {
     fn to() -> RelationDef {

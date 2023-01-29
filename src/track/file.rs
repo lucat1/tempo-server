@@ -18,8 +18,8 @@ use super::mp4;
 use super::Picture;
 use super::TagFrom;
 use super::{Tag, TagError};
+use crate::models::GroupTracks;
 use crate::models::UNKNOWN_TITLE;
-use crate::models::{Artist, GroupTracks, Release, Track};
 use crate::track::TagKey;
 use crate::util::{dedup, maybe_date};
 
