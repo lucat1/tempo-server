@@ -1,7 +1,5 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, EnumIter, DeriveActiveEnum)]
@@ -50,13 +48,13 @@ impl Related<super::medium::Entity> for Entity {
     }
 }
 
-impl Related<super::artist::Entity> for Entity {
+impl Related<super::artist_credit::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_track::Relation::Artist.def()
+        super::artist_credit_track::Relation::Artist.def()
     }
 
     fn via() -> Option<RelationDef> {
-        Some(super::artist_track::Relation::Track.def().rev())
+        Some(super::artist_credit_track::Relation::Track.def().rev())
     }
 }
 

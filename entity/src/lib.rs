@@ -3,8 +3,9 @@ mod medium;
 mod release;
 mod track;
 
-mod artist_release;
-mod artist_track;
+mod artist_credit;
+mod artist_credit_release;
+mod artist_credit_track;
 
 pub use artist::Column as ArtistColumn;
 pub use artist::Entity as ArtistEntity;
@@ -19,9 +20,9 @@ pub use track::Column as TrackColumn;
 pub use track::Entity as TrackEntity;
 pub use track::Model as Track;
 
-pub use artist_release::Column as ArtistReleaseColumn;
-pub use artist_release::Entity as ArtistReleaseEntity;
-pub use artist_release::Model as ArtistRelease;
-pub use artist_track::Column as ArtistTrackColumn;
-pub use artist_track::Entity as ArtistTrackEntity;
-pub use artist_track::Model as ArtistTrack;
+pub use artist_credit_release::Column as ArtistReleaseColumn;
+pub use artist_credit_release::Entity as ArtistReleaseEntity;
+pub use artist_credit_release::Model as ArtistRelease;
+pub use artist_credit_track::Column as ArtistTrackColumn;
+pub use artist_credit_track::Entity as ArtistTrackEntity;
+pub use artist_credit_track::Model as ArtistTrack;

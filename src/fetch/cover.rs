@@ -2,6 +2,7 @@ use crate::fetch::structures::Itunes;
 use crate::models::Artists;
 use crate::settings::ArtProvider;
 use crate::{Settings, SETTINGS};
+use entity::Release;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::ImageOutputFormat;
@@ -33,7 +34,7 @@ pub async fn probe(url: String) -> Option<()> {
     CLIENT.head(url).send().await.ok().map(|_| ())
 }
 
-pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Result<Vec<Cover>> {
+pub async fn fetch_itunes(release: &entity::Release, _: &Settings) -> Result<Vec<Cover>> {
     let start = Instant::now();
     let raw_country = release.country.as_deref().unwrap_or(DEFAULT_COUNTRY);
     let country = if ITUNES_COUNTRIES.contains(&raw_country) {
@@ -80,7 +81,7 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
 }
 
 pub async fn fetch_cover_art_archive(
-    release: &crate::models::Release,
+    release: &entity::Release,
     settings: &Settings,
 ) -> Result<Vec<Cover>> {
     let start = Instant::now();
@@ -119,7 +120,7 @@ pub async fn fetch_cover_art_archive(
     Ok(json.into(release.title.clone(), release.artists.joined()))
 }
 
-pub async fn search_covers(release: &crate::models::Release) -> Result<Vec<Vec<Cover>>> {
+pub async fn search_covers(release: &entity::Release) -> Result<Vec<Vec<Cover>>> {
     let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
     let mut v = vec![];
     for provider in settings.art.providers.iter() {

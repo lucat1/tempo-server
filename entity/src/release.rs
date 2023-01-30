@@ -34,13 +34,13 @@ impl Related<super::medium::Entity> for Entity {
     }
 }
 
-impl Related<super::artist::Entity> for Entity {
+impl Related<super::artist_credit::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_release::Relation::Artist.def()
+        super::artist_credit_release::Relation::ArtistCredit.def()
     }
 
     fn via() -> Option<RelationDef> {
-        Some(super::artist_release::Relation::Release.def().rev())
+        Some(super::artist_credit_release::Relation::Release.def().rev())
     }
 }
 
