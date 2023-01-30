@@ -4,7 +4,7 @@ use log::debug;
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
-use crate::fetch::structures::Cover;
+use crate::fetch::cover::Cover;
 use crate::SETTINGS;
 use crate::settings::ArtProvider;
 

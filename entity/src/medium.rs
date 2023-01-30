@@ -10,8 +10,8 @@ pub struct Instruments(Vec<String>);
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub position: Option<u64>,
-    pub track_offset: Option<u64>,
+    pub position: u64,
+    pub track_offset: u64,
     pub format: Option<String>,
 }
 

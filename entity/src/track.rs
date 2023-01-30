@@ -24,12 +24,12 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
     pub title: String,
-    pub length: u32,
-    pub number: Option<u64>,
+    pub length: u64,
+    pub number: u64,
     pub genres: Genres,
 
-    pub format: Option<TrackFormat>,
-    pub path: Option<String>,
+    pub format: TrackFormat,
+    pub path: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -55,6 +55,16 @@ impl Related<super::artist_credit::Entity> for Entity {
 
     fn via() -> Option<RelationDef> {
         Some(super::artist_credit_track::Relation::Track.def().rev())
+    }
+}
+
+impl Related<super::artist_track_relation::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::artist_track_relation::Relation::Artist.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::artist_track_relation::Relation::Track.def().rev())
     }
 }
 

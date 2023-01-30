@@ -6,13 +6,11 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub release_group_id: Option<String>,
-    pub release_type: Option<String>,
-    pub asin: Option<String>,
     pub title: String,
-    pub discs: Option<u64>,
+    pub release_group_id: Option<Uuid>,
+    pub release_type: Option<String>,
+    pub asin: String,
     pub media: Option<String>,
-    pub tracks: Option<u64>,
     pub country: Option<String>,
     pub label: Option<String>,
     pub catalog_no: Option<String>,

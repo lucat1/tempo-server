@@ -1,7 +1,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "i32", db_type = "Integer")]
+#[sea_orm(rs_type = "i8", db_type = "Integer")]
 pub enum TrackFormat {
     #[sea_orm(num_value = 0)]
     Flac,

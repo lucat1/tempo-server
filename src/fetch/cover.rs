@@ -1,20 +1,51 @@
-use crate::fetch::structures::Itunes;
 use crate::models::Artists;
 use crate::settings::ArtProvider;
 use crate::{Settings, SETTINGS};
-use entity::Release;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::ImageOutputFormat;
 use image::{io::Reader as ImageReader, DynamicImage};
 use log::{debug, trace};
 use mime::Mime;
+use std::cmp::Ordering;
 use std::io::Cursor;
 use std::time::Instant;
 
-use super::structures::Cover;
-use super::structures::CoverArtArchive;
+use super::cover_art_archive::CoverArtArchive;
+use super::itunes::Itunes;
 use super::CLIENT;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cover {
+    pub provider: ArtProvider,
+    pub url: String,
+    pub width: usize,
+    pub height: usize,
+    pub title: String,
+    pub artist: String,
+}
+
+// Covers are sorted by picture size
+impl Ord for Cover {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s1 = self.width * self.height;
+        let s2 = other.width * other.height;
+        s1.cmp(&s2)
+    }
+}
+
+impl PartialOrd for Cover {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Cover {
+    fn eq(&self, other: &Self) -> bool {
+        self.width * self.height == other.width * other.height
+    }
+}
+impl Eq for Cover {}
 
 static DEFAULT_COUNTRY: &str = "US";
 static ITUNES_COUNTRIES: &[&str] = &[
@@ -188,3 +219,4 @@ pub async fn get_cover(url: String) -> Result<(Vec<u8>, Mime)> {
     resized.write_to(&mut Cursor::new(&mut bytes), format)?;
     Ok((bytes, settings.art.format.mime()))
 }
+use serde_derive::{Deserialize, Serialize};

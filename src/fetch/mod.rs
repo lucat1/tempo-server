@@ -1,4 +1,6 @@
 pub mod cover;
+pub mod cover_art_archive;
+pub mod itunes;
 pub mod structures;
 
 use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
@@ -9,7 +11,6 @@ use log::trace;
 use reqwest::header::USER_AGENT;
 use std::sync::Arc;
 use std::time::Instant;
-use structures::{Release, ReleaseSearch};
 
 static COUNT: u32 = 8;
 static MB_USER_AGENT: &str =
@@ -19,7 +20,7 @@ lazy_static! {
 }
 
 pub async fn search(
-    release: &crate::models::Release,
+    release: &entity::Release,
     tracks: usize,
 ) -> Result<Vec<crate::models::Release>> {
     let start = Instant::now();

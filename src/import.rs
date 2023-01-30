@@ -7,8 +7,8 @@ use std::fs::canonicalize;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use crate::fetch::cover::Cover;
 use crate::fetch::cover::{get_cover, search_covers};
-use crate::fetch::structures::Cover;
 use crate::fetch::{get, search};
 use crate::models::GroupTracks;
 use crate::rank::CoverRating;
