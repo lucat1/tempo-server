@@ -5,6 +5,7 @@ pub mod structures;
 
 use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
 use const_format::formatcp;
+pub use cover::Cover;
 use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
 use log::trace;

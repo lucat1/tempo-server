@@ -13,16 +13,17 @@ pub mod key;
 pub mod map;
 pub mod picture;
 
-use core::convert::AsRef;
-use eyre::{Report, Result};
-use log::debug;
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter, Result as FormatResult};
-use std::path::Path;
+pub use core::convert::AsRef;
+pub use eyre::{Report, Result};
+pub use log::debug;
+pub use std::collections::HashMap;
+pub use std::fmt::{Debug, Formatter, Result as FormatResult};
+pub use std::path::Path;
 
-use self::format::Format;
-use self::key::TagKey;
-use picture::Picture;
+pub use file::TrackFile;
+pub use format::Format;
+pub use key::TagKey;
+pub use picture::Picture;
 
 pub enum TagError {
     NotSupported,
