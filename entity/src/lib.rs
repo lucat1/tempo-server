@@ -40,3 +40,17 @@ pub use artist_credit_release::Model as ArtistRelease;
 pub use artist_credit_track::Column as ArtistTrackColumn;
 pub use artist_credit_track::Entity as ArtistTrackEntity;
 pub use artist_credit_track::Model as ArtistTrack;
+
+pub struct FullRelease(
+    ReleaseActive,
+    Vec<MediumActive>,
+    Vec<ArtistCreditActive>,
+    Vec<ArtistActive>,
+);
+
+pub struct FullTrack(
+    TrackActive,
+    Vec<ArtistCreditActive>,
+    Vec<ArtistTrackRelationActive>,
+    Vec<ArtistActive>,
+);

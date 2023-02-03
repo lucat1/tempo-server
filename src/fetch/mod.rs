@@ -3,7 +3,8 @@ pub mod cover_art_archive;
 pub mod itunes;
 pub mod structures;
 
-use crate::models::{Artists, GroupTracks, UNKNOWN_ARTIST};
+use crate::fetch::structures::ReleaseSearch;
+use crate::internal::{Release, UNKNOWN_ARTIST};
 use const_format::formatcp;
 pub use cover::Cover;
 use eyre::{bail, eyre, Context, Result};
@@ -20,12 +21,11 @@ lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-pub async fn search(
-    release: &entity::Release,
-    tracks: usize,
-) -> Result<Vec<crate::models::Release>> {
+pub struct SearchResult(entity::FullRelease, Vec<entity::FullTrack>);
+
+pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
     let start = Instant::now();
-    let raw_artists = release.artists.joined();
+    let raw_artists = release.artists.join(", ");
     let artists = match raw_artists.as_str() {
         UNKNOWN_ARTIST => "",
         s => s,
@@ -33,7 +33,7 @@ pub async fn search(
     let res = CLIENT
         .get(format!(
             "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{} tracks:{}&fmt=json&limit={}",
-            release.title, artists, tracks, COUNT
+            release.title, artists, release.tracks, COUNT
         ))
         .header(USER_AGENT, MB_USER_AGENT)
         .send()
@@ -58,10 +58,23 @@ pub async fn search(
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    Ok(json.releases.into_iter().map(|v| v.into()).collect())
+    Ok(json
+        .releases
+        .into_iter()
+        .map(|r| {
+            (
+                r.into(),
+                r.media
+                    .into_iter()
+                    .map(|m| m.tracks.into())
+                    .flatten()
+                    .collect(),
+            )
+        })
+        .collect())
 }
 
-pub async fn get(id: &str) -> Result<(crate::models::Release, Vec<crate::models::Track>)> {
+pub async fn get(id: &str) -> Result<SearchResult> {
     let start = Instant::now();
     let res = CLIENT
         .get(format!(

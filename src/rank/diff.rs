@@ -1,6 +1,4 @@
 use crate::rank::{Release, Track};
-use crate::track::TrackFile;
-use eyre::Result;
 use levenshtein::levenshtein;
 
 static TRACK_TITLE_FACTOR: usize = 1000;
@@ -18,17 +16,7 @@ static RELEASE_RELEASE_TYPE_FACTOR: usize = 50;
 static RELEASE_DATE_FACTOR: usize = 100;
 static RELEASE_ORIGINAL_DATE_FACTOR: usize = 100;
 
-fn group_tracks(tracks: Vec<TrackFile>) -> Result<(Release, Vec<Track>)> {
-    Ok((
-        tracks.clone().try_into()?,
-        tracks
-            .into_iter()
-            .map(|t| t.try_into())
-            .collect::<Result<Vec<_>>>()?,
-    ))
-}
-
-trait Diff {
+pub trait Diff {
     fn diff(&self, other: &Self) -> i64;
 }
 

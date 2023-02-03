@@ -11,8 +11,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
     pub name: String,
-    pub sort_name: Option<String>,
-    pub instruments: Instruments,
+    pub sort_name: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -10,7 +10,6 @@ pub struct Model {
     pub release_group_id: Option<Uuid>,
     pub release_type: Option<String>,
     pub asin: String,
-    pub media: Option<String>,
     pub country: Option<String>,
     pub label: Option<String>,
     pub catalog_no: Option<String>,

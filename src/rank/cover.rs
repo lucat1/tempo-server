@@ -1,7 +1,6 @@
-use super::internal::Release;
 use crate::fetch::Cover;
-use crate::settings::ArtProvider;
-use crate::SETTINGS;
+use crate::internal::Release;
+use crate::settings::{get_settings, ArtProvider};
 use levenshtein::levenshtein;
 use std::cmp::Ordering;
 
@@ -33,7 +32,7 @@ fn in_range(val: f64, min: f64, max: f64) -> f64 {
 }
 
 fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
-    let art_settings = &SETTINGS.get().unwrap().art;
+    let art_settings = &get_settings().unwrap().art;
     let provider_index = art_settings
         .providers
         .iter()

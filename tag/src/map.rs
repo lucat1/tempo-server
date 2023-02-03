@@ -1,13 +1,16 @@
 use super::key::TagKey;
-use crate::SETTINGS;
+use crate::settings::get_settings;
 use chrono::Datelike;
-use eyre::{eyre, Report, Result};
+use entity::{FullRelease, FullTrack};
+use eyre::{Report, Result};
 use std::collections::HashMap;
 
-impl TryFrom<Track> for HashMap<TagKey, Vec<String>> {
+pub type KeyMap = HashMap<TagKey, Vec<String>>;
+
+impl TryFrom<FullTrack> for KeyMap {
     type Error = Report;
-    fn try_from(track: Track) -> Result<Self, Self::Error> {
-        let settings = SETTINGS.get().ok_or(eyre!("Could not get settings"))?;
+    fn try_from(track: FullTrack) -> Result<Self, Self::Error> {
+        let settings = get_settings();
         let mut map = HashMap::new();
         if let Some(id) = track.mbid {
             map.insert(TagKey::MusicBrainzTrackID, vec![id]);
@@ -54,21 +57,9 @@ impl TryFrom<Track> for HashMap<TagKey, Vec<String>> {
     }
 }
 
-impl TryFrom<Track> for HashMap<String, Vec<String>> {
+impl TryFrom<FullRelease> for HashMap<TagKey, Vec<String>> {
     type Error = Report;
-    fn try_from(track: Track) -> Result<Self, Self::Error> {
-        let mut map = HashMap::new();
-        let tag_map: HashMap<TagKey, Vec<String>> = track.try_into()?;
-        for (k, v) in tag_map.into_iter() {
-            map.insert(k.to_string(), v);
-        }
-        Ok(map)
-    }
-}
-
-impl TryFrom<Release> for HashMap<TagKey, Vec<String>> {
-    type Error = Report;
-    fn try_from(release: Release) -> Result<Self, Self::Error> {
+    fn try_from(release: FullRelease) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
         if let Some(rel_id) = &release.mbid {
             map.insert(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()]);
@@ -132,9 +123,12 @@ impl TryFrom<Release> for HashMap<TagKey, Vec<String>> {
     }
 }
 
-impl TryFrom<Release> for HashMap<String, Vec<String>> {
+impl<T> TryFrom<T> for HashMap<String, Vec<String>>
+where
+    HashMap<TagKey, Vec<String>>: TryInto<T>,
+{
     type Error = Report;
-    fn try_from(track: Release) -> Result<Self, Self::Error> {
+    fn try_from(track: T) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
         let tag_map: HashMap<TagKey, Vec<String>> = track.try_into()?;
         for (k, v) in tag_map.into_iter() {

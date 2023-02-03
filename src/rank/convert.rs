@@ -1,8 +1,8 @@
 use super::{Release, Track};
-use crate::models::UNKNOWN_TITLE;
+use crate::internal::UNKNOWN_TITLE;
 use crate::track::{TagKey, TrackFile};
 use crate::util::{dedup, maybe_date};
-use eyre::{eyre, Report, Result};
+use eyre::eyre;
 use log::warn;
 
 fn artists_with_name(name: String, sep: Option<String>) -> Vec<String> {
@@ -37,13 +37,12 @@ fn first_tag(tracks: &[TrackFile], tag: TagKey) -> Option<String> {
     options.first().map(|f| f.to_string())
 }
 
-impl TryFrom<TrackFile> for Track {
-    type Error = Report;
-    fn try_from(file: TrackFile) -> Result<Self> {
+impl From<TrackFile> for Track {
+    fn from(file: TrackFile) -> Self {
         let file_singleton = vec![file];
-        Ok(Track {
+        Track {
             title: first_tag(&file_singleton, TagKey::TrackTitle)
-                .ok_or(eyre!("A track doesn't have any title"))?,
+                .unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists: artists_from_tag(&file_singleton, TagKey::Artists),
             length: first_tag(&file_singleton, TagKey::Duration)
                 .and_then(|d| d.parse::<u64>().ok()),
@@ -51,13 +50,12 @@ impl TryFrom<TrackFile> for Track {
                 .and_then(|d| d.parse::<u64>().ok()),
             number: first_tag(&file_singleton, TagKey::TrackNumber)
                 .and_then(|d| d.parse::<u64>().ok()),
-        })
+        }
     }
 }
 
-impl TryFrom<Vec<TrackFile>> for Release {
-    type Error = Report;
-    fn try_from(tracks: Vec<TrackFile>) -> Result<Self, Self::Error> {
+impl From<Vec<TrackFile>> for Release {
+    fn from(tracks: Vec<TrackFile>) -> Self {
         let artists = if first_tag(&tracks, TagKey::AlbumArtist).is_some() {
             // Use the AlbumArtist to search if we have one available
             artists_from_tag(&tracks, TagKey::AlbumArtist)
@@ -69,7 +67,7 @@ impl TryFrom<Vec<TrackFile>> for Release {
             v1
         };
 
-        Ok(Release {
+        Release {
             title: first_tag(&tracks, TagKey::Album).unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists,
             discs: first_tag(&tracks, TagKey::TotalDiscs).and_then(|d| d.parse::<u64>().ok()),
@@ -86,6 +84,6 @@ impl TryFrom<Vec<TrackFile>> for Release {
                 first_tag(&tracks, TagKey::OriginalReleaseDate)
                     .or_else(|| first_tag(&tracks, TagKey::OriginalReleaseYear)),
             ),
-        })
+        }
     }
 }

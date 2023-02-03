@@ -1,12 +1,11 @@
-use crate::models::Artists;
-use crate::settings::ArtProvider;
-use crate::{Settings, SETTINGS};
+use crate::settings::{get_settings, ArtProvider, Settings};
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::ImageOutputFormat;
 use image::{io::Reader as ImageReader, DynamicImage};
 use log::{debug, trace};
 use mime::Mime;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::io::Cursor;
 use std::time::Instant;
@@ -152,7 +151,7 @@ pub async fn fetch_cover_art_archive(
 }
 
 pub async fn search_covers(release: &entity::Release) -> Result<Vec<Vec<Cover>>> {
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let settings = get_settings()?;
     let mut v = vec![];
     for provider in settings.art.providers.iter() {
         let res = match *provider {
@@ -176,7 +175,7 @@ pub async fn search_covers(release: &entity::Release) -> Result<Vec<Vec<Cover>>>
 
 pub async fn get_cover(url: String) -> Result<(Vec<u8>, Mime)> {
     let start = Instant::now();
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let settings = get_settings()?;
     let res = CLIENT.get(url).send().await?;
     let req_time = start.elapsed();
     trace!("Fetch request for cover art took {:?}", req_time);
@@ -219,4 +218,3 @@ pub async fn get_cover(url: String) -> Result<(Vec<u8>, Mime)> {
     resized.write_to(&mut Cursor::new(&mut bytes), format)?;
     Ok((bytes, settings.art.format.mime()))
 }
-use serde_derive::{Deserialize, Serialize};

@@ -1,6 +1,6 @@
 mod fetch;
+mod internal;
 mod library;
-mod models;
 mod rank;
 mod settings;
 mod theme;
@@ -21,7 +21,7 @@ use sea_orm::{Database, DatabaseConnection};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use settings::Settings;
+use settings::{get_settings, Settings};
 
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
@@ -33,7 +33,6 @@ pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
 
 lazy_static! {
     pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
-    pub static ref DB: Arc<OnceCell<SqlitePool>> = Arc::new(OnceCell::new());
 }
 
 fn cli() -> Command<'static> {
@@ -71,7 +70,7 @@ fn cli() -> Command<'static> {
 }
 
 async fn open_database() -> Result<DatabaseConnection> {
-    let path = util::path_to_str(&SETTINGS.get().ok_or(eyre!("Could not obtain settings"))?.db)?;
+    let path = util::path_to_str(&get_settings().db)?;
     let conn = Database::connect(format!("sqlite://{}", path))
         .await
         .map_err(|e| eyre!(e))?;
@@ -97,7 +96,7 @@ async fn main() -> Result<()> {
         Some(("config", _)) => settings::print(),
         Some((a, b)) => {
             // all subcommands that require a database connection go in here
-            DB.get_or_try_init(open_database()).await?;
+            // DB.get_or_try_init(open_database()).await?;
 
             match (a, b) {
                 ("list", sub_matches) => {

@@ -16,7 +16,6 @@ use super::mp4;
 use super::Picture;
 use super::TagFrom;
 use super::{Tag, TagError};
-use crate::models::GroupTracks;
 use crate::track::TagKey;
 
 #[derive(Clone, Debug)]

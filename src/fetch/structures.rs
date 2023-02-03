@@ -151,17 +151,27 @@ pub struct LabelInfo {
     pub label: Option<Label>,
 }
 
-impl From<ArtistCredit> for entity::ArtistCreditActive {
-    fn from(artist: ArtistCredit) -> Self {
-        entity::ArtistCreditActive {
-            join_phrase: ActiveValue::Set(artist.joinphrase),
-            artist_id: ActiveValue::Set(artist.artist.id),
-            ..Default::default()
-        }
-    }
-}
+// impl From<Artist> for entity::ArtistActive {
+//     fn from(artist: Artist) -> Self {
+//         entity::ArtistActive {
+//             id: ActiveValue::Set(artist.id),
+//             name: ActiveValue::Set(artist.name),
+//             sort_name: ActiveValue::Set(artist.sort_name),
+//         }
+//     }
+// }
+//
+// impl From<ArtistCredit> for entity::ArtistCreditActive {
+//     fn from(artist: ArtistCredit) -> Self {
+//         entity::ArtistCreditActive {
+//             join_phrase: ActiveValue::Set(artist.joinphrase),
+//             artist_id: ActiveValue::Set(artist.artist.id),
+//             ..Default::default()
+//         }
+//     }
+// }
 
-impl From<Track> for (entity::TrackActive, Vec<entity::ArtistTrackRelationActive>) {
+impl From<Track> for entity::FullTrack {
     fn from(track: Track) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
@@ -182,6 +192,12 @@ impl From<Track> for (entity::TrackActive, Vec<entity::ArtistTrackRelationActive
         let mut all_relations = track.recording.relations.clone();
         all_relations.append(&mut other_relations);
 
+        let mut artists: Vec<entity::ArtistActive> = track.recording.artist_credit.map_or(
+            |acs| acs.into_iter().map(|ac| ac.artist.into()).collect(),
+            vec![],
+        );
+        // Append artists for all other relations
+        artists.append(all_relations.iter().map(|r| r.artist.into()).collect());
         (
             entity::TrackActive {
                 id: ActiveValue::Set(track.id),
@@ -195,6 +211,7 @@ impl From<Track> for (entity::TrackActive, Vec<entity::ArtistTrackRelationActive
                 format: ActiveValue::NotSet,
                 path: ActiveValue::NotSet,
             },
+            track.recording.artist_credit.into(),
             all_relations
                 .iter()
                 .map(|r| entity::ArtistTrackRelationActive {
@@ -207,17 +224,12 @@ impl From<Track> for (entity::TrackActive, Vec<entity::ArtistTrackRelationActive
                     relation_value: r.type_field,
                 })
                 .collect(),
+            artists,
         )
     }
 }
 
-impl From<Release>
-    for (
-        entity::ReleaseActive,
-        Vec<entity::MediumActive>,
-        Vec<entity::ArtistCreditActive>,
-    )
-{
+impl From<Release> for entity::FullRelease {
     fn from(release: Release) -> Self {
         let original_date = maybe_date(
             release
@@ -243,10 +255,6 @@ impl From<Release>
                         ActiveValue::NotSet,
                     ),
                 asin: ActiveValue::Set(release.asin),
-                media: release
-                    .media
-                    .first()
-                    .map_or(|m| ActiveValue::Set(m.format.clone()), ActiveValue::NotSet),
                 country: release
                     .country
                     .map_or(|c| ActiveValue::Set(c), ActiveValue::NotSet),
@@ -291,6 +299,7 @@ impl From<Release>
                 .into_iter()
                 .map(|a| a.into())
                 .collect(),
+            release.artist_credit.into_iter().map(|a| a).collect(),
         )
     }
 }

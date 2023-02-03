@@ -11,10 +11,11 @@ id3 = []
 mp4 = []
 
 [workspace]
-members = [".", "entity", "migration"]
+members = [".", "entity", "tag", "migration"]
 
 [dependencies]
 entity = { path = "entity" }
+tag = { path = "tag" }
 migration = { path = "migration" }
 
 clap = "3.2"

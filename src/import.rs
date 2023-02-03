@@ -9,15 +9,13 @@ use std::time::Instant;
 
 use crate::fetch::cover::Cover;
 use crate::fetch::cover::{get_cover, search_covers};
-use crate::fetch::{get, search};
-use crate::models::GroupTracks;
-use crate::rank::CoverRating;
-use crate::rank::{match_tracks, rank_covers};
+use crate::fetch::{get, search, SearchResult};
+use crate::rank::{rank_covers, rate_and_match, CoverRating};
+use crate::settings::get_settings;
 use crate::theme::DialoguerTheme;
 use crate::track::file::TrackFile;
 use crate::track::picture::{write_picture, Picture, PictureType};
 use crate::util::{mkdirp, path_to_str};
-use crate::SETTINGS;
 
 fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
     ScanDir::files()
@@ -32,9 +30,9 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
 
 async fn ask(
     theme: &DialoguerTheme,
-    original_tracks: &Vec<Track>,
-    candidate: (Release, Vec<Track>, Vec<usize>),
-) -> Result<(bool, Release, Vec<Track>, Vec<usize>)> {
+    original_tracks: &Vec<TrackFile>,
+    candidate: SearchResult,
+) -> Result<(bool, SearchResult, Vec<usize>)> {
     info!(
         "Tagging as {} - {} ({})",
         candidate.0.artists.joined(),
@@ -58,7 +56,7 @@ async fn ask(
                 .interact()
                 .map_err(|_| eyre!("Aborted"))?;
             let (release, tracks) = get(id.as_str()).await?;
-            let (_, tracks_map) = match_tracks(original_tracks, &tracks);
+            let (_, tracks_map) = rate_and_match(original_tracks, &tracks);
             Ok((false, release, tracks, tracks_map))
         }
         v => {
@@ -105,7 +103,7 @@ fn ask_cover(theme: &DialoguerTheme, covers: Vec<CoverRating>) -> Option<Cover> 
 
 pub async fn import(path: &PathBuf) -> Result<()> {
     let start = Instant::now();
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let settings = get_settings()?;
     let theme = DialoguerTheme::default();
 
     let files = all_files(&canonicalize(path)?)?;
@@ -130,7 +128,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .wrap_err("Trying to convert local files to internal structures")?;
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
     // see here for the previous implementation:
-    // https://github.com/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
+    // https://codeberg.org/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
     // Decide on what the user interaction should look like before proceeding with the implementation
 
     info!(
@@ -143,7 +141,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     info!("Found {} release candidates, ranking...", releases.len());
 
-    let mut expanded_releases: Vec<(Release, Vec<Track>)> = vec![];
+    let mut expanded_releases: Vec<SearchResult> = vec![];
     for release in releases.into_iter() {
         let id = release.mbid.clone().ok_or(eyre!(
             "The given release doesn't have an ID associated with it, can not fetch specific metadata"
@@ -153,7 +151,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let mut rated_expanded_releases = expanded_releases
         .into_iter()
         .map(|(r, tracks)| {
-            let (val, map) = match_tracks(&choice_tracks, &tracks);
+            let (val, map) = rate_and_match(&choice_tracks, &tracks);
             (r, tracks, map, val)
         })
         .collect::<Vec<_>>();
