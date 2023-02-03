@@ -1,5 +1,5 @@
-use crate::settings::ArtProvider;
 use serde_derive::{Deserialize, Serialize};
+use setting::ArtProvider;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Itunes {

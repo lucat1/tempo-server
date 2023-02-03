@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 chrono = "0.4.23"
+eyre = "0.6.8"
 sea-orm = { version = "^0", features = [ "with-time" ] }
 sea-query = "0.28.2"
 serde = "1.0.152"

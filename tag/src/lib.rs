@@ -7,23 +7,20 @@ pub mod id3;
 #[cfg(feature = "mp4")]
 pub mod mp4;
 
-pub mod file;
 pub mod format;
 pub mod key;
-pub mod map;
 pub mod picture;
 
 pub use core::convert::AsRef;
 pub use eyre::{Report, Result};
-pub use log::debug;
-pub use std::collections::HashMap;
-pub use std::fmt::{Debug, Formatter, Result as FormatResult};
-pub use std::path::Path;
-
-pub use file::TrackFile;
 pub use format::Format;
 pub use key::TagKey;
-pub use picture::Picture;
+pub use picture::{Picture, PictureType};
+
+use log::debug;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter, Result as FormatResult};
+use std::path::Path;
 
 pub enum TagError {
     NotSupported,
@@ -52,17 +49,6 @@ where
 impl Clone for Box<dyn Tag> {
     fn clone(&self) -> Box<dyn Tag> {
         self.clone_box()
-    }
-}
-
-impl Debug for Box<dyn Tag> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
-        let mut str = f.debug_struct("Tag");
-        for (k, v) in self.get_all() {
-            str.field(&k, &v);
-        }
-        str.field("pictures", &self.get_pictures());
-        str.finish()
     }
 }
 

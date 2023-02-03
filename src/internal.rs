@@ -1,68 +1,57 @@
 use chrono::NaiveDate;
+use entity::{FullRelease, FullTrack};
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
 
 pub struct Track {
-    title: String,
-    artists: Vec<String>,
-    length: Option<String>,
-    disc: Option<u64>,
-    number: Option<u64>,
+    pub title: String,
+    pub artists: Vec<String>,
+    pub length: Option<usize>,
+    pub disc: Option<usize>,
+    pub number: Option<usize>,
 }
 
 pub struct Release {
-    title: String,
-    artists: Vec<String>,
-    media: Option<String>,
-    discs: Option<u64>,
-    tracks: Option<u64>,
-    country: Option<String>,
-    label: Option<String>,
-    release_type: Option<String>,
-    date: Option<NaiveDate>,
-    original_date: Option<NaiveDate>,
+    pub title: String,
+    pub artists: Vec<String>,
+    pub media: Option<String>,
+    pub discs: Option<usize>,
+    pub tracks: Option<usize>,
+    pub country: Option<String>,
+    pub label: Option<String>,
+    pub release_type: Option<String>,
+    pub date: Option<NaiveDate>,
+    pub original_date: Option<NaiveDate>,
 }
 
-impl From<entity::FullRelease> for Release {
+impl From<FullRelease> for Release {
     fn from(full_release: entity::FullRelease) -> Self {
-        let (release, mediums, _, artists) = full_release;
+        let FullRelease(release, mediums, _, artists) = full_release;
         Release {
-            title: release
-                .title
-                .into_value()
-                .unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
-            artists: artists
-                .into_iter()
-                .filter_map(|a| a.name.into_value())
-                .collect(),
+            title: release.title,
+            artists: artists.into_iter().map(|a| a.name.clone()).collect(),
             discs: Some(mediums.len()),
             media: mediums.first().and_then(|m| m.format),
             tracks: None, // TODO: consider adding a track count in the media structure
-            country: release.country.into_value(),
-            label: release.label.into_value(),
-            release_type: release.release_type.into_value(),
-            date: release.date.into_value(),
-            original_date: release.original_date.into_value(),
+            country: release.country,
+            label: release.label,
+            release_type: release.release_type,
+            date: release.date,
+            original_date: release.original_date,
         }
     }
 }
 
-impl From<entity::FullTrack> for Track {
+impl From<FullTrack> for Track {
     fn from(full_track: entity::FullTrack) -> Self {
-        let (track, _, _, artists) = full_track;
+        let FullTrack(track, _, _, artists) = full_track;
         Track {
-            title: track
-                .title
-                .into_value()
-                .unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
-            artists: artists
-                .into_iter()
-                .filter_map(|a| a.name.into_value())
-                .collect(),
-            length: track.length.into_value(),
+            title: track.title,
+            artists: artists.into_iter().map(|a| a.name.clone()).collect(),
+            length: Some(track.length),
             disc: None, // TODO: see above
-            number: track.number.into_value(),
+            number: Some(track.number),
         }
     }
 }

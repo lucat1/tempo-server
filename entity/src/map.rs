@@ -1,8 +1,8 @@
 use super::key::TagKey;
-use crate::settings::get_settings;
 use chrono::Datelike;
 use entity::{FullRelease, FullTrack};
 use eyre::{Report, Result};
+use setting::get_settings;
 use std::collections::HashMap;
 
 pub type KeyMap = HashMap<TagKey, Vec<String>>;
@@ -38,13 +38,7 @@ impl TryFrom<FullTrack> for KeyMap {
         if let Some(number) = track.number {
             map.insert(TagKey::TrackNumber, vec![number.to_string()]);
         }
-        map.insert(
-            TagKey::Genre,
-            match settings.tagging.genre_limit {
-                None => track.genres,
-                Some(l) => track.genres.into_iter().take(l).collect(),
-            },
-        );
+        map.insert(TagKey::Genre, track.genres);
         map.insert(TagKey::Performer, track.performers.instruments());
         map.insert(TagKey::Engineer, track.engigneers.names());
         map.insert(TagKey::Mixer, track.mixers.names());

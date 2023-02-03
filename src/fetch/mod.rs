@@ -1,17 +1,17 @@
 pub mod cover;
 pub mod cover_art_archive;
 pub mod itunes;
-pub mod structures;
+pub mod music_brainz;
 
-use crate::fetch::structures::ReleaseSearch;
+pub use cover::Cover;
+pub use music_brainz::ReleaseSearch;
+
 use crate::internal::{Release, UNKNOWN_ARTIST};
 use const_format::formatcp;
-pub use cover::Cover;
 use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
 use log::trace;
 use reqwest::header::USER_AGENT;
-use std::sync::Arc;
 use std::time::Instant;
 
 static COUNT: u32 = 8;
@@ -21,7 +21,22 @@ lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-pub struct SearchResult(entity::FullRelease, Vec<entity::FullTrack>);
+#[derive(Clone, Debug)]
+pub struct SearchResult(pub entity::FullRelease, pub Vec<entity::FullTrack>);
+
+fn release_to_result(r: music_brainz::Release) -> SearchResult {
+    let tracks: Vec<entity::FullTrackActive> = r
+        .media
+        .clone()
+        .into_iter()
+        .filter_map(|m| m.tracks)
+        .flatten()
+        .map(|t| t.into())
+        .collect();
+    let release: entity::FullReleaseActive = r.into();
+
+    SearchResult(release, tracks)
+}
 
 pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
     let start = Instant::now();
@@ -30,10 +45,11 @@ pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
         UNKNOWN_ARTIST => "",
         s => s,
     };
+    // TODO: don't apply the tracks filter when it's None
     let res = CLIENT
         .get(format!(
             "http://musicbrainz.org/ws/2/release/?query=release:{} artist:{} tracks:{}&fmt=json&limit={}",
-            release.title, artists, release.tracks, COUNT
+            release.title, artists, release.tracks.unwrap_or_default(), COUNT
         ))
         .header(USER_AGENT, MB_USER_AGENT)
         .send()
@@ -58,20 +74,7 @@ pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    Ok(json
-        .releases
-        .into_iter()
-        .map(|r| {
-            (
-                r.into(),
-                r.media
-                    .into_iter()
-                    .map(|m| m.tracks.into())
-                    .flatten()
-                    .collect(),
-            )
-        })
-        .collect())
+    Ok(json.releases.into_iter().map(release_to_result).collect())
 }
 
 pub async fn get(id: &str) -> Result<SearchResult> {
@@ -113,11 +116,11 @@ pub async fn get(id: &str) -> Result<SearchResult> {
         .await
         .wrap_err(eyre!("Could not read response as text"))?;
 
-    let json: Arc<Release> =
+    let json: music_brainz::Release =
         serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(text.as_str()))
             .map_err(|e| eyre!("Error {} at path {}", e, e.path().to_string()))
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    json.group_tracks()
+    Ok(release_to_result(json))
 }

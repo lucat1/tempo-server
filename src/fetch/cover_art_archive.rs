@@ -1,5 +1,5 @@
-use crate::settings::ArtProvider;
 use serde_derive::{Deserialize, Serialize};
+use setting::ArtProvider;
 use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

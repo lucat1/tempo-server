@@ -1,7 +1,5 @@
-extern crate metaflac;
-
 use super::key::TagKey;
-use super::picture::{Picture, PictureType};
+use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use metaflac::block::PictureType as FLACPictureType;
@@ -15,8 +13,8 @@ pub struct Tag {
     tag: metaflac::Tag,
 }
 
-impl crate::track::TagFrom for Tag {
-    fn from_path<P>(path: P) -> Result<Box<dyn crate::track::Tag>>
+impl crate::TagFrom for Tag {
+    fn from_path<P>(path: P) -> Result<Box<dyn crate::Tag>>
     where
         P: AsRef<Path>,
     {
@@ -26,7 +24,7 @@ impl crate::track::TagFrom for Tag {
     }
 }
 
-impl crate::track::Tag for Tag {
+impl crate::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
         for key in map.keys() {

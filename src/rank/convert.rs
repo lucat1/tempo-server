@@ -1,9 +1,10 @@
-use super::{Release, Track};
-use crate::internal::UNKNOWN_TITLE;
-use crate::track::{TagKey, TrackFile};
-use crate::util::{dedup, maybe_date};
-use eyre::eyre;
 use log::warn;
+use tag::TagKey;
+
+use crate::internal::UNKNOWN_TITLE;
+use crate::internal::{Release, Track};
+use crate::track::TrackFile;
+use crate::util::{dedup, maybe_date};
 
 fn artists_with_name(name: String, sep: Option<String>) -> Vec<String> {
     match sep {

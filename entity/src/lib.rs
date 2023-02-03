@@ -8,6 +8,9 @@ mod artist_credit_release;
 mod artist_credit_track;
 mod artist_track_relation;
 
+use eyre::{bail, Result};
+use uuid::Uuid;
+
 pub use artist::ActiveModel as ArtistActive;
 pub use artist::Column as ArtistColumn;
 pub use artist::Entity as ArtistEntity;
@@ -19,7 +22,7 @@ pub use artist_credit::Model as ArtistCredit;
 pub use artist_track_relation::ActiveModel as ArtistTrackRelationActive;
 pub use artist_track_relation::Column as ArtistTrackRelationColumn;
 pub use artist_track_relation::Entity as ArtistTrackRelationEntity;
-pub use artist_track_relation::Model as ArtistTrackRelationModel;
+pub use artist_track_relation::Model as ArtistTrackRelation;
 pub use artist_track_relation::RelationType;
 pub use medium::ActiveModel as MediumActive;
 pub use medium::Column as MediumColumn;
@@ -41,16 +44,62 @@ pub use artist_credit_track::Column as ArtistTrackColumn;
 pub use artist_credit_track::Entity as ArtistTrackEntity;
 pub use artist_credit_track::Model as ArtistTrack;
 
-pub struct FullRelease(
-    ReleaseActive,
-    Vec<MediumActive>,
-    Vec<ArtistCreditActive>,
-    Vec<ArtistActive>,
+#[derive(Debug, Clone)]
+pub struct FullReleaseActive(
+    pub ReleaseActive,
+    pub Vec<MediumActive>,
+    pub Vec<ArtistCreditActive>,
+    pub Vec<ArtistActive>,
 );
 
-pub struct FullTrack(
-    TrackActive,
-    Vec<ArtistCreditActive>,
-    Vec<ArtistTrackRelationActive>,
-    Vec<ArtistActive>,
+#[derive(Debug, Clone)]
+pub struct FullTrackActive(
+    pub TrackActive,
+    pub Vec<ArtistCreditActive>,
+    pub Vec<ArtistTrackRelationActive>,
+    pub Vec<ArtistActive>,
 );
+
+#[derive(Debug, Clone)]
+pub struct FullRelease(
+    pub Release,
+    pub Vec<Medium>,
+    pub Vec<ArtistCredit>,
+    pub Vec<Artist>,
+);
+
+#[derive(Debug, Clone)]
+pub struct FullTrack(
+    pub Track,
+    pub Vec<ArtistCredit>,
+    pub Vec<ArtistTrackRelation>,
+    pub Vec<Artist>,
+);
+
+impl FullRelease {
+    fn artist(&self, id: Uuid) -> Option<&Artist> {
+        let FullRelease(_, _, _, artists) = self;
+        for artist in artists.iter() {
+            if artist.id == id {
+                return Some(artist);
+            }
+        }
+        None
+    }
+
+    pub fn joined_artists(&self) -> Result<String> {
+        let FullRelease(_, _, credits, _) = self;
+        let mut s = String::new();
+        for credit in credits.iter() {
+            if let Some(artist) = self.artist(credit.artist_id) {
+                s += artist.name.as_str();
+                if let Some(join) = credit.join_phrase.as_ref() {
+                    s += join.as_str();
+                }
+            } else {
+                bail!("Artist credit referes to a missing artist id");
+            }
+        }
+        Ok(s)
+    }
+}

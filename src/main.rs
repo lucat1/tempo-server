@@ -2,7 +2,6 @@ mod fetch;
 mod internal;
 mod library;
 mod rank;
-mod settings;
 mod theme;
 mod track;
 mod util;
@@ -11,17 +10,14 @@ mod import;
 mod list;
 mod update;
 
-use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
-use lazy_static::lazy_static;
-use log::{error, info};
+use log::error;
 use migration::MigratorTrait;
 use sea_orm::{Database, DatabaseConnection};
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use settings::{get_settings, Settings};
+use setting::{get_settings, Settings};
 
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
@@ -30,10 +26,6 @@ pub const GITHUB: &str = "github.com/lucat1/tagger";
 // logging constants
 pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
 pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
-
-lazy_static! {
-    pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
-}
 
 fn cli() -> Command<'static> {
     Command::new(CLI_NAME)
@@ -70,7 +62,7 @@ fn cli() -> Command<'static> {
 }
 
 async fn open_database() -> Result<DatabaseConnection> {
-    let path = util::path_to_str(&get_settings().db)?;
+    let path = util::path_to_str(&get_settings()?.db)?;
     let conn = Database::connect(format!("sqlite://{}", path))
         .await
         .map_err(|e| eyre!(e))?;
@@ -89,11 +81,13 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     theme::init_logger();
 
-    SETTINGS.get_or_try_init(async { settings::load() }).await?;
+    setting::SETTINGS
+        .get_or_try_init(async { setting::load() })
+        .await?;
 
     let matches = cli().get_matches();
     match matches.subcommand() {
-        Some(("config", _)) => settings::print(),
+        Some(("config", _)) => setting::print(),
         Some((a, b)) => {
             // all subcommands that require a database connection go in here
             // DB.get_or_try_init(open_database()).await?;

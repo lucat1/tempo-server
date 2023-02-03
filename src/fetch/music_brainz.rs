@@ -1,11 +1,11 @@
 use sea_orm::entity::ActiveValue;
 use serde_derive::{Deserialize, Serialize};
+use setting::get_settings;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::util::maybe_date;
-use crate::SETTINGS;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
@@ -171,7 +171,7 @@ pub struct LabelInfo {
 //     }
 // }
 
-impl From<Track> for entity::FullTrack {
+impl From<Track> for entity::FullTrackActive {
     fn from(track: Track) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
@@ -229,7 +229,7 @@ impl From<Track> for entity::FullTrack {
     }
 }
 
-impl From<Release> for entity::FullRelease {
+impl From<Release> for entity::FullReleaseActive {
     fn from(release: Release) -> Self {
         let original_date = maybe_date(
             release
@@ -269,16 +269,12 @@ impl From<Release> for entity::FullRelease {
                 status: release
                     .status
                     .map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
-                date: SETTINGS
-                    .get()
-                    .and_then(|s| {
-                        if s.tagging.use_original_date {
-                            original_date
-                        } else {
-                            maybe_date(release.date)
-                        }
-                    })
-                    .map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
+                date: if get_settings()?.tagging.use_original_date {
+                    original_date
+                } else {
+                    maybe_date(release.date)
+                }
+                .map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
                 original_date: original_date.map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
                 script: release.text_representation.and_then(|t| t.script),
             },

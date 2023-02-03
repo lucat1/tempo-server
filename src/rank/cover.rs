@@ -1,7 +1,7 @@
 use crate::fetch::Cover;
-use crate::internal::Release;
-use crate::settings::{get_settings, ArtProvider};
+use entity::FullRelease;
 use levenshtein::levenshtein;
+use setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
 
 static MAX_COVER_SIZE: usize = 5000 * 5000;
@@ -52,17 +52,18 @@ fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
         ) * art_settings.size_relevance
 }
 
-pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &Release) -> Vec<CoverRating> {
+pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &FullRelease) -> Vec<CoverRating> {
+    let FullRelease(release, _, _, artists) = release;
     let mut vec: Vec<CoverRating> = covers_by_provider
         .into_iter()
         .flat_map(|covers| {
             covers.into_iter().map(|cover| {
                 let mut distance = 1.0
                     - ((levenshtein(cover.title.as_str(), release.title.as_str())
-                        + levenshtein(cover.artist.as_str(), release.artists.joined().as_str()))
+                        + levenshtein(cover.artist.as_str(), release.joined_artists().as_str()))
                         as f64
                         / (cover.title.len().max(release.title.len())
-                            + cover.artist.len().max(release.artists.joined().len()))
+                            + cover.artist.len().max(release.joined_artists().len()))
                             as f64);
                 if cover.provider == ArtProvider::CoverArtArchive {
                     distance = 0.9; // TODO: better way? otherwise art from the CoverArtArchive always

@@ -28,8 +28,8 @@ pub struct Model {
     pub number: u64,
     pub genres: Genres,
 
-    pub format: TrackFormat,
-    pub path: String,
+    pub format: Option<TrackFormat>,
+    pub path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

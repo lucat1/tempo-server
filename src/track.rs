@@ -5,18 +5,18 @@ use std::fs::copy;
 use std::path::PathBuf;
 
 #[cfg(feature = "ape")]
-use super::ape;
+use tag::ape;
 #[cfg(feature = "flac")]
-use super::flac;
-use super::format::Format;
+use tag::flac;
+use tag::format::Format;
 #[cfg(feature = "id3")]
-use super::id3;
+use tag::id3;
 #[cfg(feature = "mp4")]
-use super::mp4;
-use super::Picture;
-use super::TagFrom;
-use super::{Tag, TagError};
-use crate::track::TagKey;
+use tag::mp4;
+
+use tag::Picture;
+use tag::{Tag, TagError};
+use tag::{TagFrom, TagKey};
 
 #[derive(Clone, Debug)]
 pub struct TrackFile {

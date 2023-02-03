@@ -1,7 +1,7 @@
 extern crate id3;
 
 use super::key::TagKey;
-use super::picture::{Picture, PictureType};
+use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
 use eyre::{eyre, Result};
 use id3::frame::PictureType as ID3PictureType;
@@ -9,13 +9,13 @@ use id3::frame::{ExtendedText, Picture as ID3Picture};
 use id3::{Content, Frame, TagLike, Version};
 use itertools::Itertools;
 use log::debug;
+use setting::get_settings;
 use std::collections::HashMap;
 use std::path::Path;
 
 use super::format::Format;
 use super::Tag as TagTrait;
 use super::TagError;
-use crate::SETTINGS;
 
 static SECOND_VALUE_KEYS: [TagKey; 3] = [
     TagKey::MovementCount,
@@ -32,18 +32,13 @@ pub struct Tag {
 static EXTENDED_LEN_4: [&str; 1] = ["ASIN"];
 
 impl super::TagFrom for Tag {
-    fn from_path<P>(path: P) -> Result<Box<dyn crate::track::Tag>>
+    fn from_path<P>(path: P) -> Result<Box<dyn crate::Tag>>
     where
         P: AsRef<Path>,
     {
         Ok(Box::new(Tag {
             tag: id3::Tag::read_from_path(path)?,
-            separator: SETTINGS
-                .get()
-                .ok_or(eyre!("Could not obtain settings"))?
-                .tagging
-                .id3_separator
-                .to_string(),
+            separator: get_settings()?.tagging.id3_separator.to_string(),
         }))
     }
 }

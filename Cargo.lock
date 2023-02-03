@@ -820,6 +820,7 @@ name = "entity"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "eyre",
  "sea-orm",
  "sea-query 0.28.2",
  "serde",
@@ -1281,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "id3"
-version = "1.5.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e46cd976185412abbe751da4d9e092223b078196751f73f947fe2cddd1255859"
+checksum = "19d7a833474b30425eb64132d1f9b727b4e39537418bcc3288497c8d2f5c8948"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -1349,9 +1350,9 @@ dependencies = [
 
 [[package]]
 name = "infer"
-version = "0.9.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f178e61cdbfe084aa75a2f4f7a25a5bb09701a47ae1753608f194b15783c937a"
+checksum = "a898e4b7951673fce96614ce5751d13c40fc5674bc2d759288e46c3ab62598b3"
 dependencies = [
  "cfb",
 ]
@@ -1605,6 +1606,15 @@ checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nom8"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae01545c9c7fc4486ab7debaf2aad7003ac19431791868fb2e8066df97fad2f8"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -1890,7 +1900,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
 dependencies = [
- "toml",
+ "toml 0.5.9",
 ]
 
 [[package]]
@@ -2488,6 +2498,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2497,6 +2516,22 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "setting"
+version = "0.1.0"
+dependencies = [
+ "async-once-cell",
+ "directories",
+ "eyre",
+ "image",
+ "lazy_static",
+ "log",
+ "mime",
+ "serde",
+ "serde_derive",
+ "toml 0.7.1",
 ]
 
 [[package]]
@@ -2728,10 +2763,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tag"
+version = "0.1.0"
+dependencies = [
+ "ape",
+ "chrono",
+ "entity",
+ "eyre",
+ "id3",
+ "infer",
+ "itertools 0.10.5",
+ "log",
+ "metaflac",
+ "mime",
+ "mp4ameta",
+ "setting",
+]
+
+[[package]]
 name = "tagger"
 version = "0.0.1"
 dependencies = [
- "ape",
  "async-once-cell",
  "async-trait",
  "chrono",
@@ -2739,23 +2791,18 @@ dependencies = [
  "color-eyre",
  "const_format",
  "dialoguer",
- "directories",
  "entity",
  "env_logger",
  "eyre",
  "futures",
- "id3",
  "image",
  "indicatif",
- "infer",
  "itertools 0.10.5",
  "lazy_static",
  "levenshtein",
  "log",
- "metaflac",
  "migration",
  "mime",
- "mp4ameta",
  "pathfinding",
  "regex",
  "reqwest",
@@ -2765,11 +2812,12 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_path_to_error",
+ "setting",
  "sqlx-migrate",
  "strfmt",
+ "tag",
  "tokio",
  "tokio-stream",
- "toml",
  "uuid",
 ]
 
@@ -2988,6 +3036,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "toml"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "772c1426ab886e7362aedf4abc9c0d1348a979517efedfc25862944d10137af0"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90a238ee2e6ede22fb95350acc78e21dc40da00bb66c0334bde83de4ed89424e"
+dependencies = [
+ "indexmap",
+ "nom8",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
 ]
 
 [[package]]

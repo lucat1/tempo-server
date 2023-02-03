@@ -1,21 +1,42 @@
 use dialoguer::{Confirm, Input, Select};
+use entity::FullRelease;
+use entity::FullTrack;
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
+use std::fs::write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::fetch::cover::Cover;
 use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search, SearchResult};
+use crate::internal::Release;
+use crate::internal::Track;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
-use crate::settings::get_settings;
 use crate::theme::DialoguerTheme;
-use crate::track::file::TrackFile;
-use crate::track::picture::{write_picture, Picture, PictureType};
+use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
+use setting::get_settings;
+use tag::{Picture, PictureType};
+
+pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    let cover_name = get_settings()?.art.image_name;
+    let name = match cover_name {
+        Some(n) => n.to_string(),
+        None => bail!("Picture write not required"),
+    };
+    let ext = picture.mime_type.subtype().as_str();
+    let filename = PathBuf::from_str((name + "." + ext).as_str())?;
+    let path = root.as_ref().join(filename);
+    write(path, &picture.data).map_err(|e| eyre!(e))
+}
 
 fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
     ScanDir::files()
@@ -30,38 +51,37 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
 
 async fn ask(
     theme: &DialoguerTheme,
-    original_tracks: &Vec<TrackFile>,
-    candidate: SearchResult,
+    original_tracks: &Vec<Track>,
+    search_result: SearchResult,
+    matching: Vec<usize>,
 ) -> Result<(bool, SearchResult, Vec<usize>)> {
+    let SearchResult(candidate_release, _) = &search_result;
+    let FullRelease(release, _, _, artists) = &candidate_release;
     info!(
         "Tagging as {} - {} ({})",
-        candidate.0.artists.joined(),
-        candidate.0.title,
-        candidate
-            .0
-            .mbid
-            .clone()
-            .unwrap_or_else(|| "no mbid".to_string()),
+        candidate_release.joined_artists()?,
+        release.title,
+        release.id
     );
     let ch = Input::<char>::with_theme(theme)
         .with_prompt("Proceed? [y]es, [n]o, [i]d")
         .interact()
         .map_err(|_| eyre!("Aborted"))?;
     match ch {
-        'y' => Ok((true, candidate.0, candidate.1, candidate.2)),
+        'y' => Ok((true, search_result.clone(), matching)),
         'n' => Err(eyre!("Aborted")),
         'i' => {
             let id: String = Input::with_theme(theme)
                 .with_prompt("Enter the MusicBrainz Release ID")
                 .interact()
                 .map_err(|_| eyre!("Aborted"))?;
-            let (release, tracks) = get(id.as_str()).await?;
-            let (_, tracks_map) = rate_and_match(original_tracks, &tracks);
-            Ok((false, release, tracks, tracks_map))
+            let search_result = get(id.as_str()).await?;
+            let (_, tracks_map) = rate_and_match(original_tracks, &search_result);
+            Ok((false, search_result, tracks_map))
         }
         v => {
             warn!("Invalid choice: {}", v);
-            Ok((false, candidate.0, candidate.1, candidate.2))
+            Ok((false, search_result, matching))
         }
     }
 }
@@ -122,10 +142,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     if tracks.is_empty() {
         bail!("No tracks to import were found");
     }
-    let (choice_release, choice_tracks) = tracks
-        .clone()
-        .group_tracks()
-        .wrap_err("Trying to convert local files to internal structures")?;
+    let source_release: Release = tracks.clone().into();
+    let source_tracks: Vec<Track> = tracks.iter().map(|t| t.clone().into()).collect();
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
     // see here for the previous implementation:
     // https://codeberg.org/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
@@ -133,51 +151,47 @@ pub async fn import(path: &PathBuf) -> Result<()> {
 
     info!(
         "Searching for {} - {}...",
-        choice_release.artists.joined(),
-        choice_release.title
+        source_release.artists.join(","), // TODO: make "," configurable
+        source_release.title
     );
-    let releases = search(&choice_release, choice_tracks.len())
+    let search_results = search(&source_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
-    info!("Found {} release candidates, ranking...", releases.len());
+    info!(
+        "Found {} release candidates, ranking...",
+        search_results.len()
+    );
 
-    let mut expanded_releases: Vec<SearchResult> = vec![];
-    for release in releases.into_iter() {
-        let id = release.mbid.clone().ok_or(eyre!(
-            "The given release doesn't have an ID associated with it, can not fetch specific metadata"
-        ))?;
-        expanded_releases.push(get(id.as_str()).await?);
+    let mut expanded_results: Vec<SearchResult> = vec![];
+    for result in search_results.into_iter() {
+        expanded_results.push(get(result.0 .0.id.to_string().as_str()).await?);
     }
-    let mut rated_expanded_releases = expanded_releases
+    let mut rated_expanded_releases = expanded_results
         .into_iter()
-        .map(|(r, tracks)| {
-            let (val, map) = rate_and_match(&choice_tracks, &tracks);
-            (r, tracks, map, val)
+        .map(|search_result| {
+            let (val, map) = rate_and_match(&source_tracks, &search_result);
+            (val, search_result, map)
         })
         .collect::<Vec<_>>();
-    rated_expanded_releases.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(Ordering::Equal));
-    let (mut final_release, mut final_tracks, mut tracks_map, _) = rated_expanded_releases
+    rated_expanded_releases.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+    let (_, mut search_result, map) = rated_expanded_releases
         .first()
-        .ok_or(eyre!("No release available for given tracks"))?
+        .ok_or(eyre!("No release available for the given tracks"))?
         .clone();
     let mut proceed = false;
     while !proceed {
-        (proceed, final_release, final_tracks, tracks_map) = ask(
-            &theme,
-            &choice_tracks,
-            (final_release, final_tracks, tracks_map),
-        )
-        .await?;
+        (proceed, search_result, map) = ask(&theme, &source_tracks, search_result, map).await?;
     }
 
-    let covers_by_provider = search_covers(&final_release).await?;
-    let covers = rank_covers(covers_by_provider, &final_release);
+    let SearchResult(full_release, full_tracks) = search_result;
+    let covers_by_provider = search_covers(&full_release).await?;
+    let covers = rank_covers(covers_by_provider, &full_release);
     let maybe_cover = ask_cover(&theme, covers);
     let mut maybe_picture: Option<Picture> = None;
-    let mut final_tracks = tracks_map
+    let mut final_tracks = map
         .iter()
         .enumerate()
-        .map(|(i, map)| (tracks[i].clone(), final_tracks[*map].clone()))
+        .map(|(i, map)| (tracks[i].clone(), full_tracks[*map].clone()))
         .collect::<Vec<_>>();
     for (src, dest) in final_tracks.iter_mut() {
         dest.format = Some(src.format);

@@ -1,12 +1,12 @@
-use crate::SETTINGS;
 use entity::{ArtistActive, ReleaseActive, TrackActive};
 use eyre::{eyre, Context, Result, WrapErr};
+use setting::get_settings;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use strfmt::strfmt;
 
-use crate::track::key::TagKey;
 use crate::util::path_to_str;
+use tag::TagKey;
 
 pub trait Format {
     fn fmt(&self, template: &str) -> Result<String>;
@@ -104,10 +104,8 @@ pub trait InLibrary {
 
 impl InLibrary for TrackActive {
     fn filename(&self) -> Result<PathBuf> {
-        let settings = SETTINGS
-            .get()
-            .ok_or(eyre!("Could not read settings"))
-            .wrap_err("While generating a track filename for the library")?;
+        let settings =
+            get_settings()?.wrap_err("While generating a track filename for the library")?;
         let mut builder = self.fmt(settings.track_name.as_str())?;
         builder.push('.');
         builder.push_str(
@@ -121,10 +119,8 @@ impl InLibrary for TrackActive {
 
 impl InLibrary for ReleaseActive {
     fn filename(&self) -> Result<PathBuf> {
-        let settings = SETTINGS
-            .get()
-            .ok_or(eyre!("Could not read settings"))
-            .wrap_err("While generating a release folder name for the library")?;
+        let settings =
+            get_settings()?.wrap_err("While generating a release folder name for the library")?;
         Ok(settings
             .library
             .join(self.fmt(settings.release_name.as_str())?))

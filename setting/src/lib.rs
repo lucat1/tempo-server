@@ -1,15 +1,21 @@
+use async_once_cell::OnceCell;
 use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
+use lazy_static::lazy_static;
 use log::trace;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
 
-use crate::{CLI_NAME, SETTINGS};
+lazy_static! {
+    pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
+}
 
+const CLI_NAME: &str = "tagger";
 static DEFAULT_DB_FILE: &str = "lib.db";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,7 +48,7 @@ pub struct Tagging {
     #[serde(default = "default_true")]
     pub clear: bool,
     #[serde(default)]
-    pub genre_limit: Option<usize>,
+    pub genre_limit: Option<usize>, // TODO: reimplement genre limits
     #[serde(default = "default_true")]
     pub use_original_date: bool,
 
