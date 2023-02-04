@@ -11,6 +11,7 @@ pub struct Genres(pub Vec<String>);
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    pub medium_id: Uuid,
     pub title: String,
     pub length: u64,
     pub number: u64,
@@ -24,7 +25,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::medium::Entity",
-        from = "Column::Id",
+        from = "Column::MediumId",
         to = "super::medium::Column::Id"
     )]
     Medium,
@@ -38,7 +39,7 @@ impl Related<super::medium::Entity> for Entity {
 
 impl Related<super::artist_credit::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_credit_track::Relation::Artist.def()
+        super::artist_credit_track::Relation::ArtistCredit.def()
     }
 
     fn via() -> Option<RelationDef> {

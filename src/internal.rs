@@ -27,12 +27,17 @@ pub struct Release {
 
 impl From<FullRelease> for Release {
     fn from(full_release: entity::FullRelease) -> Self {
-        let FullRelease(release, mediums, _, artists) = full_release;
+        let FullRelease {
+            release,
+            medium,
+            artist,
+            ..
+        } = full_release;
         Release {
             title: release.title,
-            artists: artists.into_iter().map(|a| a.name.clone()).collect(),
-            discs: Some(mediums.len() as u64),
-            media: mediums.first().as_ref().and_then(|m| m.format.clone()),
+            artists: artist.into_iter().map(|a| a.name.clone()).collect(),
+            discs: Some(medium.len() as u64),
+            media: medium.first().as_ref().and_then(|m| m.format.clone()),
             tracks: None, // TODO: consider adding a track count in the media structure
             country: release.country,
             label: release.label,
@@ -45,10 +50,10 @@ impl From<FullRelease> for Release {
 
 impl From<FullTrack> for Track {
     fn from(full_track: entity::FullTrack) -> Self {
-        let FullTrack(track, _, _, artists) = full_track;
+        let FullTrack { track, artist, .. } = full_track;
         Track {
             title: track.title,
-            artists: artists.into_iter().map(|a| a.name.clone()).collect(),
+            artists: artist.into_iter().map(|a| a.name.clone()).collect(),
             length: Some(track.length),
             disc: None, // TODO: see above
             number: Some(track.number),

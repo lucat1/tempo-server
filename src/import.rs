@@ -1,11 +1,14 @@
 use dialoguer::{Confirm, Input, Select};
 use entity::FullReleaseActive;
 use entity::{
-    ArtistCreditEntity, ArtistEntity, ArtistTrackRelationEntity, FullRelease, FullTrack,
-    FullTrackActive, MediumEntity, ReleaseEntity, TrackEntity,
+    ArtistColumn, ArtistCreditColumn, ArtistCreditEntity, ArtistCreditReleaseColumn,
+    ArtistCreditReleaseEntity, ArtistCreditTrackColumn, ArtistCreditTrackEntity, ArtistEntity,
+    ArtistTrackRelationColumn, ArtistTrackRelationEntity, FullRelease, FullTrack, FullTrackActive,
+    MediumColumn, MediumEntity, ReleaseColumn, ReleaseEntity, TrackColumn, TrackEntity,
 };
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
+use migration::OnConflict;
 use scan_dir::ScanDir;
 use sea_orm::EntityTrait;
 use std::cmp::Ordering;
@@ -68,7 +71,9 @@ async fn ask(
     matching: Vec<usize>,
 ) -> Result<(bool, SearchResult, Vec<usize>)> {
     let SearchResult(candidate_release, _) = &search_result;
-    let FullRelease(release, _, _, artists) = &candidate_release;
+    let FullRelease {
+        release, artist, ..
+    } = &candidate_release;
     info!(
         "Tagging as {} - {} ({})",
         candidate_release.joined_artists()?,
@@ -176,7 +181,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
 
     let mut expanded_results: Vec<SearchResult> = vec![];
     for result in search_results.into_iter() {
-        expanded_results.push(get(result.0 .0.id.to_string().as_str()).await?);
+        expanded_results.push(get(result.0.release.id.to_string().as_str()).await?);
     }
     let mut rated_expanded_releases = expanded_results
         .into_iter()
@@ -208,8 +213,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             let mut track: FullTrack = full_tracks[*map].clone();
             // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
             let dest_path = "tmp/file.flac".into();
-            track.0.format = Some(tracks[i].format);
-            track.0.path = Some(path_to_str(&dest_path)?);
+            track.track.format = Some(tracks[i].format);
+            track.track.path = Some(path_to_str(&dest_path)?);
             Ok(Task {
                 file: tracks[i].clone(),
                 track,
@@ -248,14 +253,74 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         warn!("No album art found")
     }
     let db = get_database()?;
-    let FullReleaseActive(release_active, medium_active, artist_credit_active, artist_active) =
-        full_release.into();
-    ArtistEntity::insert_many(artist_active).exec(db).await?;
-    ReleaseEntity::insert(release_active).exec(db).await?;
-    ArtistCreditEntity::insert_many(artist_credit_active)
+    let FullReleaseActive {
+        release: release_active,
+        medium: medium_active,
+        artist_credit_release: artist_credit_release_active,
+        artist_credit: artist_credit_active,
+        artist: artist_active,
+        ..
+    } = full_release.into();
+    ArtistEntity::insert_many(artist_active)
+        .on_conflict(
+            OnConflict::column(ArtistColumn::Id)
+                .update_columns([ArtistColumn::Name, ArtistColumn::SortName])
+                .to_owned(),
+        )
         .exec(db)
         .await?;
-    MediumEntity::insert_many(medium_active).exec(db).await?;
+    ReleaseEntity::insert(release_active)
+        .on_conflict(
+            OnConflict::column(ReleaseColumn::Id)
+                .update_columns([
+                    ReleaseColumn::Title,
+                    ReleaseColumn::ReleaseGroupId,
+                    ReleaseColumn::ReleaseType,
+                    ReleaseColumn::Asin,
+                    ReleaseColumn::Country,
+                    ReleaseColumn::Label,
+                    ReleaseColumn::CatalogNo,
+                    ReleaseColumn::Status,
+                    ReleaseColumn::Date,
+                    ReleaseColumn::OriginalDate,
+                    ReleaseColumn::Script,
+                ])
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+    ArtistCreditEntity::insert_many(artist_credit_active)
+        .on_conflict(
+            OnConflict::column(ArtistCreditColumn::Id)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
+    ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
+        .on_conflict(
+            OnConflict::columns([
+                ArtistCreditReleaseColumn::ArtistCreditId,
+                ArtistCreditReleaseColumn::ReleaseId,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec(db)
+        .await?;
+    MediumEntity::insert_many(medium_active)
+        .on_conflict(
+            OnConflict::column(MediumColumn::Id)
+                .update_columns([
+                    MediumColumn::Position,
+                    MediumColumn::Tracks,
+                    MediumColumn::TrackOffset,
+                    MediumColumn::Format,
+                ])
+                .to_owned(),
+        )
+        .exec(db)
+        .await?;
 
     for task in tasks.into_iter() {
         debug!("Beofre tagging {:?}", task.file);
@@ -280,18 +345,65 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         //     .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         // TODO: store in the db
         // task.store().await?;
-        let FullTrackActive(
-            track_active,
-            artist_credit_active,
-            artist_track_relation_active,
-            artist_active,
-        ): FullTrackActive = task.track.into();
-        ArtistEntity::insert_many(artist_active).exec(db).await?;
-        ArtistCreditEntity::insert_many(artist_credit_active)
+        let FullTrackActive {
+            track: track_active,
+            artist_credit_track: artist_credit_track_active,
+            artist_credit: artist_credit_active,
+            artist_track_relation: artist_track_relation_active,
+            artist: artist_active,
+        }: FullTrackActive = task.track.into();
+        ArtistEntity::insert_many(artist_active)
+            .on_conflict(
+                OnConflict::column(ArtistColumn::Id)
+                    .update_columns([ArtistColumn::Name, ArtistColumn::SortName])
+                    .to_owned(),
+            )
             .exec(db)
             .await?;
-        TrackEntity::insert(track_active).exec(db).await?;
+        ArtistCreditEntity::insert_many(artist_credit_active)
+            .on_conflict(
+                OnConflict::column(ArtistCreditColumn::Id)
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(db)
+            .await?;
+        TrackEntity::insert(track_active)
+            .on_conflict(
+                OnConflict::column(TrackColumn::Id)
+                    .update_columns([
+                        TrackColumn::Title,
+                        TrackColumn::Length,
+                        TrackColumn::Number,
+                        TrackColumn::Genres,
+                        TrackColumn::Format,
+                        TrackColumn::Path,
+                    ])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await?;
+        ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
+            .on_conflict(
+                OnConflict::columns([
+                    ArtistCreditTrackColumn::ArtistCreditId,
+                    ArtistCreditTrackColumn::TrackId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec(db)
+            .await?;
         ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
+            .on_conflict(
+                OnConflict::columns([
+                    ArtistTrackRelationColumn::ArtistId,
+                    ArtistTrackRelationColumn::TrackId,
+                    ArtistTrackRelationColumn::RelationType,
+                ])
+                .update_column(ArtistTrackRelationColumn::RelationValue)
+                .to_owned(),
+            )
             .exec(db)
             .await?;
 

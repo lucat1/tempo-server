@@ -67,7 +67,9 @@ pub async fn probe(url: String) -> Option<()> {
 }
 
 pub async fn fetch_itunes(release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
-    let FullRelease(release, _, _, artists) = release;
+    let FullRelease {
+        release, artist, ..
+    } = release;
     let start = Instant::now();
     let raw_country = release
         .country
@@ -84,7 +86,7 @@ pub async fn fetch_itunes(release: &FullRelease, _: &Settings) -> Result<Vec<Cov
         .get(format!(
             "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
             country,
-            artists.into_iter().map(|a| a.name.clone()).join(",")
+            artist.into_iter().map(|a| a.name.clone()).join(",")
                 + " "
                 + release.title.clone().as_str()
         ))
@@ -123,7 +125,9 @@ pub async fn fetch_cover_art_archive(
     full_release: &FullRelease,
     settings: &Settings,
 ) -> Result<Vec<Cover>> {
-    let FullRelease(release, _, _, artists) = full_release;
+    let FullRelease {
+        release, artist, ..
+    } = full_release;
     let start = Instant::now();
     let res = CLIENT
         .get(format!(
@@ -156,7 +160,7 @@ pub async fn fetch_cover_art_archive(
     // TODO: make the "," configurable
     Ok(json.into(
         release.title.clone(),
-        artists.into_iter().map(|a| a.name.clone()).join(","),
+        artist.into_iter().map(|a| a.name.clone()).join(","),
     ))
 }
 

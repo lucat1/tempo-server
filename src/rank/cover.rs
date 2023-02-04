@@ -56,7 +56,9 @@ pub fn rank_covers(
     covers_by_provider: Vec<Vec<Cover>>,
     full_release: &FullRelease,
 ) -> Vec<CoverRating> {
-    let FullRelease(release, _, _, artists) = full_release;
+    let FullRelease {
+        release, artist, ..
+    } = full_release;
     let mut vec: Vec<CoverRating> = covers_by_provider
         .into_iter()
         .flat_map(|covers| {

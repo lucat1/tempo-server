@@ -1,5 +1,5 @@
 use entity::{
-    ArtistCreditEntity, ArtistEntity, ArtistReleaseEntity, ArtistTrackEntity,
+    ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
     ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
 use sea_orm::Schema;
@@ -20,10 +20,10 @@ impl MigrationTrait for Migration {
             .exec_stmt(schema.create_table_from_entity(ArtistEntity))
             .await?;
         manager
-            .exec_stmt(schema.create_table_from_entity(ArtistReleaseEntity))
+            .exec_stmt(schema.create_table_from_entity(ArtistCreditReleaseEntity))
             .await?;
         manager
-            .exec_stmt(schema.create_table_from_entity(ArtistTrackEntity))
+            .exec_stmt(schema.create_table_from_entity(ArtistCreditTrackEntity))
             .await?;
         manager
             .exec_stmt(schema.create_table_from_entity(ArtistTrackRelationEntity))

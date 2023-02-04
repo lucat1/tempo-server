@@ -10,6 +10,7 @@ pub struct Instruments(Vec<String>);
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    pub release_id: Uuid,
     pub position: u64,
     pub tracks: u64,
     pub track_offset: u64,
@@ -20,7 +21,7 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::release::Entity",
-        from = "Column::Id",
+        from = "Column::ReleaseId",
         to = "super::release::Column::Id"
     )]
     Release,

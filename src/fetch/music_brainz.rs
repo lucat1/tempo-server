@@ -97,9 +97,6 @@ pub struct Track {
     pub position: u64,
     pub length: Option<u64>,
     pub title: String,
-
-    pub medium: Option<Arc<Medium>>,
-    pub release: Option<Arc<Release>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,18 +167,24 @@ impl From<Artist> for entity::Artist {
     }
 }
 
+fn artist_credit_id(ac: &ArtistCredit) -> String {
+    return ac.artist.id.to_string() + ac.joinphrase.as_ref().map_or("", |s| s.as_str());
+}
+
 impl From<ArtistCredit> for entity::ArtistCredit {
-    fn from(artist: ArtistCredit) -> Self {
+    fn from(artist_credit: ArtistCredit) -> Self {
         entity::ArtistCredit {
-            id: 0,
-            join_phrase: artist.joinphrase,
-            artist_id: artist.artist.id,
+            id: artist_credit_id(&artist_credit),
+            join_phrase: artist_credit.joinphrase,
+            artist_id: artist_credit.artist.id,
         }
     }
 }
 
-impl From<Track> for entity::FullTrack {
-    fn from(track: Track) -> Self {
+pub struct TrackWithMediumId(pub Track, pub Uuid);
+
+impl From<TrackWithMediumId> for entity::FullTrack {
+    fn from(TrackWithMediumId(track, medium_id): TrackWithMediumId) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
         let mut other_relations = track
@@ -218,9 +221,10 @@ impl From<Track> for entity::FullTrack {
                 .map(|a| a.clone().into())
                 .collect(),
         );
-        entity::FullTrack(
-            entity::Track {
+        entity::FullTrack {
+            track: entity::Track {
                 id: track.id,
+                medium_id,
                 title: track.title,
                 length: track.length.or(track.recording.length).unwrap_or_default(),
                 number: track.position,
@@ -233,14 +237,25 @@ impl From<Track> for entity::FullTrack {
                 format: None,
                 path: None,
             },
-            track
+            artist_credit_track: track
+                .recording
+                .artist_credit
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ac| entity::ArtistCreditTrack {
+                    artist_credit_id: artist_credit_id(&ac),
+                    track_id: track.id,
+                })
+                .collect(),
+            artist_credit: track
                 .recording
                 .artist_credit
                 .unwrap_or_default()
                 .into_iter()
                 .map(|ac| ac.into())
                 .collect(),
-            all_relations
+            artist_track_relation: all_relations
                 .iter()
                 .filter_map(|r| {
                     r.artist.as_ref().map(|a| entity::ArtistTrackRelation {
@@ -251,8 +266,8 @@ impl From<Track> for entity::FullTrack {
                     })
                 })
                 .collect(),
-            artists,
-        )
+            artist: artists,
+        }
     }
 }
 
@@ -266,8 +281,8 @@ impl TryFrom<Release> for entity::FullRelease {
                 .and_then(|r| r.first_release_date.clone()),
         );
         let label = release.label_info.first();
-        Ok(entity::FullRelease(
-            entity::Release {
+        Ok(entity::FullRelease {
+            release: entity::Release {
                 id: release.id,
                 title: release.title,
                 release_group_id: release.release_group.as_ref().map(|r| r.id),
@@ -292,27 +307,36 @@ impl TryFrom<Release> for entity::FullRelease {
                 original_date,
                 script: release.text_representation.and_then(|t| t.script),
             },
-            release
+            medium: release
                 .media
                 .iter()
                 .map(|m| entity::Medium {
                     id: m.id.unwrap_or_else(|| Uuid::new_v4()),
+                    release_id: release.id,
                     position: m.position.unwrap_or_default(),
                     tracks: m.track_count,
                     track_offset: m.track_offset.unwrap_or_default(),
                     format: m.format.clone(),
                 })
                 .collect(),
-            release
+            artist_credit_release: release
+                .artist_credit
+                .iter()
+                .map(|ac| entity::ArtistCreditRelease {
+                    artist_credit_id: artist_credit_id(ac),
+                    release_id: release.id,
+                })
+                .collect(),
+            artist_credit: release
                 .artist_credit
                 .iter()
                 .map(|ac| ac.clone().into())
                 .collect(),
-            release
+            artist: release
                 .artist_credit
                 .into_iter()
                 .map(|a| a.artist.into())
                 .collect(),
-        ))
+        })
     }
 }

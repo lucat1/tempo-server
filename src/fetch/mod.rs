@@ -14,6 +14,8 @@ use log::trace;
 use reqwest::header::USER_AGENT;
 use std::time::Instant;
 
+use self::music_brainz::TrackWithMediumId;
+
 static COUNT: u32 = 8;
 static MB_USER_AGENT: &str =
     formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
@@ -25,15 +27,22 @@ lazy_static! {
 pub struct SearchResult(pub entity::FullRelease, pub Vec<entity::FullTrack>);
 
 fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
+    let release: entity::FullRelease = r.clone().try_into()?;
     let tracks: Vec<entity::FullTrack> = r
         .media
-        .clone()
         .into_iter()
-        .filter_map(|m| m.tracks)
+        .enumerate()
+        .filter_map(|(i, m)| {
+            m.tracks.map(|tracks| {
+                tracks
+                    .into_iter()
+                    .map(|t| music_brainz::TrackWithMediumId(t, release.medium[i].id.clone()))
+                    .collect::<Vec<TrackWithMediumId>>()
+            })
+        })
         .flatten()
-        .map(|t| t.into())
+        .map(|twm: TrackWithMediumId| twm.into())
         .collect();
-    let release: entity::FullRelease = r.try_into()?;
     Ok(SearchResult(release, tracks))
 }
 
