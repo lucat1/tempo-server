@@ -29,18 +29,6 @@ fn if_both<T, R>(a: Option<T>, b: Option<T>, then: impl Fn(T, T) -> R) -> Option
     None
 }
 
-fn if_both_or_default<T: Default, R>(a: Option<T>, b: Option<T>, then: impl Fn(T, T) -> R) -> R {
-    let a_val = match a {
-        Some(a_val) => a_val,
-        None => T::default(),
-    };
-    let b_val = match b {
-        Some(b_val) => b_val,
-        None => T::default(),
-    };
-    then(a_val, b_val)
-}
-
 impl Diff for Track {
     fn diff(&self, other: &Self) -> i64 {
         // TODO: diff artists
@@ -93,11 +81,12 @@ impl Diff for Release {
             )
             .unwrap_or_default()
             + if_both(self.date, other.date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days() * RELEASE_DATE_FACTOR) as i64
+                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR) as i64
             })
             .unwrap_or_default()
             + if_both(self.original_date, other.original_date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days() * RELEASE_ORIGINAL_DATE_FACTOR) as i64
+                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR)
+                    as i64
             })
             .unwrap_or_default()
     }

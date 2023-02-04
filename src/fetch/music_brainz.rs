@@ -1,5 +1,4 @@
 use eyre::Report;
-use sea_orm::entity::ActiveValue;
 use serde_derive::{Deserialize, Serialize};
 use setting::get_settings;
 use std::cmp::Ordering;
@@ -18,7 +17,7 @@ pub struct Release {
     pub release_group: Option<ReleaseGroup>,
     #[serde(rename = "artist-credit")]
     pub artist_credit: Vec<ArtistCredit>,
-    pub asin: String,
+    pub asin: Option<String>,
     pub date: Option<String>,
     pub id: Uuid,
     pub media: Vec<Medium>,
@@ -80,9 +79,12 @@ pub struct Area {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Medium {
-    pub id: Uuid,
-    pub position: u64,
-    pub track_offset: u64,
+    pub id: Option<Uuid>,
+    pub position: Option<u64>,
+    #[serde(rename = "track-offset")]
+    pub track_offset: Option<u64>,
+    #[serde(rename = "track-count")]
+    pub track_count: u64,
     pub tracks: Option<Vec<Track>>,
     pub format: Option<String>,
 }
@@ -294,14 +296,10 @@ impl TryFrom<Release> for entity::FullRelease {
                 .media
                 .iter()
                 .map(|m| entity::Medium {
-                    id: m.id,
-                    position: m.position,
-                    tracks: m
-                        .tracks
-                        .as_ref()
-                        .map(|tracks| tracks.len() as u64)
-                        .unwrap_or_default(),
-                    track_offset: m.track_offset,
+                    id: m.id.unwrap_or_else(|| Uuid::new_v4()),
+                    position: m.position.unwrap_or_default(),
+                    tracks: m.track_count,
+                    track_offset: m.track_offset.unwrap_or_default(),
                     format: m.format.clone(),
                 })
                 .collect(),

@@ -1,9 +1,13 @@
 use dialoguer::{Confirm, Input, Select};
-use entity::{FullRelease, FullTrack, FullTrackActive};
+use entity::FullReleaseActive;
+use entity::{
+    ArtistCreditEntity, ArtistEntity, ArtistTrackRelationEntity, FullRelease, FullTrack,
+    FullTrackActive, MediumEntity, ReleaseEntity, TrackEntity,
+};
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
-use sea_orm::ActiveValue;
+use sea_orm::EntityTrait;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::fs::write;
@@ -15,6 +19,7 @@ use std::time::Instant;
 use crate::fetch::cover::Cover;
 use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search, SearchResult};
+use crate::get_database;
 use crate::internal::Release;
 use crate::internal::Track;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
@@ -27,7 +32,6 @@ use tag::{Picture, PictureType};
 struct Task {
     file: TrackFile,
     track: FullTrack,
-    track_active: FullTrackActive,
     dest_path: PathBuf,
 }
 
@@ -201,15 +205,14 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         .iter()
         .enumerate()
         .map(|(i, map)| -> Result<Task> {
-            let mut track_active: FullTrackActive = full_tracks[*map].clone().into();
+            let mut track: FullTrack = full_tracks[*map].clone();
             // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
             let dest_path = "tmp/file.flac".into();
-            track_active.0.format = ActiveValue::Set(Some(tracks[i].format));
-            track_active.0.path = ActiveValue::Set(Some(path_to_str(&dest_path)?));
+            track.0.format = Some(tracks[i].format);
+            track.0.path = Some(path_to_str(&dest_path)?);
             Ok(Task {
                 file: tracks[i].clone(),
-                track: full_tracks[*map].clone(),
-                track_active,
+                track,
                 dest_path,
             })
         })
@@ -244,29 +247,54 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     } else {
         warn!("No album art found")
     }
-    for task in tasks.iter_mut() {
+    let db = get_database()?;
+    let FullReleaseActive(release_active, medium_active, artist_credit_active, artist_active) =
+        full_release.into();
+    ArtistEntity::insert_many(artist_active).exec(db).await?;
+    ReleaseEntity::insert(release_active).exec(db).await?;
+    ArtistCreditEntity::insert_many(artist_credit_active)
+        .exec(db)
+        .await?;
+    MediumEntity::insert_many(medium_active).exec(db).await?;
+
+    for task in tasks.into_iter() {
         debug!("Beofre tagging {:?}", task.file);
-        task.file.duplicate_to(&task.dest_path).wrap_err(eyre!(
-            "Could not copy track {:?} to its new location: {:?}",
-            task.file.path,
-            path
-        ))?;
-        if settings.tagging.clear {
-            task.file
-                .clear()
-                .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
-        }
-        task.file
-            .apply(task.track.clone().try_into()?)
-            .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
-        if let Some(ref picture) = maybe_picture {
-            task.file.set_pictures(vec![picture.clone()])?;
-        }
-        task.file
-            .write()
-            .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
+        // task.file.duplicate_to(&task.dest_path).wrap_err(eyre!(
+        //     "Could not copy track {:?} to its new location: {:?}",
+        //     task.file.path,
+        //     path
+        // ))?;
+        // if settings.tagging.clear {
+        //     task.file
+        //         .clear()
+        //         .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
+        // }
+        // task.file
+        //     .apply(task.track.clone().try_into()?)
+        //     .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
+        // if let Some(ref picture) = maybe_picture {
+        //     task.file.set_pictures(vec![picture.clone()])?;
+        // }
+        // task.file
+        //     .write()
+        //     .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         // TODO: store in the db
         // task.store().await?;
+        let FullTrackActive(
+            track_active,
+            artist_credit_active,
+            artist_track_relation_active,
+            artist_active,
+        ): FullTrackActive = task.track.into();
+        ArtistEntity::insert_many(artist_active).exec(db).await?;
+        ArtistCreditEntity::insert_many(artist_credit_active)
+            .exec(db)
+            .await?;
+        TrackEntity::insert(track_active).exec(db).await?;
+        ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
+            .exec(db)
+            .await?;
+
         debug!("After tagging {:?}", task.file);
     }
 

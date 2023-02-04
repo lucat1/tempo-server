@@ -67,6 +67,10 @@ fn cli() -> Command<'static> {
         )
 }
 
+pub fn get_database() -> Result<&'static DatabaseConnection> {
+    DB.get().ok_or(eyre!("Could not get the database"))
+}
+
 async fn open_database() -> Result<DatabaseConnection> {
     let path = util::path_to_str(&get_settings()?.db)?;
     let mut opt = ConnectOptions::new(format!("sqlite://{}?mode=rwc", path));

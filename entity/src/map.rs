@@ -68,7 +68,10 @@ impl TryFrom<FullRelease> for HashMap<TagKey, Vec<String>> {
                 vec![rel_group_id.to_string()],
             );
         }
-        map.insert(TagKey::ASIN, vec![release.asin.clone()]);
+        map.insert(
+            TagKey::ASIN,
+            release.asin.as_ref().map_or(vec![], |a| vec![a.clone()]),
+        );
         if let Some(rel_country) = &release.country {
             map.insert(TagKey::ReleaseCountry, vec![rel_country.to_string()]);
         }
