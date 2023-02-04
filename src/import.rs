@@ -1,9 +1,10 @@
 use dialoguer::{Confirm, Input, Select};
-use entity::FullRelease;
-use entity::FullTrack;
+use entity::{FullRelease, FullTrack, FullTrackActive};
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
+use sea_orm::ActiveValue;
+use sea_orm::TryIntoModel;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::fs::write;
@@ -16,12 +17,20 @@ use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search, SearchResult};
 use crate::internal::Release;
 use crate::internal::Track;
+use crate::library::InLibrary;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
 use crate::util::{mkdirp, path_to_str};
 use setting::get_settings;
 use tag::{Picture, PictureType};
+
+struct Task<'a> {
+    file: &'a TrackFile,
+    track: &'a FullTrackActive,
+    release: &'a FullRelease,
+    dest_path: PathBuf,
+}
 
 pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
 where
@@ -188,20 +197,28 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let covers = rank_covers(covers_by_provider, &full_release);
     let maybe_cover = ask_cover(&theme, covers);
     let mut maybe_picture: Option<Picture> = None;
-    let mut final_tracks = map
+    let release_path = full_release.0.filename()?;
+    let mut tasks: Vec<Task> = map
         .iter()
         .enumerate()
-        .map(|(i, map)| (tracks[i].clone(), full_tracks[*map].clone()))
-        .collect::<Vec<_>>();
-    for (src, dest) in final_tracks.iter_mut() {
-        dest.format = Some(src.format);
-        let dest_path = dest.path()?;
-        dest.path = Some(dest_path.clone());
-    }
-    let mut folders = final_tracks
+        .map(|(i, map)| -> Result<Task> {
+            let track_active: FullTrackActive = full_tracks[*map].into();
+            let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
+            track_active.0.format = ActiveValue::Set(Some(tracks[i].format));
+            track_active.0.path = ActiveValue::Set(Some(path_to_str(&dest_path)?));
+            Ok(Task {
+                file: &tracks[i],
+                track: &track_active,
+                release: &full_release,
+                dest_path,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut folders = tasks
         .iter()
-        .map(|(_, t)| {
-            Ok(t.path()?
+        .map(|task| {
+            Ok(task
+                .dest_path
                 .parent()
                 .ok_or(eyre!("Could not get parent"))?
                 .to_path_buf())
@@ -227,29 +244,29 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     } else {
         warn!("No album art found")
     }
-    for (src, dest) in final_tracks.iter_mut() {
-        debug!("Beofre tagging {:?}", src);
-        let path = dest
-            .path
-            .as_ref()
-            .ok_or(eyre!("The track doesn't have an associated path"))?;
-        src.duplicate_to(path).wrap_err(eyre!(
+    for task in tasks.iter_mut() {
+        debug!("Beofre tagging {:?}", task.file);
+        task.file.duplicate_to(&task.dest_path).wrap_err(eyre!(
             "Could not copy track {:?} to its new location: {:?}",
-            src.path,
+            task.file.path,
             path
         ))?;
         if settings.tagging.clear {
-            src.clear()
+            task.file
+                .clear()
                 .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
         }
-        src.apply(dest.clone().try_into()?)
+        task.file
+            .apply(task.track.clone().try_into()?)
             .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
         if let Some(ref picture) = maybe_picture {
-            src.set_pictures(vec![picture.clone()])?;
+            task.file.set_pictures(vec![picture.clone()])?;
         }
-        src.write()
+        task.file
+            .write()
             .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
-        dest.store().await?;
+        // TODO: store in the db
+        // task.store().await?;
         debug!("After tagging {:?}", src);
     }
 

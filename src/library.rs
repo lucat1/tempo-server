@@ -1,4 +1,4 @@
-use entity::{ArtistActive, ReleaseActive, TrackActive};
+use entity::{Artist, Release, Track};
 use eyre::{eyre, Context, Result, WrapErr};
 use setting::get_settings;
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ pub trait Format {
     fn fmt(&self, template: &str) -> Result<String>;
 }
 
-impl Format for ArtistActive {
+impl Format for Artist {
     fn fmt(&self, template: &str) -> Result<String> {
         let mut vars = HashMap::new();
         vars.insert("mbid".to_string(), self.mbid.clone().unwrap_or_default());
@@ -35,7 +35,7 @@ impl Format for ArtistActive {
     }
 }
 
-impl Format for TrackActive {
+impl Format for Track {
     fn fmt(&self, template: &str) -> Result<String> {
         let multiple_vars: HashMap<String, Vec<String>> = self.clone().try_into()?;
         let mut vars: HashMap<String, String> = multiple_vars
@@ -76,7 +76,7 @@ impl Format for TrackActive {
     }
 }
 
-impl Format for ReleaseActive {
+impl Format for Release {
     fn fmt(&self, template: &str) -> Result<String> {
         let multiple_vars: HashMap<String, Vec<String>> = self.clone().try_into()?;
         let mut vars: HashMap<String, String> = multiple_vars
@@ -102,7 +102,7 @@ pub trait InLibrary {
     fn filename(&self) -> Result<PathBuf>;
 }
 
-impl InLibrary for TrackActive {
+impl InLibrary for Track {
     fn filename(&self) -> Result<PathBuf> {
         let settings =
             get_settings()?.wrap_err("While generating a track filename for the library")?;
@@ -117,7 +117,7 @@ impl InLibrary for TrackActive {
     }
 }
 
-impl InLibrary for ReleaseActive {
+impl InLibrary for Release {
     fn filename(&self) -> Result<PathBuf> {
         let settings =
             get_settings()?.wrap_err("While generating a release folder name for the library")?;

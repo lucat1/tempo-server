@@ -1,6 +1,5 @@
-use super::key::TagKey;
+use super::{FullRelease, FullTrack, TagKey};
 use chrono::Datelike;
-use entity::{FullRelease, FullTrack};
 use eyre::{Report, Result};
 use setting::get_settings;
 use std::collections::HashMap;
@@ -9,35 +8,43 @@ pub type KeyMap = HashMap<TagKey, Vec<String>>;
 
 impl TryFrom<FullTrack> for KeyMap {
     type Error = Report;
-    fn try_from(track: FullTrack) -> Result<Self, Self::Error> {
+    fn try_from(full_track: FullTrack) -> Result<Self, Self::Error> {
+        let FullTrack(track, artist_credits, artist_track_relations, artists) = full_track;
         let settings = get_settings();
         let mut map = HashMap::new();
-        if let Some(id) = track.mbid {
-            map.insert(TagKey::MusicBrainzTrackID, vec![id]);
-        }
-        if let Some(release) = track.release {
-            let rel_map: HashMap<_, _> = release.try_into()?;
-            map.extend(rel_map);
-        }
+        map.insert(TagKey::MusicBrainzTrackID, vec![track.id.to_string()]);
         map.insert(TagKey::TrackTitle, vec![track.title]);
 
         // artists
-        map.insert(TagKey::Artists, track.artists.names());
-        map.insert(TagKey::Artist, track.artists.names());
-        map.insert(TagKey::MusicBrainzArtistID, track.artists.ids());
-        map.insert(TagKey::ArtistSortOrder, track.artists.sort_order());
-        if let Some(len) = track.length {
-            map.insert(TagKey::Duration, vec![len.as_secs().to_string()]);
-        }
-        if let Some(disc) = track.disc {
-            map.insert(TagKey::DiscNumber, vec![disc.to_string()]);
-        }
-        if let Some(disc_mbid) = track.disc_mbid {
-            map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid]);
-        }
-        if let Some(number) = track.number {
-            map.insert(TagKey::TrackNumber, vec![number.to_string()]);
-        }
+        let artist_names = full_track
+            .artists()?
+            .into_iter()
+            .map(|a| a.name.to_string())
+            .collect();
+        map.insert(TagKey::Artists, artist_names);
+        map.insert(TagKey::Artist, artist_names);
+        map.insert(
+            TagKey::MusicBrainzArtistID,
+            full_track
+                .artists()?
+                .into_iter()
+                .map(|a| a.id.to_string())
+                .collect(),
+        );
+        map.insert(
+            TagKey::ArtistSortOrder,
+            full_track
+                .artists()?
+                .into_iter()
+                .map(|a| a.id.to_string())
+                .collect(),
+        );
+        map.insert(TagKey::Duration, vec![track.length.to_string()]);
+        // map.insert(TagKey::DiscNumber, vec![track.disc.to_string()]);
+        // if let Some(disc_mbid) = track.disc_mbid {
+        //     map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid]);
+        // }
+        map.insert(TagKey::TrackNumber, vec![track.number.to_string()]);
         map.insert(TagKey::Genre, track.genres);
         map.insert(TagKey::Performer, track.performers.instruments());
         map.insert(TagKey::Engineer, track.engigneers.names());
@@ -117,14 +124,23 @@ impl TryFrom<FullRelease> for HashMap<TagKey, Vec<String>> {
     }
 }
 
-impl<T> TryFrom<T> for HashMap<String, Vec<String>>
-where
-    HashMap<TagKey, Vec<String>>: TryInto<T>,
-{
+impl TryFrom<FullTrack> for HashMap<String, Vec<String>> {
     type Error = Report;
-    fn try_from(track: T) -> Result<Self, Self::Error> {
+    fn try_from(track: FullTrack) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
         let tag_map: HashMap<TagKey, Vec<String>> = track.try_into()?;
+        for (k, v) in tag_map.into_iter() {
+            map.insert(k.to_string(), v);
+        }
+        Ok(map)
+    }
+}
+
+impl TryFrom<FullRelease> for HashMap<String, Vec<String>> {
+    type Error = Report;
+    fn try_from(release: FullRelease) -> Result<Self, Self::Error> {
+        let mut map = HashMap::new();
+        let tag_map: HashMap<TagKey, Vec<String>> = release.try_into()?;
         for (k, v) in tag_map.into_iter() {
             map.insert(k.to_string(), v);
         }

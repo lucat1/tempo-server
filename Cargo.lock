@@ -821,10 +821,12 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "eyre",
+ "infer",
  "sea-orm",
  "sea-query 0.28.2",
  "serde",
  "serde_json",
+ "setting",
  "uuid",
 ]
 

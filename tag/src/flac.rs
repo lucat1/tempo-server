@@ -1,12 +1,11 @@
 use super::key::TagKey;
 use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
+use entity::TrackFormat;
 use eyre::{eyre, Result};
 use metaflac::block::PictureType as FLACPictureType;
 use std::collections::HashMap;
 use std::path::Path;
-
-use super::format::Format;
 
 #[derive(Clone)]
 pub struct Tag {
@@ -33,8 +32,8 @@ impl crate::Tag for Tag {
         self.set_pictures(vec![])?;
         Ok(())
     }
-    fn format(&self) -> Format {
-        Format::Flac
+    fn format(&self) -> TrackFormat {
+        TrackFormat::Flac
     }
     fn separator(&self) -> Option<String> {
         None

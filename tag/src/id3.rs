@@ -3,6 +3,7 @@ extern crate id3;
 use super::key::TagKey;
 use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
+use entity::TrackFormat;
 use eyre::{eyre, Result};
 use id3::frame::PictureType as ID3PictureType;
 use id3::frame::{ExtendedText, Picture as ID3Picture};
@@ -13,7 +14,6 @@ use setting::get_settings;
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::format::Format;
 use super::Tag as TagTrait;
 use super::TagError;
 
@@ -52,8 +52,8 @@ impl super::Tag for Tag {
         self.set_pictures(vec![])?;
         Ok(())
     }
-    fn format(&self) -> Format {
-        Format::Id3
+    fn format(&self) -> TrackFormat {
+        TrackFormat::Id3
     }
     fn separator(&self) -> Option<String> {
         Some(self.separator.clone())
