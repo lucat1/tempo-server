@@ -4,12 +4,12 @@ use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use scan_dir::ScanDir;
 use sea_orm::ActiveValue;
-use sea_orm::TryIntoModel;
 use std::cmp::Ordering;
 use std::fs::canonicalize;
 use std::fs::write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Instant;
 
 use crate::fetch::cover::Cover;
@@ -17,7 +17,6 @@ use crate::fetch::cover::{get_cover, search_covers};
 use crate::fetch::{get, search, SearchResult};
 use crate::internal::Release;
 use crate::internal::Track;
-use crate::library::InLibrary;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
@@ -25,10 +24,10 @@ use crate::util::{mkdirp, path_to_str};
 use setting::get_settings;
 use tag::{Picture, PictureType};
 
-struct Task<'a> {
-    file: &'a TrackFile,
-    track: &'a FullTrackActive,
-    release: &'a FullRelease,
+struct Task {
+    file: TrackFile,
+    track: FullTrack,
+    track_active: FullTrackActive,
     dest_path: PathBuf,
 }
 
@@ -36,7 +35,7 @@ pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
 where
     P: AsRef<Path>,
 {
-    let cover_name = get_settings()?.art.image_name;
+    let cover_name = &get_settings()?.art.image_name;
     let name = match cover_name {
         Some(n) => n.to_string(),
         None => bail!("Picture write not required"),
@@ -60,7 +59,7 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
 
 async fn ask(
     theme: &DialoguerTheme,
-    original_tracks: &Vec<Track>,
+    original_tracks: &Vec<TrackFile>,
     search_result: SearchResult,
     matching: Vec<usize>,
 ) -> Result<(bool, SearchResult, Vec<usize>)> {
@@ -178,18 +177,18 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let mut rated_expanded_releases = expanded_results
         .into_iter()
         .map(|search_result| {
-            let (val, map) = rate_and_match(&source_tracks, &search_result);
+            let (val, map) = rate_and_match(&tracks, &search_result);
             (val, search_result, map)
         })
         .collect::<Vec<_>>();
     rated_expanded_releases.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
-    let (_, mut search_result, map) = rated_expanded_releases
+    let (_, mut search_result, mut map) = rated_expanded_releases
         .first()
         .ok_or(eyre!("No release available for the given tracks"))?
         .clone();
     let mut proceed = false;
     while !proceed {
-        (proceed, search_result, map) = ask(&theme, &source_tracks, search_result, map).await?;
+        (proceed, search_result, map) = ask(&theme, &tracks, search_result, map).await?;
     }
 
     let SearchResult(full_release, full_tracks) = search_result;
@@ -197,19 +196,20 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let covers = rank_covers(covers_by_provider, &full_release);
     let maybe_cover = ask_cover(&theme, covers);
     let mut maybe_picture: Option<Picture> = None;
-    let release_path = full_release.0.filename()?;
+    // let release_path = full_release.0.filename()?;
     let mut tasks: Vec<Task> = map
         .iter()
         .enumerate()
         .map(|(i, map)| -> Result<Task> {
-            let track_active: FullTrackActive = full_tracks[*map].into();
-            let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
+            let mut track_active: FullTrackActive = full_tracks[*map].clone().into();
+            // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
+            let dest_path = "tmp/file.flac".into();
             track_active.0.format = ActiveValue::Set(Some(tracks[i].format));
             track_active.0.path = ActiveValue::Set(Some(path_to_str(&dest_path)?));
             Ok(Task {
-                file: &tracks[i],
-                track: &track_active,
-                release: &full_release,
+                file: tracks[i].clone(),
+                track: full_tracks[*map].clone(),
+                track_active,
                 dest_path,
             })
         })
@@ -267,7 +267,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         // TODO: store in the db
         // task.store().await?;
-        debug!("After tagging {:?}", src);
+        debug!("After tagging {:?}", task.file);
     }
 
     info!("Import done, took {:?}", start.elapsed());

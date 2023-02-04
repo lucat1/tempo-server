@@ -7,17 +7,17 @@ pub const UNKNOWN_TITLE: &str = "(unkown title)";
 pub struct Track {
     pub title: String,
     pub artists: Vec<String>,
-    pub length: Option<usize>,
-    pub disc: Option<usize>,
-    pub number: Option<usize>,
+    pub length: Option<u64>,
+    pub disc: Option<u64>,
+    pub number: Option<u64>,
 }
 
 pub struct Release {
     pub title: String,
     pub artists: Vec<String>,
     pub media: Option<String>,
-    pub discs: Option<usize>,
-    pub tracks: Option<usize>,
+    pub discs: Option<u64>,
+    pub tracks: Option<u64>,
     pub country: Option<String>,
     pub label: Option<String>,
     pub release_type: Option<String>,
@@ -31,8 +31,8 @@ impl From<FullRelease> for Release {
         Release {
             title: release.title,
             artists: artists.into_iter().map(|a| a.name.clone()).collect(),
-            discs: Some(mediums.len()),
-            media: mediums.first().and_then(|m| m.format),
+            discs: Some(mediums.len() as u64),
+            media: mediums.first().as_ref().and_then(|m| m.format.clone()),
             tracks: None, // TODO: consider adding a track count in the media structure
             country: release.country,
             label: release.label,

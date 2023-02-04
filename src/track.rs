@@ -13,15 +13,14 @@ use tag::id3;
 #[cfg(feature = "mp4")]
 use tag::mp4;
 
-use tag::Picture;
-use tag::{Tag, TagError};
-use tag::{TagFrom, TagKey};
+use entity::TagKey;
+use tag::{Picture, Tag, TagError, TagFrom};
 
 #[derive(Clone, Debug)]
 pub struct TrackFile {
     pub path: PathBuf,
     pub format: TrackFormat,
-    tag: Box<dyn Tag>,
+    pub tag: Box<dyn Tag>,
 }
 
 impl TrackFile {

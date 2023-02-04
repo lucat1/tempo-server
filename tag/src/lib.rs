@@ -6,14 +6,12 @@ pub mod flac;
 pub mod id3;
 #[cfg(feature = "mp4")]
 pub mod mp4;
-
-pub mod key;
 pub mod picture;
 
 pub use core::convert::AsRef;
+use entity::TagKey;
 use entity::TrackFormat;
 pub use eyre::{Report, Result};
-pub use key::TagKey;
 pub use picture::{Picture, PictureType};
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 

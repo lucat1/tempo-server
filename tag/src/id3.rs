@@ -1,8 +1,8 @@
 extern crate id3;
 
-use super::key::TagKey;
 use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
+use entity::TagKey;
 use entity::TrackFormat;
 use eyre::{eyre, Result};
 use id3::frame::PictureType as ID3PictureType;

@@ -1,4 +1,7 @@
-use entity::{ArtistEntity, ArtistReleaseEntity, ReleaseEntity};
+use entity::{
+    ArtistCreditEntity, ArtistEntity, ArtistReleaseEntity, ArtistTrackEntity,
+    ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
+};
 use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
@@ -11,13 +14,28 @@ impl MigrationTrait for Migration {
         let builder = manager.get_database_backend();
         let schema = Schema::new(builder);
         manager
+            .exec_stmt(schema.create_table_from_entity(ArtistCreditEntity))
+            .await?;
+        manager
             .exec_stmt(schema.create_table_from_entity(ArtistEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(ArtistReleaseEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(ArtistTrackEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(ArtistTrackRelationEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(MediumEntity))
             .await?;
         manager
             .exec_stmt(schema.create_table_from_entity(ReleaseEntity))
             .await?;
         manager
-            .exec_stmt(schema.create_table_from_entity(ArtistReleaseEntity))
+            .exec_stmt(schema.create_table_from_entity(TrackEntity))
             .await?;
         Ok(())
     }

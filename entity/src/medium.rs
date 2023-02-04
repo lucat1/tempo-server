@@ -6,11 +6,12 @@ use uuid::Uuid;
 pub struct Instruments(Vec<String>);
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "tracks")]
+#[sea_orm(table_name = "medium")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub position: u64,
+    pub tracks: u64,
     pub track_offset: u64,
     pub format: Option<String>,
 }

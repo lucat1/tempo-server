@@ -13,10 +13,10 @@ use log::debug;
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
-pub fn rate_and_match(tracks: &Vec<Track>, result: &SearchResult) -> (i64, Vec<usize>) {
+pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> (i64, Vec<usize>) {
     let SearchResult(full_release, full_tracks) = result;
     let release: Release = tracks.clone().into();
-    let candidate_release: Release = full_release.into();
+    let candidate_release: Release = full_release.clone().into();
 
     let rows = tracks.len();
     let mut columns = full_tracks.len();
@@ -24,7 +24,8 @@ pub fn rate_and_match(tracks: &Vec<Track>, result: &SearchResult) -> (i64, Vec<u
 
     for original_track in tracks.iter() {
         for candidate_track in full_tracks.iter() {
-            matrix_vec.push(original_track.diff(&candidate_track.into()));
+            let track: Track = original_track.clone().into();
+            matrix_vec.push(track.diff(&candidate_track.clone().into()));
         }
     }
     if matrix_vec.is_empty() {

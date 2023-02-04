@@ -1,5 +1,6 @@
+use entity::TagKey;
+use itertools::Itertools;
 use log::warn;
-use tag::TagKey;
 
 use crate::internal::UNKNOWN_TITLE;
 use crate::internal::{Release, Track};

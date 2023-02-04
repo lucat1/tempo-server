@@ -1,3 +1,4 @@
+use eyre::Report;
 use sea_orm::entity::ActiveValue;
 use serde_derive::{Deserialize, Serialize};
 use setting::get_settings;
@@ -17,7 +18,7 @@ pub struct Release {
     pub release_group: Option<ReleaseGroup>,
     #[serde(rename = "artist-credit")]
     pub artist_credit: Vec<ArtistCredit>,
-    pub asin: Option<String>,
+    pub asin: String,
     pub date: Option<String>,
     pub id: Uuid,
     pub media: Vec<Medium>,
@@ -119,7 +120,13 @@ pub struct Relation {
     #[serde(rename = "type")]
     pub type_field: String,
     pub artist: Option<Artist>,
+    pub work: Option<Work>,
     pub attributes: Vec<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Work {
+    pub relations: Option<Vec<Relation>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,27 +158,27 @@ pub struct LabelInfo {
     pub label: Option<Label>,
 }
 
-// impl From<Artist> for entity::ArtistActive {
-//     fn from(artist: Artist) -> Self {
-//         entity::ArtistActive {
-//             id: ActiveValue::Set(artist.id),
-//             name: ActiveValue::Set(artist.name),
-//             sort_name: ActiveValue::Set(artist.sort_name),
-//         }
-//     }
-// }
-//
-// impl From<ArtistCredit> for entity::ArtistCreditActive {
-//     fn from(artist: ArtistCredit) -> Self {
-//         entity::ArtistCreditActive {
-//             join_phrase: ActiveValue::Set(artist.joinphrase),
-//             artist_id: ActiveValue::Set(artist.artist.id),
-//             ..Default::default()
-//         }
-//     }
-// }
+impl From<Artist> for entity::Artist {
+    fn from(artist: Artist) -> entity::Artist {
+        entity::Artist {
+            id: artist.id,
+            name: artist.name,
+            sort_name: artist.sort_name,
+        }
+    }
+}
 
-impl From<Track> for entity::FullTrackActive {
+impl From<ArtistCredit> for entity::ArtistCredit {
+    fn from(artist: ArtistCredit) -> Self {
+        entity::ArtistCredit {
+            id: 0,
+            join_phrase: artist.joinphrase,
+            artist_id: artist.artist.id,
+        }
+    }
+}
+
+impl From<Track> for entity::FullTrack {
     fn from(track: Track) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
@@ -180,7 +187,9 @@ impl From<Track> for entity::FullTrackActive {
             .relations
             .iter()
             .filter_map(|rel| {
-                if rel.type_field.clone().into() == entity::RelationType::Performance {
+                if <String as Into<entity::RelationType>>::into(rel.type_field.clone())
+                    == entity::RelationType::Performance
+                {
                     rel.work.clone()
                 } else {
                     None
@@ -192,36 +201,52 @@ impl From<Track> for entity::FullTrackActive {
         let mut all_relations = track.recording.relations.clone();
         all_relations.append(&mut other_relations);
 
-        let mut artists: Vec<entity::ArtistActive> = track.recording.artist_credit.map_or(
-            |acs| acs.into_iter().map(|ac| ac.artist.into()).collect(),
-            vec![],
-        );
+        let mut artists: Vec<entity::Artist> = track
+            .recording
+            .artist_credit
+            .as_ref()
+            .map_or(vec![], |acs| {
+                acs.into_iter().map(|ac| ac.artist.clone().into()).collect()
+            });
         // Append artists for all other relations
-        artists.append(all_relations.iter().map(|r| r.artist.into()).collect());
-        (
-            entity::TrackActive {
-                id: ActiveValue::Set(track.id),
+        artists.append(
+            &mut all_relations
+                .iter()
+                .filter_map(|r| r.artist.as_ref())
+                .map(|a| a.clone().into())
+                .collect(),
+        );
+        entity::FullTrack(
+            entity::Track {
+                id: track.id,
                 title: track.title,
-                length: track.length.or(track.recording.length).into(),
-                number: ActiveValue::Set(track.position),
-                genres: sorted_genres
-                    .into_iter()
-                    .map(|g| g.name)
-                    .collect::<Vec<_>>(),
-                format: ActiveValue::NotSet,
-                path: ActiveValue::NotSet,
+                length: track.length.or(track.recording.length).unwrap_or_default(),
+                number: track.position,
+                genres: entity::Genres(
+                    sorted_genres
+                        .into_iter()
+                        .map(|g| g.name)
+                        .collect::<Vec<_>>(),
+                ),
+                format: None,
+                path: None,
             },
-            track.recording.artist_credit.into(),
+            track
+                .recording
+                .artist_credit
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ac| ac.into())
+                .collect(),
             all_relations
                 .iter()
-                .map(|r| entity::ArtistTrackRelationActive {
-                    artist_id: r
-                        .artist
-                        .id
-                        .map_or(|a| ActiveValue::Set(a.id), ActiveValue::NotSet),
-                    track_id: ActiveValue::Set(track.id),
-                    relation_type: r.type_field.into(),
-                    relation_value: r.type_field,
+                .filter_map(|r| {
+                    r.artist.as_ref().map(|a| entity::ArtistTrackRelation {
+                        artist_id: a.id,
+                        track_id: track.id,
+                        relation_type: r.type_field.clone().into(),
+                        relation_value: r.type_field.clone(),
+                    })
                 })
                 .collect(),
             artists,
@@ -229,8 +254,9 @@ impl From<Track> for entity::FullTrackActive {
     }
 }
 
-impl From<Release> for entity::FullReleaseActive {
-    fn from(release: Release) -> Self {
+impl TryFrom<Release> for entity::FullRelease {
+    type Error = Report;
+    fn try_from(release: Release) -> Result<Self, Self::Error> {
         let original_date = maybe_date(
             release
                 .release_group
@@ -238,64 +264,57 @@ impl From<Release> for entity::FullReleaseActive {
                 .and_then(|r| r.first_release_date.clone()),
         );
         let label = release.label_info.first();
-        (
-            entity::ReleaseActive {
-                id: ActiveValue::Set(release.id),
-                title: ActiveValue::Set(release.title),
-                release_group_id: release
-                    .release_group
-                    .as_ref()
-                    .map_or(|r| ActiveValue::Set(r.id.clone()), ActiveValue::NotSet),
+        Ok(entity::FullRelease(
+            entity::Release {
+                id: release.id,
+                title: release.title,
+                release_group_id: release.release_group.as_ref().map(|r| r.id),
                 release_type: release
                     .release_group
                     .as_ref()
                     .and_then(|r| r.primary_type.as_ref())
-                    .map_or(
-                        |pt| ActiveValue::Set(pt.to_lowercase()),
-                        ActiveValue::NotSet,
-                    ),
-                asin: ActiveValue::Set(release.asin),
-                country: release
-                    .country
-                    .map_or(|c| ActiveValue::Set(c), ActiveValue::NotSet),
+                    .map(|s| s.to_lowercase()),
+                asin: release.asin,
+                country: release.country,
                 label: label
                     .as_ref()
                     .and_then(|li| li.label.as_ref())
-                    .map_or(|l| ActiveValue::Set(l.name.clone()), ActiveValue::NotSet),
-                catalog_no: label.as_ref().map_or(
-                    |l| ActiveValue::Set(l.catalog_number.clone()),
-                    ActiveValue::NotSet,
-                ),
-                status: release
-                    .status
-                    .map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
+                    .map(|l| l.name.to_string()),
+                catalog_no: label.as_ref().and_then(|l| l.catalog_number.clone()),
+                status: release.status,
                 date: if get_settings()?.tagging.use_original_date {
                     original_date
                 } else {
                     maybe_date(release.date)
-                }
-                .map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
-                original_date: original_date.map_or(|v| ActiveValue::Set(v), ActiveValue::NotSet),
+                },
+                original_date,
                 script: release.text_representation.and_then(|t| t.script),
             },
             release
                 .media
                 .iter()
-                .map(|m| entity::MediumActive {
-                    id: ActiveValue::Set(m.id),
-                    position: ActiveValue::Set(m.position),
-                    track_offset: ActiveValue::Set(m.track_offset),
-                    format: m
-                        .format
-                        .map_or(|f| ActiveValue::Set(f), ActiveValue::NotSet),
+                .map(|m| entity::Medium {
+                    id: m.id,
+                    position: m.position,
+                    tracks: m
+                        .tracks
+                        .as_ref()
+                        .map(|tracks| tracks.len() as u64)
+                        .unwrap_or_default(),
+                    track_offset: m.track_offset,
+                    format: m.format.clone(),
                 })
                 .collect(),
             release
                 .artist_credit
-                .into_iter()
-                .map(|a| a.into())
+                .iter()
+                .map(|ac| ac.clone().into())
                 .collect(),
-            release.artist_credit.into_iter().map(|a| a).collect(),
-        )
+            release
+                .artist_credit
+                .into_iter()
+                .map(|a| a.artist.into())
+                .collect(),
+        ))
     }
 }

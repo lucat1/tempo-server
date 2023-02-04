@@ -4,7 +4,7 @@ use levenshtein::levenshtein;
 use setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
 
-static MAX_COVER_SIZE: usize = 5000 * 5000;
+static MAX_COVER_SIZE: u64 = 5000 * 5000;
 
 #[derive(Debug, Clone)]
 pub struct CoverRating(pub f64, pub Cover);
@@ -52,24 +52,32 @@ fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
         ) * art_settings.size_relevance
 }
 
-pub fn rank_covers(covers_by_provider: Vec<Vec<Cover>>, release: &FullRelease) -> Vec<CoverRating> {
-    let FullRelease(release, _, _, artists) = release;
+pub fn rank_covers(
+    covers_by_provider: Vec<Vec<Cover>>,
+    full_release: &FullRelease,
+) -> Vec<CoverRating> {
+    let FullRelease(release, _, _, artists) = full_release;
     let mut vec: Vec<CoverRating> = covers_by_provider
         .into_iter()
         .flat_map(|covers| {
-            covers.into_iter().map(|cover| {
+            covers.into_iter().filter_map(|cover| {
                 let mut distance = 1.0
                     - ((levenshtein(cover.title.as_str(), release.title.as_str())
-                        + levenshtein(cover.artist.as_str(), release.joined_artists().as_str()))
-                        as f64
+                        + levenshtein(
+                            cover.artist.as_str(),
+                            full_release.joined_artists().ok()?.as_str(),
+                        )) as f64
                         / (cover.title.len().max(release.title.len())
-                            + cover.artist.len().max(release.joined_artists().len()))
+                            + cover
+                                .artist
+                                .len()
+                                .max(full_release.joined_artists().ok()?.len()))
                             as f64);
                 if cover.provider == ArtProvider::CoverArtArchive {
                     distance = 0.9; // TODO: better way? otherwise art from the CoverArtArchive always
                                     // achieves the best score
                 }
-                CoverRating(valuate_cover(distance, &cover), cover)
+                Some(CoverRating(valuate_cover(distance, &cover), cover))
             })
         })
         .collect();

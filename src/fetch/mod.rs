@@ -24,8 +24,8 @@ lazy_static! {
 #[derive(Clone, Debug)]
 pub struct SearchResult(pub entity::FullRelease, pub Vec<entity::FullTrack>);
 
-fn release_to_result(r: music_brainz::Release) -> SearchResult {
-    let tracks: Vec<entity::FullTrackActive> = r
+fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
+    let tracks: Vec<entity::FullTrack> = r
         .media
         .clone()
         .into_iter()
@@ -33,9 +33,8 @@ fn release_to_result(r: music_brainz::Release) -> SearchResult {
         .flatten()
         .map(|t| t.into())
         .collect();
-    let release: entity::FullReleaseActive = r.into();
-
-    SearchResult(release, tracks)
+    let release: entity::FullRelease = r.try_into()?;
+    Ok(SearchResult(release, tracks))
 }
 
 pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
@@ -74,7 +73,7 @@ pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    Ok(json.releases.into_iter().map(release_to_result).collect())
+    json.releases.into_iter().map(release_to_result).collect()
 }
 
 pub async fn get(id: &str) -> Result<SearchResult> {
@@ -122,5 +121,5 @@ pub async fn get(id: &str) -> Result<SearchResult> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    Ok(release_to_result(json))
+    release_to_result(json)
 }

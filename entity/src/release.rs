@@ -2,9 +2,9 @@ use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "releases")]
+#[sea_orm(table_name = "release")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub title: String,
     pub release_group_id: Option<Uuid>,

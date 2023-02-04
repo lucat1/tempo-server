@@ -1,6 +1,5 @@
 mod fetch;
 mod internal;
-mod library;
 mod rank;
 mod theme;
 mod track;
@@ -10,14 +9,17 @@ mod import;
 mod list;
 mod update;
 
+use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
+use lazy_static::lazy_static;
 use log::error;
 use migration::MigratorTrait;
-use sea_orm::{Database, DatabaseConnection};
-use std::path::PathBuf;
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use std::sync::Arc;
+use std::{path::PathBuf, time::Duration};
 
-use setting::{get_settings, Settings};
+use setting::get_settings;
 
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
@@ -26,6 +28,10 @@ pub const GITHUB: &str = "github.com/lucat1/tagger";
 // logging constants
 pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
 pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
+
+lazy_static! {
+    pub static ref DB: Arc<OnceCell<DatabaseConnection>> = Arc::new(OnceCell::new());
+}
 
 fn cli() -> Command<'static> {
     Command::new(CLI_NAME)
@@ -63,9 +69,16 @@ fn cli() -> Command<'static> {
 
 async fn open_database() -> Result<DatabaseConnection> {
     let path = util::path_to_str(&get_settings()?.db)?;
-    let conn = Database::connect(format!("sqlite://{}", path))
-        .await
-        .map_err(|e| eyre!(e))?;
+    let mut opt = ConnectOptions::new(format!("sqlite://{}?mode=rwc", path));
+    opt.max_connections(100)
+        .min_connections(5)
+        .connect_timeout(Duration::from_secs(8))
+        .acquire_timeout(Duration::from_secs(8))
+        .idle_timeout(Duration::from_secs(8))
+        .max_lifetime(Duration::from_secs(8))
+        .sqlx_logging(true)
+        .sqlx_logging_level(log::LevelFilter::Info);
+    let conn = Database::connect(opt).await.map_err(|e| eyre!(e))?;
     migration::Migrator::up(&conn, None).await?;
     // sqlx::query("PRAGMA journal_mode=WAL")
     //     .execute(&pool)
@@ -90,7 +103,7 @@ async fn main() -> Result<()> {
         Some(("config", _)) => setting::print(),
         Some((a, b)) => {
             // all subcommands that require a database connection go in here
-            // DB.get_or_try_init(open_database()).await?;
+            DB.get_or_try_init(open_database()).await?;
 
             match (a, b) {
                 ("list", sub_matches) => {

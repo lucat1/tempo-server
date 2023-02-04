@@ -1,7 +1,6 @@
 use super::{FullRelease, FullTrack, TagKey};
 use chrono::Datelike;
 use eyre::{Report, Result};
-use setting::get_settings;
 use std::collections::HashMap;
 
 pub type KeyMap = HashMap<TagKey, Vec<String>>;
@@ -9,19 +8,18 @@ pub type KeyMap = HashMap<TagKey, Vec<String>>;
 impl TryFrom<FullTrack> for KeyMap {
     type Error = Report;
     fn try_from(full_track: FullTrack) -> Result<Self, Self::Error> {
-        let FullTrack(track, artist_credits, artist_track_relations, artists) = full_track;
-        let settings = get_settings();
+        let FullTrack(track, _, _, _) = &full_track;
         let mut map = HashMap::new();
         map.insert(TagKey::MusicBrainzTrackID, vec![track.id.to_string()]);
-        map.insert(TagKey::TrackTitle, vec![track.title]);
+        map.insert(TagKey::TrackTitle, vec![track.title.clone()]);
 
         // artists
-        let artist_names = full_track
+        let artist_names: Vec<String> = full_track
             .artists()?
             .into_iter()
             .map(|a| a.name.to_string())
             .collect();
-        map.insert(TagKey::Artists, artist_names);
+        map.insert(TagKey::Artists, artist_names.clone());
         map.insert(TagKey::Artist, artist_names);
         map.insert(
             TagKey::MusicBrainzArtistID,
@@ -45,35 +43,32 @@ impl TryFrom<FullTrack> for KeyMap {
         //     map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid]);
         // }
         map.insert(TagKey::TrackNumber, vec![track.number.to_string()]);
-        map.insert(TagKey::Genre, track.genres);
-        map.insert(TagKey::Performer, track.performers.instruments());
-        map.insert(TagKey::Engineer, track.engigneers.names());
-        map.insert(TagKey::Mixer, track.mixers.names());
-        map.insert(TagKey::Producer, track.producers.names());
-        map.insert(TagKey::Lyricist, track.lyricists.names());
-        map.insert(TagKey::Writer, track.writers.names());
-        map.insert(TagKey::Composer, track.composers.names());
-        map.insert(TagKey::ComposerSortOrder, track.composers.sort_order());
+        map.insert(TagKey::Genre, track.genres.0.clone());
+        // map.insert(TagKey::Performer, track.performers);
+        // map.insert(TagKey::Engineer, track.engigneers);
+        // map.insert(TagKey::Mixer, track.mixers);
+        // map.insert(TagKey::Producer, track.producers);
+        // map.insert(TagKey::Lyricist, track.lyricists);
+        // map.insert(TagKey::Writer, track.writers);
+        // map.insert(TagKey::Composer, track.composers);
+        // map.insert(TagKey::ComposerSortOrder, track.composers);
         Ok(map)
     }
 }
 
 impl TryFrom<FullRelease> for HashMap<TagKey, Vec<String>> {
     type Error = Report;
-    fn try_from(release: FullRelease) -> Result<Self, Self::Error> {
+    fn try_from(full_release: FullRelease) -> Result<Self, Self::Error> {
+        let FullRelease(release, mediums, _, _) = &full_release;
         let mut map = HashMap::new();
-        if let Some(rel_id) = &release.mbid {
-            map.insert(TagKey::MusicBrainzReleaseID, vec![rel_id.clone()]);
-        }
-        if let Some(rel_group_id) = &release.release_group_mbid {
+        map.insert(TagKey::MusicBrainzReleaseID, vec![release.id.to_string()]);
+        if let Some(rel_group_id) = &release.release_group_id {
             map.insert(
                 TagKey::MusicBrainzReleaseGroupID,
-                vec![rel_group_id.clone()],
+                vec![rel_group_id.to_string()],
             );
         }
-        if let Some(rel_asin) = &release.asin {
-            map.insert(TagKey::ASIN, vec![rel_asin.to_string()]);
-        }
+        map.insert(TagKey::ASIN, vec![release.asin.clone()]);
         if let Some(rel_country) = &release.country {
             map.insert(TagKey::ReleaseCountry, vec![rel_country.to_string()]);
         }
@@ -106,20 +101,40 @@ impl TryFrom<FullRelease> for HashMap<TagKey, Vec<String>> {
         if let Some(rel_script) = &release.script {
             map.insert(TagKey::Script, vec![rel_script.to_string()]);
         }
-        if let Some(rel_media) = &release.media {
-            map.insert(TagKey::Media, vec![rel_media.to_string()]);
+        if let Some(media_format) = &mediums.first().and_then(|m| m.format.as_ref()) {
+            map.insert(TagKey::Media, vec![media_format.to_string()]);
         }
         map.insert(TagKey::Album, vec![release.title.clone()]);
         map.insert(TagKey::AlbumSortOrder, vec![release.title.clone()]);
-        map.insert(TagKey::AlbumArtist, release.artists.names());
-        map.insert(TagKey::AlbumArtistSortOrder, release.artists.sort_order());
-        map.insert(TagKey::MusicBrainzReleaseArtistID, release.artists.ids());
-        if let Some(discs) = release.discs {
-            map.insert(TagKey::TotalDiscs, vec![discs.to_string()]);
-        }
-        if let Some(tracks) = release.tracks {
-            map.insert(TagKey::TotalTracks, vec![tracks.to_string()]);
-        }
+        map.insert(
+            TagKey::AlbumArtist,
+            full_release
+                .artists()?
+                .into_iter()
+                .map(|a| a.name.to_string())
+                .collect(),
+        );
+        map.insert(
+            TagKey::AlbumArtistSortOrder,
+            full_release
+                .artists()?
+                .into_iter()
+                .map(|a| a.sort_name)
+                .collect(),
+        );
+        map.insert(
+            TagKey::MusicBrainzReleaseArtistID,
+            full_release
+                .artists()?
+                .into_iter()
+                .map(|a| a.id.to_string())
+                .collect(),
+        );
+        map.insert(TagKey::TotalDiscs, vec![mediums.len().to_string()]);
+        map.insert(
+            TagKey::TotalTracks,
+            vec![mediums.into_iter().fold(0, |v, e| v + e.tracks).to_string()],
+        );
         Ok(map)
     }
 }

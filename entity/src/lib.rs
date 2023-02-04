@@ -39,6 +39,7 @@ pub use release::Model as Release;
 pub use track::ActiveModel as TrackActive;
 pub use track::Column as TrackColumn;
 pub use track::Entity as TrackEntity;
+pub use track::Genres;
 pub use track::Model as Track;
 pub use track_format::TrackFormat;
 
@@ -122,23 +123,10 @@ impl FullRelease {
 
     pub fn artists(&self) -> Result<Vec<Artist>> {
         let FullRelease(_, _, credits, _) = self;
-        let res = vec![];
+        let mut res = vec![];
         for credit in credits.iter() {
             if let Some(artist) = self.artist(credit.artist_id) {
                 res.push(artist.clone());
-            } else {
-                bail!("Artist credit referes to a missing artist id");
-            }
-        }
-        Ok(res)
-    }
-
-    pub fn artist_names(&self) -> Result<Vec<String>> {
-        let FullRelease(_, _, credits, _) = self;
-        let res = vec![];
-        for credit in credits.iter() {
-            if let Some(artist) = self.artist(credit.artist_id) {
-                res.push(artist.name.as_str());
             } else {
                 bail!("Artist credit referes to a missing artist id");
             }
@@ -176,7 +164,7 @@ impl FullTrack {
 
     pub fn artists(&self) -> Result<Vec<Artist>> {
         let FullTrack(_, _, credits, _) = self;
-        let res = vec![];
+        let mut res = vec![];
         for credit in credits.iter() {
             if let Some(artist) = self.artist(credit.artist_id) {
                 res.push(artist.clone());
@@ -188,7 +176,7 @@ impl FullTrack {
     }
 
     pub fn joined_artists(&self) -> Result<String> {
-        let FullTrack(_, _, credits, _) = self;
+        let FullTrack(_, credits, _, _) = self;
         let mut s = String::new();
         for credit in credits.iter() {
             if let Some(artist) = self.artist(credit.artist_id) {

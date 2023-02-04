@@ -1,6 +1,6 @@
-use super::key::TagKey;
 use crate::picture::{Picture, PictureType};
 use core::convert::AsRef;
+use entity::TagKey;
 use entity::TrackFormat;
 use eyre::{eyre, Result};
 use metaflac::block::PictureType as FLACPictureType;

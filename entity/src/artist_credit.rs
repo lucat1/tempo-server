@@ -22,7 +22,7 @@ pub enum Relation {
 
 impl Related<super::artist::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist::Relation::ArtistCredit.def()
+        Relation::Artist.def()
     }
 }
 
