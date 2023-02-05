@@ -24,11 +24,14 @@ lazy_static! {
 }
 
 #[derive(Clone, Debug)]
-pub struct SearchResult(pub entity::FullRelease, pub Vec<entity::FullTrack>);
+pub struct SearchResult(
+    pub entity::full::FullRelease,
+    pub Vec<entity::full::FullTrack>,
+);
 
 fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
-    let release: entity::FullRelease = r.clone().try_into()?;
-    let tracks: Vec<entity::FullTrack> = r
+    let release: entity::full::FullRelease = r.clone().try_into()?;
+    let tracks: Vec<entity::full::FullTrack> = r
         .media
         .into_iter()
         .enumerate()

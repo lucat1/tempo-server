@@ -1,5 +1,5 @@
 use crate::fetch::Cover;
-use entity::FullRelease;
+use entity::full::{ArtistInfo, FullRelease};
 use levenshtein::levenshtein;
 use setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
@@ -56,9 +56,7 @@ pub fn rank_covers(
     covers_by_provider: Vec<Vec<Cover>>,
     full_release: &FullRelease,
 ) -> Vec<CoverRating> {
-    let FullRelease {
-        release, artist, ..
-    } = full_release;
+    let FullRelease { release, .. } = full_release;
     let mut vec: Vec<CoverRating> = covers_by_provider
         .into_iter()
         .flat_map(|covers| {

@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use entity::{FullRelease, FullTrack};
+use entity::full::{FullRelease, FullTrack};
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
@@ -26,7 +26,7 @@ pub struct Release {
 }
 
 impl From<FullRelease> for Release {
-    fn from(full_release: entity::FullRelease) -> Self {
+    fn from(full_release: entity::full::FullRelease) -> Self {
         let FullRelease {
             release,
             medium,
@@ -49,7 +49,7 @@ impl From<FullRelease> for Release {
 }
 
 impl From<FullTrack> for Track {
-    fn from(full_track: entity::FullTrack) -> Self {
+    fn from(full_track: entity::full::FullTrack) -> Self {
         let FullTrack { track, artist, .. } = full_track;
         Track {
             title: track.title,

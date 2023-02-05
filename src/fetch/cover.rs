@@ -1,4 +1,4 @@
-use entity::{FullRelease, FullReleaseActive};
+use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::ImageOutputFormat;

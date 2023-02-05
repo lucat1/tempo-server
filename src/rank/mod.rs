@@ -24,7 +24,7 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> (i64, V
 
     for original_track in tracks.iter() {
         for candidate_track in full_tracks.iter() {
-            let track: Track = original_track.clone().into();
+            let mut track: Track = original_track.clone().into();
             matrix_vec.push(track.diff(&candidate_track.clone().into()));
         }
     }

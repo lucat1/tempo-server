@@ -1,23 +1,28 @@
 use dialoguer::{Confirm, Input, Select};
-use entity::FullReleaseActive;
+use entity::conflict::{
+    ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
+    ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, MEDIUM_CONFLICT,
+    RELEASE_CONFLICT, TRACK_CONFLICT,
+};
+use entity::full::FullReleaseActive;
+use entity::full::{ArtistInfo, FullRelease, FullTrack, FullTrackActive};
 use entity::{
-    ArtistColumn, ArtistCreditColumn, ArtistCreditEntity, ArtistCreditReleaseColumn,
-    ArtistCreditReleaseEntity, ArtistCreditTrackColumn, ArtistCreditTrackEntity, ArtistEntity,
-    ArtistTrackRelationColumn, ArtistTrackRelationEntity, FullRelease, FullTrack, FullTrackActive,
-    MediumColumn, MediumEntity, ReleaseColumn, ReleaseEntity, TrackColumn, TrackEntity,
+    ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
+    ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
-use migration::OnConflict;
 use scan_dir::ScanDir;
 use sea_orm::EntityTrait;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fs::canonicalize;
 use std::fs::write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
+use tag::{tags_from_full_track, TagKey};
 
 use crate::fetch::cover::Cover;
 use crate::fetch::cover::{get_cover, search_covers};
@@ -28,14 +33,16 @@ use crate::internal::Track;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
+use crate::util::dedup;
 use crate::util::{mkdirp, path_to_str};
 use setting::get_settings;
 use tag::{Picture, PictureType};
 
-struct Task {
+struct Job {
     file: TrackFile,
-    track: FullTrack,
-    dest_path: PathBuf,
+    dest: PathBuf,
+    tags: HashMap<TagKey, Vec<String>>,
+    cover: Option<Picture>,
 }
 
 pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
@@ -71,9 +78,7 @@ async fn ask(
     matching: Vec<usize>,
 ) -> Result<(bool, SearchResult, Vec<usize>)> {
     let SearchResult(candidate_release, _) = &search_result;
-    let FullRelease {
-        release, artist, ..
-    } = &candidate_release;
+    let FullRelease { release, .. } = &candidate_release;
     info!(
         "Tagging as {} - {} ({})",
         candidate_release.joined_artists()?,
@@ -206,37 +211,6 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let maybe_cover = ask_cover(&theme, covers);
     let mut maybe_picture: Option<Picture> = None;
     // let release_path = full_release.0.filename()?;
-    let mut tasks: Vec<Task> = map
-        .iter()
-        .enumerate()
-        .map(|(i, map)| -> Result<Task> {
-            let mut track: FullTrack = full_tracks[*map].clone();
-            // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
-            let dest_path = "tmp/file.flac".into();
-            track.track.format = Some(tracks[i].format);
-            track.track.path = Some(path_to_str(&dest_path)?);
-            Ok(Task {
-                file: tracks[i].clone(),
-                track,
-                dest_path,
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let mut folders = tasks
-        .iter()
-        .map(|task| {
-            Ok(task
-                .dest_path
-                .parent()
-                .ok_or(eyre!("Could not get parent"))?
-                .to_path_buf())
-        })
-        .collect::<Result<Vec<_>>>()?;
-    folders.sort();
-    folders.dedup();
-    for dest in folders.iter() {
-        mkdirp(dest)?;
-    }
     if let Some(cover) = maybe_cover {
         let (image, mime) = get_cover(cover.url).await?;
         let picture = Picture {
@@ -245,82 +219,48 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             description: "Front".to_string(),
             data: image,
         };
-        for dest in folders.into_iter() {
-            write_picture(&picture, &dest)?;
-        }
         maybe_picture = Some(picture)
     } else {
         warn!("No album art found")
     }
-    let db = get_database()?;
-    let FullReleaseActive {
-        release: release_active,
-        medium: medium_active,
-        artist_credit_release: artist_credit_release_active,
-        artist_credit: artist_credit_active,
-        artist: artist_active,
-        ..
-    } = full_release.into();
-    ArtistEntity::insert_many(artist_active)
-        .on_conflict(
-            OnConflict::column(ArtistColumn::Id)
-                .update_columns([ArtistColumn::Name, ArtistColumn::SortName])
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    ReleaseEntity::insert(release_active)
-        .on_conflict(
-            OnConflict::column(ReleaseColumn::Id)
-                .update_columns([
-                    ReleaseColumn::Title,
-                    ReleaseColumn::ReleaseGroupId,
-                    ReleaseColumn::ReleaseType,
-                    ReleaseColumn::Asin,
-                    ReleaseColumn::Country,
-                    ReleaseColumn::Label,
-                    ReleaseColumn::CatalogNo,
-                    ReleaseColumn::Status,
-                    ReleaseColumn::Date,
-                    ReleaseColumn::OriginalDate,
-                    ReleaseColumn::Script,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    ArtistCreditEntity::insert_many(artist_credit_active)
-        .on_conflict(
-            OnConflict::column(ArtistCreditColumn::Id)
-                .do_nothing()
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
-        .on_conflict(
-            OnConflict::columns([
-                ArtistCreditReleaseColumn::ArtistCreditId,
-                ArtistCreditReleaseColumn::ReleaseId,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    MediumEntity::insert_many(medium_active)
-        .on_conflict(
-            OnConflict::column(MediumColumn::Id)
-                .update_columns([
-                    MediumColumn::Position,
-                    MediumColumn::Tracks,
-                    MediumColumn::TrackOffset,
-                    MediumColumn::Format,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
+    let tasks: Vec<Job> = map
+        .iter()
+        .enumerate()
+        .map(|(i, map)| -> Result<Job> {
+            let mut track: FullTrack = full_tracks[*map].clone();
+            // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
+            let dest_path = "tmp/file.flac".into();
+            track.track.format = Some(tracks[i].format);
+            track.track.path = Some(path_to_str(&dest_path)?);
+            Ok(Job {
+                file: tracks[i].clone(),
+                dest: dest_path,
+                tags: tags_from_full_track(&track)?,
+                cover: maybe_picture.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let folders = dedup(
+        tasks
+            .iter()
+            .map(|task| {
+                Ok(task
+                    .dest
+                    .parent()
+                    .ok_or(eyre!("Could not get track parent folder"))?
+                    .to_path_buf())
+            })
+            .collect::<Result<Vec<_>>>()?,
+    );
+
+    for dest in folders.iter() {
+        mkdirp(dest)?;
+    }
+    if let Some(picture) = maybe_picture {
+        for dest in folders.into_iter() {
+            write_picture(&picture, &dest)?;
+        }
+    }
 
     for task in tasks.into_iter() {
         debug!("Beofre tagging {:?}", task.file);
@@ -345,69 +285,71 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         //     .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
         // TODO: store in the db
         // task.store().await?;
+
+        debug!("After tagging {:?}", task.file);
+    }
+    info!(
+        "Moving done, took {:?}. Now writing to the library database",
+        start.elapsed()
+    );
+
+    let db = get_database()?;
+    let FullReleaseActive {
+        release: release_active,
+        medium: medium_active,
+        artist_credit_release: artist_credit_release_active,
+        artist_credit: artist_credit_active,
+        artist: artist_active,
+        ..
+    } = full_release.into();
+    ArtistEntity::insert_many(artist_active)
+        .on_conflict(ARTIST_CONFLICT.to_owned())
+        .exec(db)
+        .await?;
+    ReleaseEntity::insert(release_active)
+        .on_conflict(RELEASE_CONFLICT.to_owned())
+        .exec(db)
+        .await?;
+    ArtistCreditEntity::insert_many(artist_credit_active)
+        .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
+        .exec(db)
+        .await?;
+    ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
+        .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
+        .exec(db)
+        .await?;
+    MediumEntity::insert_many(medium_active)
+        .on_conflict(MEDIUM_CONFLICT.to_owned())
+        .exec(db)
+        .await?;
+    for track in full_tracks.into_iter() {
         let FullTrackActive {
             track: track_active,
             artist_credit_track: artist_credit_track_active,
             artist_credit: artist_credit_active,
             artist_track_relation: artist_track_relation_active,
             artist: artist_active,
-        }: FullTrackActive = task.track.into();
+        }: FullTrackActive = track.into();
         ArtistEntity::insert_many(artist_active)
-            .on_conflict(
-                OnConflict::column(ArtistColumn::Id)
-                    .update_columns([ArtistColumn::Name, ArtistColumn::SortName])
-                    .to_owned(),
-            )
+            .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(db)
             .await?;
         ArtistCreditEntity::insert_many(artist_credit_active)
-            .on_conflict(
-                OnConflict::column(ArtistCreditColumn::Id)
-                    .do_nothing()
-                    .to_owned(),
-            )
+            .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
             .exec(db)
             .await?;
         TrackEntity::insert(track_active)
-            .on_conflict(
-                OnConflict::column(TrackColumn::Id)
-                    .update_columns([
-                        TrackColumn::Title,
-                        TrackColumn::Length,
-                        TrackColumn::Number,
-                        TrackColumn::Genres,
-                        TrackColumn::Format,
-                        TrackColumn::Path,
-                    ])
-                    .to_owned(),
-            )
+            .on_conflict(TRACK_CONFLICT.to_owned())
             .exec(db)
             .await?;
         ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
-            .on_conflict(
-                OnConflict::columns([
-                    ArtistCreditTrackColumn::ArtistCreditId,
-                    ArtistCreditTrackColumn::TrackId,
-                ])
-                .do_nothing()
-                .to_owned(),
-            )
+            .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
             .exec(db)
             .await?;
         ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
-            .on_conflict(
-                OnConflict::columns([
-                    ArtistTrackRelationColumn::ArtistId,
-                    ArtistTrackRelationColumn::TrackId,
-                    ArtistTrackRelationColumn::RelationType,
-                ])
-                .update_column(ArtistTrackRelationColumn::RelationValue)
-                .to_owned(),
-            )
+            .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
             .exec(db)
             .await?;
-
-        debug!("After tagging {:?}", task.file);
     }
 
     info!("Import done, took {:?}", start.elapsed());

@@ -50,6 +50,7 @@ regex = "1.6.0"
 strfmt = "0.2.2"
 serde_path_to_error = "0.1.8"
 uuid = "1.2.2"
+sea-orm-migration = "0.10.7"
 # ape = "0.4"
 
 [build-dependencies]

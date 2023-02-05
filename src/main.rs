@@ -14,8 +14,8 @@ use clap::{arg, Command};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use log::error;
-use migration::MigratorTrait;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm_migration::MigratorTrait;
 use std::sync::Arc;
 use std::{path::PathBuf, time::Duration};
 

@@ -2,7 +2,6 @@ use eyre::Report;
 use serde_derive::{Deserialize, Serialize};
 use setting::get_settings;
 use std::cmp::Ordering;
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::util::maybe_date;
@@ -183,7 +182,7 @@ impl From<ArtistCredit> for entity::ArtistCredit {
 
 pub struct TrackWithMediumId(pub Track, pub Uuid);
 
-impl From<TrackWithMediumId> for entity::FullTrack {
+impl From<TrackWithMediumId> for entity::full::FullTrack {
     fn from(TrackWithMediumId(track, medium_id): TrackWithMediumId) -> Self {
         let mut sorted_genres = track.recording.genres.unwrap_or_default();
         sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
@@ -221,7 +220,7 @@ impl From<TrackWithMediumId> for entity::FullTrack {
                 .map(|a| a.clone().into())
                 .collect(),
         );
-        entity::FullTrack {
+        entity::full::FullTrack {
             track: entity::Track {
                 id: track.id,
                 medium_id,
@@ -271,7 +270,7 @@ impl From<TrackWithMediumId> for entity::FullTrack {
     }
 }
 
-impl TryFrom<Release> for entity::FullRelease {
+impl TryFrom<Release> for entity::full::FullRelease {
     type Error = Report;
     fn try_from(release: Release) -> Result<Self, Self::Error> {
         let original_date = maybe_date(
@@ -281,7 +280,7 @@ impl TryFrom<Release> for entity::FullRelease {
                 .and_then(|r| r.first_release_date.clone()),
         );
         let label = release.label_info.first();
-        Ok(entity::FullRelease {
+        Ok(entity::full::FullRelease {
             release: entity::Release {
                 id: release.id,
                 title: release.title,

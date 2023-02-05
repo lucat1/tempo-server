@@ -13,7 +13,7 @@ use tag::id3;
 #[cfg(feature = "mp4")]
 use tag::mp4;
 
-use entity::TagKey;
+use tag::TagKey;
 use tag::{Picture, Tag, TagError, TagFrom};
 
 #[derive(Clone, Debug)]
