@@ -33,6 +33,7 @@ fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
     let release: entity::full::FullRelease = r.clone().try_into()?;
     let tracks: Vec<entity::full::FullTrack> = r
         .media
+        .unwrap_or_default()
         .into_iter()
         .enumerate()
         .filter_map(|(i, m)| {

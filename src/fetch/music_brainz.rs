@@ -19,7 +19,7 @@ pub struct Release {
     pub asin: Option<String>,
     pub date: Option<String>,
     pub id: Uuid,
-    pub media: Vec<Medium>,
+    pub media: Option<Vec<Medium>>,
     pub country: Option<String>,
     #[serde(rename = "text-representation")]
     pub text_representation: Option<TextRepresentation>,
@@ -308,6 +308,7 @@ impl TryFrom<Release> for entity::full::FullRelease {
             },
             medium: release
                 .media
+                .unwrap_or_default()
                 .iter()
                 .map(|m| entity::Medium {
                     id: m.id.unwrap_or_else(|| Uuid::new_v4()),

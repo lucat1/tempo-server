@@ -82,27 +82,24 @@ impl From<FullTrack> for FullTrackActive {
 }
 
 pub trait ArtistInfo {
-    fn artist(&self, id: Uuid) -> Option<&Artist>;
-    fn artists(&self) -> Result<Vec<&Artist>>;
-    fn joined_artists(&self) -> Result<String>;
+    fn get_artist(&self, id: Uuid) -> Option<&Artist>;
+    fn get_artists(&self) -> Result<Vec<&Artist>>;
+    fn get_joined_artists(&self) -> Result<String>;
 }
 
 impl ArtistInfo for FullRelease {
-    fn artist(&self, id: Uuid) -> Option<&Artist> {
-        let FullRelease { artist, .. } = self;
-        for artist in artist.iter() {
-            if artist.id == id {
-                return Some(artist);
-            }
-        }
-        None
+    fn get_artist(&self, id: Uuid) -> Option<&Artist> {
+        self.artist
+            .iter()
+            .position(|a| a.id == id)
+            .map(|i| &self.artist[i])
     }
 
-    fn artists(&self) -> Result<Vec<&Artist>> {
+    fn get_artists(&self) -> Result<Vec<&Artist>> {
         let FullRelease { artist_credit, .. } = self;
         let mut res = vec![];
         for credit in artist_credit.iter() {
-            if let Some(artist) = self.artist(credit.artist_id) {
+            if let Some(artist) = self.get_artist(credit.artist_id) {
                 res.push(artist);
             } else {
                 bail!("Artist credit referes to a missing artist id");
@@ -111,11 +108,11 @@ impl ArtistInfo for FullRelease {
         Ok(res)
     }
 
-    fn joined_artists(&self) -> Result<String> {
+    fn get_joined_artists(&self) -> Result<String> {
         let FullRelease { artist_credit, .. } = self;
         let mut s = String::new();
         for credit in artist_credit.iter() {
-            if let Some(artist) = self.artist(credit.artist_id) {
+            if let Some(artist) = self.get_artist(credit.artist_id) {
                 s += artist.name.as_str();
                 if let Some(join) = credit.join_phrase.as_ref() {
                     s += join.as_str();
@@ -128,22 +125,28 @@ impl ArtistInfo for FullRelease {
     }
 }
 
+impl FullRelease {
+    pub fn get_medium(&self, id: Uuid) -> Option<&Medium> {
+        self.medium
+            .iter()
+            .position(|m| m.id == id)
+            .map(|i| &self.medium[i])
+    }
+}
+
 impl ArtistInfo for FullTrack {
-    fn artist(&self, id: Uuid) -> Option<&Artist> {
-        let FullTrack { artist, .. } = self;
-        for artist in artist.iter() {
-            if artist.id == id {
-                return Some(artist);
-            }
-        }
-        None
+    fn get_artist(&self, id: Uuid) -> Option<&Artist> {
+        self.artist
+            .iter()
+            .position(|a| a.id == id)
+            .map(|i| &self.artist[i])
     }
 
-    fn artists(&self) -> Result<Vec<&Artist>> {
+    fn get_artists(&self) -> Result<Vec<&Artist>> {
         let FullTrack { artist_credit, .. } = self;
         let mut res = vec![];
         for credit in artist_credit.iter() {
-            if let Some(artist) = self.artist(credit.artist_id) {
+            if let Some(artist) = self.get_artist(credit.artist_id) {
                 res.push(artist);
             } else {
                 bail!("Artist credit referes to a missing artist id");
@@ -152,11 +155,11 @@ impl ArtistInfo for FullTrack {
         Ok(res)
     }
 
-    fn joined_artists(&self) -> Result<String> {
+    fn get_joined_artists(&self) -> Result<String> {
         let FullTrack { artist_credit, .. } = self;
         let mut s = String::new();
         for credit in artist_credit.iter() {
-            if let Some(artist) = self.artist(credit.artist_id) {
+            if let Some(artist) = self.get_artist(credit.artist_id) {
                 s += artist.name.as_str();
                 if let Some(join) = credit.join_phrase.as_ref() {
                     s += join.as_str();

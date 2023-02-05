@@ -1,7 +1,7 @@
 use crate::TagKey;
 use chrono::Datelike;
 use entity::full::{ArtistInfo, FullRelease, FullTrack};
-use eyre::Result;
+use eyre::{eyre, Result};
 use std::collections::HashMap;
 
 pub type TagMap = HashMap<TagKey, Vec<String>>;
@@ -15,7 +15,7 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
 
     // artists
     let artist_names: Vec<String> = full_track
-        .artists()?
+        .get_artists()?
         .into_iter()
         .map(|a| a.name.to_string())
         .collect();
@@ -24,7 +24,7 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(
         TagKey::MusicBrainzArtistID,
         full_track
-            .artists()?
+            .get_artists()?
             .into_iter()
             .map(|a| a.id.to_string())
             .collect(),
@@ -32,16 +32,13 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(
         TagKey::ArtistSortOrder,
         full_track
-            .artists()?
+            .get_artists()?
             .into_iter()
-            .map(|a| a.id.to_string())
+            .map(|a| a.sort_name.to_string())
             .collect(),
     );
+    map.insert(TagKey::MusicBrainzDiscID, vec![track.medium_id.to_string()]);
     map.insert(TagKey::Duration, vec![track.length.to_string()]);
-    // map.insert(TagKey::DiscNumber, vec![track.disc.to_string()]);
-    // if let Some(disc_mbid) = track.disc_mbid {
-    //     map.insert(TagKey::MusicBrainzDiscID, vec![disc_mbid]);
-    // }
     map.insert(TagKey::TrackNumber, vec![track.number.to_string()]);
     map.insert(TagKey::Genre, track.genres.0.clone());
     // map.insert(TagKey::Performer, track.performers);
@@ -111,7 +108,7 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     map.insert(
         TagKey::AlbumArtist,
         full_release
-            .artists()?
+            .get_artists()?
             .into_iter()
             .map(|a| a.name.to_string())
             .collect(),
@@ -119,7 +116,7 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     map.insert(
         TagKey::AlbumArtistSortOrder,
         full_release
-            .artists()?
+            .get_artists()?
             .into_iter()
             .map(|a| a.sort_name.clone())
             .collect(),
@@ -127,7 +124,7 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     map.insert(
         TagKey::MusicBrainzReleaseArtistID,
         full_release
-            .artists()?
+            .get_artists()?
             .into_iter()
             .map(|a| a.id.to_string())
             .collect(),
@@ -139,6 +136,33 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     );
     Ok(map)
 }
+
+pub fn tags_from_combination(full_release: &FullRelease, full_track: &FullTrack) -> Result<TagMap> {
+    let mut map = tags_from_full_release(full_release)?;
+    map.extend(tags_from_full_track(full_track)?);
+    let index = full_release
+        .medium
+        .iter()
+        .position(|m| m.id == full_track.track.medium_id)
+        .ok_or(eyre!("track references a missing medium"))?;
+    map.insert(TagKey::DiscNumber, vec![(index + 1).to_string()]);
+    Ok(map)
+}
+
+pub fn strs_from_combination(
+    full_release: &FullRelease,
+    full_track: &FullTrack,
+) -> Result<HashMap<String, String>> {
+    let src = tag_to_string_map(tags_from_combination(full_release, full_track)?);
+    let mut map = HashMap::new();
+    for (key, value) in src.into_iter() {
+        if let Some(val) = value.first() {
+            map.insert(key, val.to_string());
+        }
+    }
+    Ok(map)
+}
+
 pub fn tag_to_string_map(input: TagMap) -> StringMap {
     let mut map: StringMap = HashMap::new();
     for (k, v) in input.into_iter() {

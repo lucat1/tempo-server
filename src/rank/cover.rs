@@ -65,13 +65,13 @@ pub fn rank_covers(
                     - ((levenshtein(cover.title.as_str(), release.title.as_str())
                         + levenshtein(
                             cover.artist.as_str(),
-                            full_release.joined_artists().ok()?.as_str(),
+                            full_release.get_joined_artists().ok()?.as_str(),
                         )) as f64
                         / (cover.title.len().max(release.title.len())
                             + cover
                                 .artist
                                 .len()
-                                .max(full_release.joined_artists().ok()?.len()))
+                                .max(full_release.get_joined_artists().ok()?.len()))
                             as f64);
                 if cover.provider == ArtProvider::CoverArtArchive {
                     distance = 0.9; // TODO: better way? otherwise art from the CoverArtArchive always

@@ -1,4 +1,3 @@
-use dialoguer::{Confirm, Input, Select};
 use entity::conflict::{
     ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
     ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, MEDIUM_CONFLICT,
@@ -10,10 +9,15 @@ use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
     ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
+use setting::get_settings;
+use tag::{Picture, PictureType};
+
+use dialoguer::{Confirm, Input, Select};
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
+use rayon::prelude::*;
 use scan_dir::ScanDir;
-use sea_orm::EntityTrait;
+use sea_orm::{EntityTrait, TransactionTrait};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::canonicalize;
@@ -22,27 +26,37 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
-use tag::{tags_from_full_track, TagKey};
+use strfmt::strfmt;
+use tag::{strs_from_combination, tags_from_combination, TagKey};
 
-use crate::fetch::cover::Cover;
-use crate::fetch::cover::{get_cover, search_covers};
+use crate::fetch::cover::{get_cover, search_covers, Cover};
 use crate::fetch::{get, search, SearchResult};
 use crate::get_database;
 use crate::internal::Release;
-use crate::internal::Track;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
-use crate::util::dedup;
-use crate::util::{mkdirp, path_to_str};
-use setting::get_settings;
-use tag::{Picture, PictureType};
+use crate::util::{dedup, mkdirp, path_to_str};
 
 struct Job {
     file: TrackFile,
     dest: PathBuf,
     tags: HashMap<TagKey, Vec<String>>,
     cover: Option<Picture>,
+}
+
+pub fn track_path(full_release: &FullRelease, full_track: &FullTrack) -> Result<PathBuf> {
+    let settings = get_settings()?;
+    let vars = strs_from_combination(full_release, full_track)?;
+    let release_name = strfmt(settings.release_name.as_str(), &vars)?;
+    let track_name = strfmt(settings.track_name.as_str(), &vars)?
+        + "."
+        + full_track
+            .track
+            .format
+            .ok_or(eyre!("Track is missing file format"))?
+            .ext();
+    Ok(settings.library.join(release_name).join(track_name))
 }
 
 pub fn write_picture<P>(picture: &Picture, root: P) -> Result<()>
@@ -81,7 +95,7 @@ async fn ask(
     let FullRelease { release, .. } = &candidate_release;
     info!(
         "Tagging as {} - {} ({})",
-        candidate_release.joined_artists()?,
+        candidate_release.get_joined_artists()?,
         release.title,
         release.id
     );
@@ -144,7 +158,6 @@ fn ask_cover(theme: &DialoguerTheme, covers: Vec<CoverRating>) -> Option<Cover> 
 }
 
 pub async fn import(path: &PathBuf) -> Result<()> {
-    let start = Instant::now();
     let settings = get_settings()?;
     let theme = DialoguerTheme::default();
 
@@ -165,7 +178,6 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         bail!("No tracks to import were found");
     }
     let source_release: Release = tracks.clone().into();
-    let source_tracks: Vec<Track> = tracks.iter().map(|t| t.clone().into()).collect();
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
     // see here for the previous implementation:
     // https://codeberg.org/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
@@ -209,8 +221,8 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let covers_by_provider = search_covers(&full_release).await?;
     let covers = rank_covers(covers_by_provider, &full_release);
     let maybe_cover = ask_cover(&theme, covers);
+    let mut start = Instant::now();
     let mut maybe_picture: Option<Picture> = None;
-    // let release_path = full_release.0.filename()?;
     if let Some(cover) = maybe_cover {
         let (image, mime) = get_cover(cover.url).await?;
         let picture = Picture {
@@ -223,19 +235,19 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     } else {
         warn!("No album art found")
     }
-    let tasks: Vec<Job> = map
+    let mut tasks: Vec<Job> = map
         .iter()
         .enumerate()
         .map(|(i, map)| -> Result<Job> {
             let mut track: FullTrack = full_tracks[*map].clone();
             // let dest_path = release_path.join(full_tracks[*map].0.filename()?.as_os_str());
-            let dest_path = "tmp/file.flac".into();
+            let dest_path = format!("tmp/{}.flac", i).into();
             track.track.format = Some(tracks[i].format);
             track.track.path = Some(path_to_str(&dest_path)?);
             Ok(Job {
                 file: tracks[i].clone(),
-                dest: dest_path,
-                tags: tags_from_full_track(&track)?,
+                dest: track_path(&full_release, &track)?,
+                tags: tags_from_combination(&full_release, &track)?,
                 cover: maybe_picture.clone(),
             })
         })
@@ -256,44 +268,51 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     for dest in folders.iter() {
         mkdirp(dest)?;
     }
-    if let Some(picture) = maybe_picture {
+    if let Some(ref picture) = maybe_picture {
         for dest in folders.into_iter() {
             write_picture(&picture, &dest)?;
         }
     }
 
-    for task in tasks.into_iter() {
-        debug!("Beofre tagging {:?}", task.file);
-        // task.file.duplicate_to(&task.dest_path).wrap_err(eyre!(
-        //     "Could not copy track {:?} to its new location: {:?}",
-        //     task.file.path,
-        //     path
-        // ))?;
-        // if settings.tagging.clear {
-        //     task.file
-        //         .clear()
-        //         .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
-        // }
-        // task.file
-        //     .apply(task.track.clone().try_into()?)
-        //     .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
-        // if let Some(ref picture) = maybe_picture {
-        //     task.file.set_pictures(vec![picture.clone()])?;
-        // }
-        // task.file
-        //     .write()
-        //     .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
-        // TODO: store in the db
-        // task.store().await?;
+    let mut results: Vec<Result<()>> = vec![];
+    tasks
+        .par_iter_mut()
+        .map(|task: &mut Job| -> Result<()> {
+            debug!("Beofre tagging {:?}", task.file);
+            task.file.duplicate_to(&task.dest).wrap_err(eyre!(
+                "Could not copy track {:?} to its new location: {:?}",
+                task.file.path,
+                path
+            ))?;
+            if settings.tagging.clear {
+                task.file
+                    .clear()
+                    .wrap_err(eyre!("Could not celar tracks from file: {:?}", path))?;
+            }
+            task.file
+                .apply(task.tags.clone().try_into()?)
+                .wrap_err(eyre!("Could not apply new tags to track: {:?}", path))?;
+            if let Some(ref picture) = task.cover {
+                task.file.set_pictures(vec![picture.clone()])?;
+            }
+            task.file
+                .write()
+                .wrap_err(eyre!("Could not write tags to track: {:?}", path))?;
 
-        debug!("After tagging {:?}", task.file);
+            debug!("After tagging {:?}", task.file);
+            Ok(())
+        })
+        .collect_into_vec(&mut results);
+    for res in results.into_iter() {
+        if let Err(e) = res {
+            bail!(e.wrap_err("While trying to move and apply tags to a track file"));
+        }
     }
-    info!(
-        "Moving done, took {:?}. Now writing to the library database",
-        start.elapsed()
-    );
 
-    let db = get_database()?;
+    info!("Tracks moved. (took {:?})", start.elapsed());
+    start = Instant::now();
+
+    let tx = get_database()?.begin().await?;
     let FullReleaseActive {
         release: release_active,
         medium: medium_active,
@@ -304,23 +323,23 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     } = full_release.into();
     ArtistEntity::insert_many(artist_active)
         .on_conflict(ARTIST_CONFLICT.to_owned())
-        .exec(db)
+        .exec(&tx)
         .await?;
     ReleaseEntity::insert(release_active)
         .on_conflict(RELEASE_CONFLICT.to_owned())
-        .exec(db)
+        .exec(&tx)
         .await?;
     ArtistCreditEntity::insert_many(artist_credit_active)
         .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-        .exec(db)
+        .exec(&tx)
         .await?;
     ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
         .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
-        .exec(db)
+        .exec(&tx)
         .await?;
     MediumEntity::insert_many(medium_active)
         .on_conflict(MEDIUM_CONFLICT.to_owned())
-        .exec(db)
+        .exec(&tx)
         .await?;
     for track in full_tracks.into_iter() {
         let FullTrackActive {
@@ -332,26 +351,27 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }: FullTrackActive = track.into();
         ArtistEntity::insert_many(artist_active)
             .on_conflict(ARTIST_CONFLICT.to_owned())
-            .exec(db)
+            .exec(&tx)
             .await?;
         ArtistCreditEntity::insert_many(artist_credit_active)
             .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-            .exec(db)
+            .exec(&tx)
             .await?;
         TrackEntity::insert(track_active)
             .on_conflict(TRACK_CONFLICT.to_owned())
-            .exec(db)
+            .exec(&tx)
             .await?;
         ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
             .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
-            .exec(db)
+            .exec(&tx)
             .await?;
         ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
             .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
-            .exec(db)
+            .exec(&tx)
             .await?;
     }
+    tx.commit().await?;
 
-    info!("Import done, took {:?}", start.elapsed());
+    info!("Tracks added. (took {:?})", start.elapsed());
     Ok(())
 }
