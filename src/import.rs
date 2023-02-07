@@ -28,11 +28,12 @@ use std::str::FromStr;
 use std::time::Instant;
 use strfmt::strfmt;
 use tag::{strs_from_combination, tags_from_combination, TagKey};
+use text_diff::{diff, Difference};
 
 use crate::fetch::cover::{get_cover, search_covers, Cover};
 use crate::fetch::{get, search, SearchResult};
 use crate::get_database;
-use crate::internal::Release;
+use crate::internal;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
@@ -85,26 +86,67 @@ fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
         })
 }
 
+pub fn print_diff(orig: &str, edit: &str) -> String {
+    let (_, changeset) = diff(orig, edit, "");
+    let mut ret = String::new();
+
+    for seq in changeset {
+        match seq {
+            Difference::Same(ref x) => {
+                ret.push_str(x);
+            }
+            Difference::Add(ref x) => {
+                ret.push_str("\x1B[92m");
+                ret.push_str(x);
+                ret.push_str("\x1B[0m");
+            }
+            Difference::Rem(ref x) => {
+                ret.push_str("\x1B[91m");
+                ret.push_str(x);
+                ret.push_str("\x1B[0m");
+            }
+        }
+    }
+    ret
+}
+
 async fn ask(
     theme: &DialoguerTheme,
     original_tracks: &Vec<TrackFile>,
     search_result: SearchResult,
-    matching: Vec<usize>,
+    map: Vec<usize>,
 ) -> Result<(bool, SearchResult, Vec<usize>)> {
-    let SearchResult(candidate_release, _) = &search_result;
+    let SearchResult(candidate_release, candidate_tracks) = &search_result;
     let FullRelease { release, .. } = &candidate_release;
+    let source_release: internal::Release = original_tracks.clone().into();
+    info!("Tagging as:");
     info!(
-        "Tagging as {} - {} ({})",
-        candidate_release.get_joined_artists()?,
-        release.title,
+        "Artist: {}",
+        print_diff(
+            source_release.artists.join(", ").as_str(), // TODO
+            candidate_release.get_joined_artists()?.as_str(),
+        )
+    );
+    info!(
+        "Title: {} ({})",
+        print_diff(source_release.title.as_str(), release.title.as_str()),
         release.id
     );
+    info!("Tracks:");
+    for (i, j) in map.iter().enumerate() {
+        let src_track: internal::Track = original_tracks[i].clone().into();
+        let out_track: internal::Track = candidate_tracks[*j].clone().into();
+        info!(
+            " * {}",
+            print_diff(src_track.title.as_str(), out_track.title.as_str())
+        );
+    }
     let ch = Input::<char>::with_theme(theme)
         .with_prompt("Proceed? [y]es, [n]o, [i]d")
         .interact()
         .map_err(|_| eyre!("Aborted"))?;
     match ch {
-        'y' => Ok((true, search_result.clone(), matching)),
+        'y' => Ok((true, search_result.clone(), map)),
         'n' => Err(eyre!("Aborted")),
         'i' => {
             let id: String = Input::with_theme(theme)
@@ -117,7 +159,7 @@ async fn ask(
         }
         v => {
             warn!("Invalid choice: {}", v);
-            Ok((false, search_result, matching))
+            Ok((false, search_result, map))
         }
     }
 }
@@ -126,15 +168,25 @@ fn ask_cover(theme: &DialoguerTheme, covers: Vec<CoverRating>) -> Option<Cover> 
     let CoverRating(match_rank, mut cover) = covers.first()?.clone();
     let mut index: usize = 0;
     info!(
-        "Using cover art for release {} - {} from {} ({}x{}, diff: {})",
-        cover.artist, cover.title, cover.provider, cover.width, cover.height, match_rank
+        "Using cover art for release {} - {} from {} ({}x{}, matching: {:.2}%)",
+        cover.artist,
+        cover.title,
+        cover.provider,
+        cover.width,
+        cover.height,
+        match_rank * 100.0
     );
     let covers_strs: Vec<String> = covers
         .iter()
         .map(|CoverRating(r, c)| {
             format!(
-                "{}x{} for release {} - {} from {} (diff: {})",
-                c.width, c.height, c.artist, c.title, c.provider, r
+                "{}x{} for release {} - {} from {} (matching: {:.2}%)",
+                c.width,
+                c.height,
+                c.artist,
+                c.title,
+                c.provider,
+                r * 100.0
             )
         })
         .collect();
@@ -177,7 +229,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     if tracks.is_empty() {
         bail!("No tracks to import were found");
     }
-    let source_release: Release = tracks.clone().into();
+    let source_release: internal::Release = tracks.clone().into();
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
     // see here for the previous implementation:
     // https://codeberg.org/lucat1/tagger/blob/33fa9789ae4e38296edcdfc08270adda6c248529/src/import.rs#L33
@@ -274,10 +326,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         }
     }
 
-    let mut results: Vec<Result<()>> = vec![];
     tasks
         .par_iter_mut()
-        .map(|task: &mut Job| -> Result<()> {
+        .try_for_each(|task: &mut Job| -> Result<()> {
             debug!("Beofre tagging {:?}", task.file);
             task.file.duplicate_to(&task.dest).wrap_err(eyre!(
                 "Could not copy track {:?} to its new location: {:?}",
@@ -301,15 +352,9 @@ pub async fn import(path: &PathBuf) -> Result<()> {
 
             debug!("After tagging {:?}", task.file);
             Ok(())
-        })
-        .collect_into_vec(&mut results);
-    for res in results.into_iter() {
-        if let Err(e) = res {
-            bail!(e.wrap_err("While trying to move and apply tags to a track file"));
-        }
-    }
+        })?;
 
-    info!("Tracks moved. (took {:?})", start.elapsed());
+    info!("Tracks moved (took {:?})", start.elapsed());
     start = Instant::now();
 
     let tx = get_database()?.begin().await?;
@@ -372,6 +417,6 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     }
     tx.commit().await?;
 
-    info!("Tracks added. (took {:?})", start.elapsed());
+    info!("Tracks added (took {:?})", start.elapsed());
     Ok(())
 }

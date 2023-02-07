@@ -52,4 +52,5 @@ serde_path_to_error = "0.1.8"
 uuid = { version = "1.2.2", features = ["v4"] }
 sea-orm-migration = "0.11.0-rc.2"
 rayon = "1.6.1"
+text-diff = "0.4.0"
 # ape = "0.4"

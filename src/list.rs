@@ -1,9 +1,12 @@
 use crate::get_database;
-use entity::{ArtistCreditEntity, ArtistEntity, ReleaseEntity};
+use entity::{
+    ArtistCreditEntity, ArtistEntity, ArtistTrackRelationEntity, MediumEntity, ReleaseEntity,
+    TrackEntity,
+};
 
 use eyre::{bail, eyre, Result};
 use log::info;
-use sea_orm::{EntityTrait, LoaderTrait};
+use sea_orm::{EntityTrait, LoaderTrait, ModelTrait};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -71,18 +74,35 @@ pub async fn list(
                 }
                 println!("{}", str);
             }
-            // let mut vars = HashMap::new();
-            // for artist in artists.into_iter() {
-            //     vars.clear();
-            //     vars.insert("name".to_string(), artist.name);
-            //     vars.insert("sort_name".to_string(), artist.sort_name);
-            //     println!(
-            //         "{}",
-            //         strfmt(format.map_or(DEFAULT_FORMAT_ARTIST, |s| s.as_str()), &vars)?
-            //     );
-            // }
         }
-        "track" | "tracks" => {}
+        "track" | "tracks" => {
+            let tracks = TrackEntity::find()
+                .find_with_related(ArtistCreditEntity)
+                .all(db)
+                .await?;
+            // let mut vars = HashMap::new();
+            for (track, artist_credit) in tracks.into_iter() {
+                let artist = artist_credit.load_one(ArtistEntity, db).await?;
+                let artist_track_relation = track
+                    .find_related(ArtistTrackRelationEntity)
+                    .all(db)
+                    .await?;
+                let medium = track
+                    .find_related(MediumEntity)
+                    .one(db)
+                    .await?
+                    .ok_or(eyre!("Track has no associated medium"))?;
+                let release = medium
+                    .find_related(ReleaseEntity)
+                    .one(db)
+                    .await?
+                    .ok_or(eyre!("Medium has no associated release"))?;
+                // println!(
+                //     "{}",
+                //     strfmt(format.map_or(DEFAULT_FORMAT_ARTIST, |s| s.as_str()), &vars)?
+                // );
+            }
+        }
 
         "release" | "releases" => (),
         _ => {

@@ -1,5 +1,5 @@
 use crate::*;
-use eyre::bail;
+use eyre::{bail, eyre};
 
 #[derive(Debug, Clone)]
 pub struct FullRelease {
@@ -169,5 +169,18 @@ impl ArtistInfo for FullTrack {
             }
         }
         Ok(s)
+    }
+}
+
+impl FullTrack {
+    pub fn get_related(&self, relation_type: RelationType) -> Result<Vec<&Artist>> {
+        self.artist_track_relation
+            .iter()
+            .filter(|atr| atr.relation_type == relation_type)
+            .map(|atr| {
+                self.get_artist(atr.artist_id)
+                    .ok_or(eyre!("Track has a non existant related artist"))
+            })
+            .collect()
     }
 }

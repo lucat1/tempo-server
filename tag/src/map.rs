@@ -1,11 +1,22 @@
 use crate::TagKey;
 use chrono::Datelike;
-use entity::full::{ArtistInfo, FullRelease, FullTrack};
+use entity::{
+    full::{ArtistInfo, FullRelease, FullTrack},
+    Artist, RelationType,
+};
 use eyre::{eyre, Result};
 use std::collections::HashMap;
 
 pub type TagMap = HashMap<TagKey, Vec<String>>;
 pub type StringMap = HashMap<String, Vec<String>>;
+
+fn artist_names(artists: Vec<&Artist>) -> Vec<String> {
+    artists
+        .into_iter()
+        .into_iter()
+        .map(|a| a.name.to_string())
+        .collect()
+}
 
 pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     let FullTrack { track, .. } = &full_track;
@@ -13,18 +24,13 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(TagKey::MusicBrainzTrackID, vec![track.id.to_string()]);
     map.insert(TagKey::TrackTitle, vec![track.title.clone()]);
 
-    // artists
-    let artist_names: Vec<String> = full_track
-        .get_artists()?
-        .into_iter()
-        .map(|a| a.name.to_string())
-        .collect();
-    map.insert(TagKey::Artists, artist_names.clone());
-    map.insert(TagKey::Artist, artist_names);
+    map.insert(TagKey::Artists, artist_names(full_track.get_artists()?));
+    map.insert(TagKey::Artist, artist_names(full_track.get_artists()?));
     map.insert(
         TagKey::MusicBrainzArtistID,
         full_track
             .get_artists()?
+            .into_iter()
             .into_iter()
             .map(|a| a.id.to_string())
             .collect(),
@@ -41,14 +47,42 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(TagKey::Duration, vec![track.length.to_string()]);
     map.insert(TagKey::TrackNumber, vec![track.number.to_string()]);
     map.insert(TagKey::Genre, track.genres.0.clone());
-    // map.insert(TagKey::Performer, track.performers);
-    // map.insert(TagKey::Engineer, track.engigneers);
-    // map.insert(TagKey::Mixer, track.mixers);
-    // map.insert(TagKey::Producer, track.producers);
-    // map.insert(TagKey::Lyricist, track.lyricists);
-    // map.insert(TagKey::Writer, track.writers);
-    // map.insert(TagKey::Composer, track.composers);
-    // map.insert(TagKey::ComposerSortOrder, track.composers);
+    map.insert(
+        TagKey::Performer,
+        artist_names(full_track.get_related(RelationType::Performer)?),
+    );
+    map.insert(
+        TagKey::Engineer,
+        artist_names(full_track.get_related(RelationType::Engineer)?),
+    );
+    map.insert(
+        TagKey::Mixer,
+        artist_names(full_track.get_related(RelationType::Mix)?),
+    );
+    map.insert(
+        TagKey::Producer,
+        artist_names(full_track.get_related(RelationType::Producer)?),
+    );
+    map.insert(
+        TagKey::Lyricist,
+        artist_names(full_track.get_related(RelationType::Lyricist)?),
+    );
+    map.insert(
+        TagKey::Writer,
+        artist_names(full_track.get_related(RelationType::Writer)?),
+    );
+    map.insert(
+        TagKey::Composer,
+        artist_names(full_track.get_related(RelationType::Composer)?),
+    );
+    map.insert(
+        TagKey::ComposerSortOrder,
+        full_track
+            .get_related(RelationType::Composer)?
+            .into_iter()
+            .map(|a| a.sort_name.to_string())
+            .collect(),
+    );
     Ok(map)
 }
 

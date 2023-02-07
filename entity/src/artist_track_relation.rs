@@ -5,7 +5,7 @@ use uuid::Uuid;
 #[sea_orm(rs_type = "i8", db_type = "Integer")]
 pub enum RelationType {
     #[sea_orm(num_value = 0)]
-    Engigneer,
+    Engineer,
     #[sea_orm(num_value = 1)]
     Instrument,
     #[sea_orm(num_value = 2)]
@@ -31,7 +31,7 @@ pub enum RelationType {
 impl From<String> for RelationType {
     fn from(str: String) -> Self {
         match str.as_str() {
-            "engigneer" => Self::Engigneer,
+            "engineer" => Self::Engineer,
             "instrument" => Self::Instrument,
             "performer" => Self::Performer,
             "mix" => Self::Mix,
