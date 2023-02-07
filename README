@@ -2,8 +2,9 @@ A music tagger pulling metadata from MusicBrainz and album arts from a iTunes
 and CoverArtArchive (more to come). Multi-valued tags support is a first-class
 citizen along with speedy performance (compared to Beets).
 
-You can find prebuild releases for Linux x86_64 on the Releases page. If you are
-on a different platform (for now) compiling from source is the only option:
+You can find prebuild releases for Linux x86_64, aarch64, i686 on the Releases
+page. If you are on a different platform (for now) compiling from source is the
+only option:
 
 $ cargo build --release
 
