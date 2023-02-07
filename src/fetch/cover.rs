@@ -1,19 +1,52 @@
-use crate::fetch::structures::Itunes;
-use crate::models::Artists;
-use crate::settings::ArtProvider;
-use crate::{Settings, SETTINGS};
+use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::ImageOutputFormat;
 use image::{io::Reader as ImageReader, DynamicImage};
+use itertools::Itertools;
 use log::{debug, trace};
 use mime::Mime;
+use serde::{Deserialize, Serialize};
+use setting::{get_settings, ArtProvider, Settings};
+use std::cmp::Ordering;
 use std::io::Cursor;
 use std::time::Instant;
 
-use super::structures::Cover;
-use super::structures::CoverArtArchive;
+use super::cover_art_archive::CoverArtArchive;
+use super::itunes::Itunes;
 use super::CLIENT;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cover {
+    pub provider: ArtProvider,
+    pub url: String,
+    pub width: usize,
+    pub height: usize,
+    pub title: String,
+    pub artist: String,
+}
+
+// Covers are sorted by picture size
+impl Ord for Cover {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s1 = self.width * self.height;
+        let s2 = other.width * other.height;
+        s1.cmp(&s2)
+    }
+}
+
+impl PartialOrd for Cover {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Cover {
+    fn eq(&self, other: &Self) -> bool {
+        self.width * self.height == other.width * other.height
+    }
+}
+impl Eq for Cover {}
 
 static DEFAULT_COUNTRY: &str = "US";
 static ITUNES_COUNTRIES: &[&str] = &[
@@ -33,20 +66,29 @@ pub async fn probe(url: String) -> Option<()> {
     CLIENT.head(url).send().await.ok().map(|_| ())
 }
 
-pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Result<Vec<Cover>> {
+pub async fn fetch_itunes(release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
+    let FullRelease {
+        release, artist, ..
+    } = release;
     let start = Instant::now();
-    let raw_country = release.country.as_deref().unwrap_or(DEFAULT_COUNTRY);
-    let country = if ITUNES_COUNTRIES.contains(&raw_country) {
-        raw_country
+    let raw_country = release
+        .country
+        .clone()
+        .unwrap_or(DEFAULT_COUNTRY.to_string());
+    let country = if ITUNES_COUNTRIES.contains(&raw_country.as_str()) {
+        raw_country.as_str()
     } else {
         DEFAULT_COUNTRY
     };
 
+    // TODO: make "," configurable
     let res = CLIENT
         .get(format!(
             "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
             country,
-            release.artists.joined() + " " + release.title.as_str()
+            artist.into_iter().map(|a| a.name.clone()).join(",")
+                + " "
+                + release.title.clone().as_str()
         ))
         .send()
         .await?;
@@ -80,9 +122,12 @@ pub async fn fetch_itunes(release: &crate::models::Release, _: &Settings) -> Res
 }
 
 pub async fn fetch_cover_art_archive(
-    release: &crate::models::Release,
+    full_release: &FullRelease,
     settings: &Settings,
 ) -> Result<Vec<Cover>> {
+    let FullRelease {
+        release, artist, ..
+    } = full_release;
     let start = Instant::now();
     let res = CLIENT
         .get(format!(
@@ -93,13 +138,9 @@ pub async fn fetch_cover_art_archive(
                 "release"
             },
             if settings.art.cover_art_archive_use_release_group {
-                release.release_group_mbid.clone().ok_or(eyre!(
-                    "The given release doesn't have an associated MusicBrainz relese-group id"
-                ))?
+                release.release_group_id.unwrap_or(release.id)
             } else {
-                release.mbid.clone().ok_or(eyre!(
-                    "The given release doesn't have an associated MusicBrainz id"
-                ))?
+                release.id
             }
         ))
         .send()
@@ -116,11 +157,15 @@ pub async fn fetch_cover_art_archive(
     let json = res.json::<CoverArtArchive>().await?;
     let json_time = start.elapsed();
     trace!("CoverArtArchive JSON parse took {:?}", json_time - req_time);
-    Ok(json.into(release.title.clone(), release.artists.joined()))
+    // TODO: make the "," configurable
+    Ok(json.into(
+        release.title.clone(),
+        artist.into_iter().map(|a| a.name.clone()).join(","),
+    ))
 }
 
-pub async fn search_covers(release: &crate::models::Release) -> Result<Vec<Vec<Cover>>> {
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+pub async fn search_covers(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
+    let settings = get_settings()?;
     let mut v = vec![];
     for provider in settings.art.providers.iter() {
         let res = match *provider {
@@ -144,7 +189,7 @@ pub async fn search_covers(release: &crate::models::Release) -> Result<Vec<Vec<C
 
 pub async fn get_cover(url: String) -> Result<(Vec<u8>, Mime)> {
     let start = Instant::now();
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let settings = get_settings()?;
     let res = CLIENT.get(url).send().await?;
     let req_time = start.elapsed();
     trace!("Fetch request for cover art took {:?}", req_time);

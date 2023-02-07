@@ -1,22 +1,19 @@
-extern crate metaflac;
-
-use super::key::TagKey;
-use super::picture::{Picture, PictureType};
+use crate::picture::{Picture, PictureType};
+use crate::TagKey;
 use core::convert::AsRef;
+use entity::TrackFormat;
 use eyre::{eyre, Result};
 use metaflac::block::PictureType as FLACPictureType;
 use std::collections::HashMap;
 use std::path::Path;
-
-use super::format::Format;
 
 #[derive(Clone)]
 pub struct Tag {
     tag: metaflac::Tag,
 }
 
-impl crate::track::TagFrom for Tag {
-    fn from_path<P>(path: P) -> Result<Box<dyn crate::track::Tag>>
+impl crate::TagFrom for Tag {
+    fn from_path<P>(path: P) -> Result<Box<dyn crate::Tag>>
     where
         P: AsRef<Path>,
     {
@@ -26,7 +23,7 @@ impl crate::track::TagFrom for Tag {
     }
 }
 
-impl crate::track::Tag for Tag {
+impl crate::Tag for Tag {
     fn clear(&mut self) -> Result<()> {
         let map = self.get_all();
         for key in map.keys() {
@@ -35,8 +32,8 @@ impl crate::track::Tag for Tag {
         self.set_pictures(vec![])?;
         Ok(())
     }
-    fn format(&self) -> Format {
-        Format::Flac
+    fn format(&self) -> TrackFormat {
+        TrackFormat::Flac
     }
     fn separator(&self) -> Option<String> {
         None

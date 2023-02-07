@@ -1,15 +1,21 @@
+use async_once_cell::OnceCell;
 use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
+use lazy_static::lazy_static;
 use log::trace;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
 
-use crate::{CLI_NAME, SETTINGS};
+lazy_static! {
+    pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
+}
 
+const CLI_NAME: &str = "tagger";
 static DEFAULT_DB_FILE: &str = "lib.db";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -18,6 +24,8 @@ pub struct Settings {
     pub library: PathBuf,
     #[serde(default)]
     pub db: PathBuf,
+    #[serde(default = "default_release_name")]
+    pub release_name: String,
     #[serde(default = "default_track_name")]
     pub track_name: String,
 
@@ -27,9 +35,12 @@ pub struct Settings {
     pub art: Art,
 }
 
+fn default_release_name() -> String {
+    "{album_artist}/{album} ({release_year}) ({release_type})".to_string()
+}
+
 fn default_track_name() -> String {
-    "{album_artist}/{album} ({release_year}) ({release_type})/{disc_number} - {track_number} - {track_title}"
-                    .to_string()
+    "{disc_number} - {track_number} - {track_title}".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +48,7 @@ pub struct Tagging {
     #[serde(default = "default_true")]
     pub clear: bool,
     #[serde(default)]
-    pub genre_limit: Option<usize>,
+    pub genre_limit: Option<usize>, // TODO: reimplement genre limits
     #[serde(default = "default_true")]
     pub use_original_date: bool,
 
@@ -211,8 +222,12 @@ pub fn load() -> Result<Settings> {
     Ok(set)
 }
 
+pub fn get_settings() -> Result<&'static Settings> {
+    SETTINGS.get().ok_or(eyre!("Could not get settings"))
+}
+
 pub fn print() -> Result<()> {
-    let settings = SETTINGS.get().ok_or(eyre!("Could not read settings"))?;
+    let settings = get_settings()?;
     print!("{}", toml::to_string(settings)?);
     Ok(())
 }

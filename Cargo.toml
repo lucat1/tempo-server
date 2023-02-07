@@ -5,15 +5,21 @@ edition = "2021"
 
 [features]
 default = ["flac", "id3"]
-ape = []
-flac = []
-id3 = []
-mp4 = []
+ape = ["tag/ape"]
+flac = ["tag/flac"]
+id3 = ["tag/id3"]
+mp4 = ["tag/mp4"]
+
+[workspace]
+members = [".", "entity", "tag", "migration"]
 
 [dependencies]
+setting = { path = "setting" }
+entity = { path = "entity" }
+tag = { path = "tag" }
+migration = { path = "migration" }
+
 clap = "3.2"
-directories = "4.0"
-toml = "0.5"
 eyre = "0.6"
 color-eyre = "0.6"
 scan_dir = "0.3"
@@ -21,7 +27,6 @@ const_format = "0.2"
 levenshtein = "1.0"
 log = "0.4"
 env_logger = "0.9"
-infer = "0.9"
 pathfinding = "0.7"
 image = "0.24.3"
 async-once-cell = "0.4"
@@ -37,19 +42,15 @@ futures = "0.3"
 serde = { version = "1.0", features = ["rc"] }
 itertools = "0.10.4"
 serde_derive = { version = "1.0" }
-sqlx = { version = "0.6.1", features = ["sqlite","runtime-tokio-rustls", "chrono"] }
-sqlx-migrate = { git = "https://github.com/lucat1/sqlx-migrate", features = ["sqlite"] }
+sea-orm = { version = "0.11.0-rc.2", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time" ] }
 
-metaflac = "0.2"
-mp4ameta = "0.11"
-id3 = "1.3"
-ape = { git = "https://github.com/lucat1/rust-ape" }
 mime = "0.3.16"
 serde_json = "1.0.85"
 regex = "1.6.0"
 strfmt = "0.2.2"
 serde_path_to_error = "0.1.8"
+uuid = { version = "1.2.2", features = ["v4"] }
+sea-orm-migration = "0.11.0-rc.2"
+rayon = "1.6.1"
+text-diff = "0.4.0"
 # ape = "0.4"
-
-[build-dependencies]
-sqlx-migrate = { git = "https://github.com/lucat1/sqlx-migrate", features = ["generate"] }

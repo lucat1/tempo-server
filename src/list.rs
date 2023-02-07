@@ -1,10 +1,19 @@
-use crate::library::Filter;
-use crate::models::{Artist, Format, Release, Track};
-use eyre::{bail, Result};
-use log::info;
-use std::time::Instant;
+use crate::get_database;
+use entity::{
+    ArtistCreditEntity, ArtistEntity, ArtistTrackRelationEntity, MediumEntity, ReleaseEntity,
+    TrackEntity,
+};
 
-static DEFAULT_FORMAT_ARTIST: &str = "{name} {join_phrase}";
+use eyre::{bail, eyre, Result};
+use log::info;
+use sea_orm::{EntityTrait, LoaderTrait, ModelTrait};
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::time::Instant;
+use strfmt::strfmt;
+
+static DEFAULT_FORMAT_ARTIST: &str = "{name} ({sort_name})";
+static DEFAULT_FORMAT_ALBUM_ARTIST: &str = "{join_phrase}{name}";
 static DEFAULT_FORMAT_TRACK: &str = "{album_artist} - {album} - {track_title}";
 static DEFAULT_FORMAT_RELEASE: &str = "{album_artist} - {album} ({release_year}) ({release_type})";
 
@@ -15,42 +24,91 @@ pub async fn list(
 ) -> Result<()> {
     let start = Instant::now();
     let object = object.map_or("track", |s| s.as_str());
-    let (objects, format) = match object {
-        "artist" | "artists" => (
-            Artist::filter::<String, String>(vec![], vec![" ORDER BY sort_name".to_string()])
-                .await?
-                .into_iter()
-                .map(|a| Box::new(a) as Box<dyn Format>)
-                .collect::<Vec<_>>(),
-            format.map_or(DEFAULT_FORMAT_ARTIST, |s| s.as_str()),
-        ),
+    let db = get_database()?;
+    match object {
+        "artist" | "artists" => {
+            let artists = ArtistEntity::find().all(db).await?;
+            let mut vars = HashMap::new();
+            for artist in artists.into_iter() {
+                vars.clear();
+                vars.insert("name".to_string(), artist.name);
+                vars.insert("sort_name".to_string(), artist.sort_name);
+                println!(
+                    "{}",
+                    strfmt(format.map_or(DEFAULT_FORMAT_ARTIST, |s| s.as_str()), &vars)?
+                );
+            }
+        }
+        "album_artist" | "album_artists" => {
+            let releases = ReleaseEntity::find()
+                .find_with_related(ArtistCreditEntity)
+                .all(db)
+                .await?;
+            let mut vars = HashMap::new();
+            for (_, mut artist_credits) in releases.into_iter() {
+                let artists = artist_credits.load_one(ArtistEntity, db).await?;
+                let mut str = String::new();
+                // TODO: consider the need for this
+                artist_credits.sort_by(|a, b| -> Ordering {
+                    a.join_phrase
+                        .as_ref()
+                        .map_or(0, |s| s.len())
+                        .cmp(&b.join_phrase.as_ref().map_or(0, |s| s.len()))
+                });
+                for (i, artist_credit) in artist_credits.into_iter().enumerate() {
+                    vars.clear();
+                    let artist = artists[i]
+                        .clone()
+                        .ok_or(eyre!("Missing artist information"))?;
+                    vars.insert("name".to_string(), artist.name);
+                    vars.insert("sort_name".to_string(), artist.sort_name);
+                    vars.insert(
+                        "join_phrase".to_string(),
+                        artist_credit.join_phrase.unwrap_or_default(),
+                    );
+                    str += strfmt(
+                        format.map_or(DEFAULT_FORMAT_ALBUM_ARTIST, |s| s.as_str()),
+                        &vars,
+                    )?
+                    .as_str();
+                }
+                println!("{}", str);
+            }
+        }
         "track" | "tracks" => {
-            let track = Track::filter::<String, String>(
-                vec![],
-                vec![" ORDER BY tracks.release, tracks.disc, tracks.number".to_string()],
-            )
-            .await?
-            .into_iter()
-            .map(|t| Box::new(t) as Box<dyn Format>)
-            .collect();
-            (track, format.map_or(DEFAULT_FORMAT_TRACK, |s| s.as_str()))
+            let tracks = TrackEntity::find()
+                .find_with_related(ArtistCreditEntity)
+                .all(db)
+                .await?;
+            // let mut vars = HashMap::new();
+            for (track, artist_credit) in tracks.into_iter() {
+                let artist = artist_credit.load_one(ArtistEntity, db).await?;
+                let artist_track_relation = track
+                    .find_related(ArtistTrackRelationEntity)
+                    .all(db)
+                    .await?;
+                let medium = track
+                    .find_related(MediumEntity)
+                    .one(db)
+                    .await?
+                    .ok_or(eyre!("Track has no associated medium"))?;
+                let release = medium
+                    .find_related(ReleaseEntity)
+                    .one(db)
+                    .await?
+                    .ok_or(eyre!("Medium has no associated release"))?;
+                // println!(
+                //     "{}",
+                //     strfmt(format.map_or(DEFAULT_FORMAT_ARTIST, |s| s.as_str()), &vars)?
+                // );
+            }
         }
 
-        "release" | "releases" => (
-            Release::filter::<String, String>(vec![], vec![" ORDER BY title".to_string()])
-                .await?
-                .into_iter()
-                .map(|r| Box::new(r) as Box<dyn Format>)
-                .collect(),
-            format.map_or(DEFAULT_FORMAT_RELEASE, |s| s.as_str()),
-        ),
+        "release" | "releases" => (),
         _ => {
             bail!("Invalid object type {}", object)
         }
     };
-    for track in objects.into_iter() {
-        println!("{}", track.fmt(format)?);
-    }
     info!("Took {:?}", start.elapsed());
     Ok(())
 }

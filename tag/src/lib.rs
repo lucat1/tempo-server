@@ -7,22 +7,25 @@ pub mod id3;
 #[cfg(feature = "mp4")]
 pub mod mp4;
 
-pub mod file;
-pub mod format;
 pub mod key;
 pub mod map;
 pub mod picture;
 
-use core::convert::AsRef;
-use eyre::{Report, Result};
+pub use core::convert::AsRef;
+pub use eyre::{Report, Result};
+pub use key::TagKey;
+pub use map::{
+    strs_from_combination, tag_to_string_map, tags_from_combination, tags_from_full_release,
+    tags_from_full_track, StringMap, TagMap,
+};
+pub use picture::{Picture, PictureType};
+
+use entity::TrackFormat;
+use std::fmt::{Debug, Formatter, Result as FormatResult};
+
 use log::debug;
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter, Result as FormatResult};
 use std::path::Path;
-
-use self::format::Format;
-use self::key::TagKey;
-use picture::Picture;
 
 pub enum TagError {
     NotSupported,
@@ -66,7 +69,7 @@ impl Debug for Box<dyn Tag> {
 }
 
 pub trait Tag: TagClone {
-    fn format(&self) -> Format;
+    fn format(&self) -> TrackFormat;
     fn separator(&self) -> Option<String>;
 
     fn clear(&mut self) -> Result<()>;
