@@ -89,6 +89,7 @@ impl Default for Tagging {
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
+    AmazonDigital,
 }
 
 impl Display for ArtProvider {
@@ -96,6 +97,7 @@ impl Display for ArtProvider {
         match self {
             ArtProvider::CoverArtArchive => write!(f, "CoverArtArchive"),
             ArtProvider::Itunes => write!(f, "iTunes"),
+            ArtProvider::AmazonDigital => write!(f, "AmazonDigital"),
         }
     }
 }

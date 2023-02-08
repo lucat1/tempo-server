@@ -24,9 +24,9 @@ impl From<Itunes> for Vec<super::cover::Cover> {
             .filter_map(|i| {
                 i.max_size.map(|s| super::cover::Cover {
                     provider: ArtProvider::Itunes,
-                    url: i
+                    urls: vec![i
                         .artwork_url_100
-                        .replace("100x100", format!("{}x{}", s, s).as_str()),
+                        .replace("100x100", format!("{}x{}", s, s).as_str())],
                     width: s,
                     height: s,
                     title: i.collection_name,

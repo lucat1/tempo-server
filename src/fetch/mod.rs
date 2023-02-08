@@ -1,3 +1,4 @@
+pub mod amazondigital;
 pub mod cover;
 pub mod cover_art_archive;
 pub mod itunes;
