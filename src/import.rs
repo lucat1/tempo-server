@@ -284,7 +284,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let mut start = Instant::now();
     let mut maybe_picture: Option<Picture> = None;
     if let Some(cover) = maybe_cover {
-        let (image, mime) = get_cover(cover.url).await?;
+        let (image, mime) = get_cover(cover).await?;
         let picture = Picture {
             mime_type: mime,
             picture_type: PictureType::CoverFront,

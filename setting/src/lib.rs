@@ -85,10 +85,11 @@ impl Default for Tagging {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
+    AmazonDigital,
 }
 
 impl Display for ArtProvider {
@@ -96,6 +97,7 @@ impl Display for ArtProvider {
         match self {
             ArtProvider::CoverArtArchive => write!(f, "CoverArtArchive"),
             ArtProvider::Itunes => write!(f, "iTunes"),
+            ArtProvider::AmazonDigital => write!(f, "AmazonDigital"),
         }
     }
 }
@@ -150,7 +152,11 @@ pub struct Art {
 }
 
 fn default_art_providers() -> Vec<ArtProvider> {
-    vec![ArtProvider::Itunes, ArtProvider::CoverArtArchive]
+    vec![
+        ArtProvider::Itunes,
+        ArtProvider::CoverArtArchive,
+        ArtProvider::AmazonDigital,
+    ]
 }
 
 fn default_art_width() -> u32 {
