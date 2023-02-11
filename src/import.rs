@@ -17,7 +17,7 @@ use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use rayon::prelude::*;
 use scan_dir::ScanDir;
-use sea_orm::{EntityTrait, TransactionTrait};
+use sea_orm::{DbErr, EntityTrait, TransactionTrait};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::canonicalize;
@@ -44,6 +44,14 @@ struct Job {
     dest: PathBuf,
     tags: HashMap<TagKey, Vec<String>>,
     cover: Option<Picture>,
+}
+
+fn ignore_none_error<T>(res: Result<T, DbErr>) -> Result<(), DbErr> {
+    let mut ans = res.map(|_| ());
+    if let Err(DbErr::RecordNotInserted) = ans {
+        ans = Ok(())
+    }
+    ans
 }
 
 pub fn track_path(full_release: &FullRelease, full_track: &FullTrack) -> Result<PathBuf> {
@@ -366,26 +374,36 @@ pub async fn import(path: &PathBuf) -> Result<()> {
         artist: artist_active,
         ..
     } = full_release.into();
-    ArtistEntity::insert_many(artist_active)
-        .on_conflict(ARTIST_CONFLICT.to_owned())
-        .exec(&tx)
-        .await?;
-    ReleaseEntity::insert(release_active)
-        .on_conflict(RELEASE_CONFLICT.to_owned())
-        .exec(&tx)
-        .await?;
-    ArtistCreditEntity::insert_many(artist_credit_active)
-        .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-        .exec(&tx)
-        .await?;
-    ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
-        .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
-        .exec(&tx)
-        .await?;
-    MediumEntity::insert_many(medium_active)
-        .on_conflict(MEDIUM_CONFLICT.to_owned())
-        .exec(&tx)
-        .await?;
+    ignore_none_error(
+        ArtistEntity::insert_many(artist_active)
+            .on_conflict(ARTIST_CONFLICT.to_owned())
+            .exec(&tx)
+            .await,
+    )?;
+    ignore_none_error(
+        ReleaseEntity::insert(release_active)
+            .on_conflict(RELEASE_CONFLICT.to_owned())
+            .exec(&tx)
+            .await,
+    )?;
+    ignore_none_error(
+        ArtistCreditEntity::insert_many(artist_credit_active)
+            .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
+            .exec(&tx)
+            .await,
+    )?;
+    ignore_none_error(
+        ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
+            .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
+            .exec(&tx)
+            .await,
+    )?;
+    ignore_none_error(
+        MediumEntity::insert_many(medium_active)
+            .on_conflict(MEDIUM_CONFLICT.to_owned())
+            .exec(&tx)
+            .await,
+    )?;
     for track in full_tracks.into_iter() {
         let FullTrackActive {
             track: track_active,
@@ -394,26 +412,36 @@ pub async fn import(path: &PathBuf) -> Result<()> {
             artist_track_relation: artist_track_relation_active,
             artist: artist_active,
         }: FullTrackActive = track.into();
-        ArtistEntity::insert_many(artist_active)
-            .on_conflict(ARTIST_CONFLICT.to_owned())
-            .exec(&tx)
-            .await?;
-        ArtistCreditEntity::insert_many(artist_credit_active)
-            .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-            .exec(&tx)
-            .await?;
-        TrackEntity::insert(track_active)
-            .on_conflict(TRACK_CONFLICT.to_owned())
-            .exec(&tx)
-            .await?;
-        ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
-            .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
-            .exec(&tx)
-            .await?;
-        ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
-            .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
-            .exec(&tx)
-            .await?;
+        ignore_none_error(
+            ArtistEntity::insert_many(artist_active)
+                .on_conflict(ARTIST_CONFLICT.to_owned())
+                .exec(&tx)
+                .await,
+        )?;
+        ignore_none_error(
+            ArtistCreditEntity::insert_many(artist_credit_active)
+                .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
+                .exec(&tx)
+                .await,
+        )?;
+        ignore_none_error(
+            TrackEntity::insert(track_active)
+                .on_conflict(TRACK_CONFLICT.to_owned())
+                .exec(&tx)
+                .await,
+        )?;
+        ignore_none_error(
+            ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
+                .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
+                .exec(&tx)
+                .await,
+        )?;
+        ignore_none_error(
+            ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
+                .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
+                .exec(&tx)
+                .await,
+        )?;
     }
     tx.commit().await?;
 
