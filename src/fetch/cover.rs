@@ -14,7 +14,7 @@ use std::io::Cursor;
 use std::time::Instant;
 
 use super::CLIENT;
-use super::{amazondigital, cover_art_archive, itunes};
+use super::{amazondigital, cover_art_archive, deezer, itunes};
 
 lazy_static! {
     static ref HEADERS_FOR_PROVIDER: HashMap<ArtProvider, HeaderMap> =
@@ -76,6 +76,7 @@ pub async fn search_covers(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
             ArtProvider::CoverArtArchive => cover_art_archive::fetch(release).await,
             ArtProvider::Itunes => itunes::fetch(release).await,
             ArtProvider::AmazonDigital => amazondigital::fetch(release).await,
+            ArtProvider::Deezer => deezer::fetch(release).await,
         };
         match res {
             Ok(r) => v.push(r),

@@ -1,11 +1,10 @@
 use eyre::{bail, Result};
-use itertools::Itertools;
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
-use entity::full::FullRelease;
+use entity::full::{ArtistInfo, FullRelease};
 use setting::ArtProvider;
 
 static DEFAULT_COUNTRY: &str = "US";
@@ -35,33 +34,10 @@ pub struct ItunesResult {
     pub collection_name: String,
     #[serde(rename = "artworkUrl100")]
     pub artwork_url_100: String,
-    pub max_size: Option<usize>,
 }
 
-impl From<Itunes> for Vec<super::cover::Cover> {
-    fn from(caa: Itunes) -> Self {
-        caa.results
-            .into_iter()
-            .filter_map(|i| {
-                i.max_size.map(|s| super::cover::Cover {
-                    provider: ArtProvider::Itunes,
-                    urls: vec![i
-                        .artwork_url_100
-                        .replace("100x100", format!("{}x{}", s, s).as_str())],
-                    width: s,
-                    height: s,
-                    title: i.collection_name,
-                    artist: i.artist_name,
-                })
-            })
-            .collect()
-    }
-}
-
-pub async fn fetch(release: &FullRelease) -> Result<Vec<Cover>> {
-    let FullRelease {
-        release, artist, ..
-    } = release;
+pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
+    let FullRelease { release, .. } = full_release;
     let start = Instant::now();
     let raw_country = release
         .country
@@ -73,14 +49,11 @@ pub async fn fetch(release: &FullRelease) -> Result<Vec<Cover>> {
         DEFAULT_COUNTRY
     };
 
-    // TODO: make "," configurable
     let res = CLIENT
         .get(format!(
             "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
             country,
-            artist.into_iter().map(|a| a.name.clone()).join(",")
-                + " "
-                + release.title.clone().as_str()
+            full_release.get_joined_artists()? + " " + release.title.clone().as_str()
         ))
         .send()
         .await?;
@@ -93,21 +66,25 @@ pub async fn fetch(release: &FullRelease) -> Result<Vec<Cover>> {
             res.text().await?
         );
     }
-    let mut json = res.json::<Itunes>().await?;
-    for item in json.results.iter_mut() {
-        for size in [5000, 1200, 600] {
-            let url = item
+    let json = res.json::<Itunes>().await?;
+    let mut res = vec![];
+    for result in json.results.iter() {
+        for size in [5000, 1200, 600].iter() {
+            let url = result
                 .artwork_url_100
                 .replace("100x100", format!("{}x{}", size, size).as_str());
-            if probe(url.as_str(), None).await {
-                item.max_size = Some(size);
-                break;
-            } else {
+            if !probe(url.as_str(), None).await {
                 continue;
             }
+            res.push(Cover {
+                provider: ArtProvider::Itunes,
+                urls: vec![url],
+                width: *size,
+                height: *size,
+                title: result.collection_name.clone(),
+                artist: result.artist_name.clone(),
+            })
         }
     }
-    let json_time = start.elapsed();
-    trace!("Itunes JSON parse took {:?}", json_time - req_time);
-    Ok(json.into())
+    Ok(res)
 }
