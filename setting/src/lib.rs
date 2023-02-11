@@ -152,7 +152,11 @@ pub struct Art {
 }
 
 fn default_art_providers() -> Vec<ArtProvider> {
-    vec![ArtProvider::Itunes, ArtProvider::CoverArtArchive]
+    vec![
+        ArtProvider::Itunes,
+        ArtProvider::CoverArtArchive,
+        ArtProvider::AmazonDigital,
+    ]
 }
 
 fn default_art_width() -> u32 {

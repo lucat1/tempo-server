@@ -1,19 +1,17 @@
 use eyre::{bail, Result};
 use lazy_static::lazy_static;
-
 use log::trace;
 use reqwest::header::{
     HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, CACHE_CONTROL, DNT, TE,
     UPGRADE_INSECURE_REQUESTS, USER_AGENT,
 };
 use scraper::{Html, Selector};
-use setting::ArtProvider;
-use setting::Settings;
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
 use entity::full::ArtistInfo;
 use entity::full::FullRelease;
+use setting::ArtProvider;
 
 struct AmazonImageFormat(usize, usize, usize);
 
@@ -87,7 +85,7 @@ fn make_cover(urls: Vec<String>, size: usize, title: &str, artist: &str) -> Cove
     }
 }
 
-pub async fn fetch(full_release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
+pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
     let mut start = Instant::now();
     let mut covers = Vec::new();
     let (artists, title) = (
