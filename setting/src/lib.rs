@@ -85,7 +85,7 @@ impl Default for Tagging {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,

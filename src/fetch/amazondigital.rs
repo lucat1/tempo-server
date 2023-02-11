@@ -1,9 +1,11 @@
-use eyre::{bail, eyre, Result};
-use itertools::Itertools;
+use eyre::{bail, Result};
 use lazy_static::lazy_static;
-use log::info;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use reqwest::Url;
+
+use log::trace;
+use reqwest::header::{
+    HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, CACHE_CONTROL, DNT, TE,
+    UPGRADE_INSECURE_REQUESTS, USER_AGENT,
+};
 use scraper::{Html, Selector};
 use setting::ArtProvider;
 use setting::Settings;
@@ -39,51 +41,40 @@ lazy_static! {
         AmazonImageFormat(3, 4, 1500),
         AmazonImageFormat(3, 7, 2560),
     ];
-    static ref HEADERS: HeaderMap = [
+    pub static ref HEADERS: HeaderMap = [
         (
-            HeaderName::from_static("user-agent"),
+            USER_AGENT,
             HeaderValue::from_str(
                 "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0"
             )
             .unwrap()
         ),
         (
-            HeaderName::from_static("accept"),
+            ACCEPT,
             HeaderValue::from_str(
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
             )
             .unwrap()
         ),
         (
-            HeaderName::from_static("accept-language"),
-            HeaderValue::from_str("en-US,en;q=0.9").unwrap()
+            ACCEPT_LANGUAGE,
+            HeaderValue::from_str("en-US,en;q=0.5").unwrap()
         ),
+        (DNT, HeaderValue::from_str("1").unwrap()),
         (
-            HeaderName::from_static("dnt"),
+            UPGRADE_INSECURE_REQUESTS,
             HeaderValue::from_str("1").unwrap()
         ),
-        (
-            HeaderName::from_static("connection"),
-            HeaderValue::from_str("Keep-Alive").unwrap()
-        ),
-        (
-            HeaderName::from_static("upgrade-insecure-requests"),
-            HeaderValue::from_str("1").unwrap()
-        ),
-        (
-            HeaderName::from_static("cache-control"),
-            HeaderValue::from_str("max-age=0").unwrap()
-        ),
-        (
-            HeaderName::from_static("te"),
-            HeaderValue::from_str("trailers").unwrap()
-        )
+        (CACHE_CONTROL, HeaderValue::from_str("max-age=0").unwrap()),
+        (TE, HeaderValue::from_str("trailers").unwrap())
     ]
     .iter()
     .cloned()
     .collect();
     static ref API_KEY: &'static str = "A17SFUTIVB227Z";
 }
+
+static AMAZON_BASE: &'static str = "https://www.amazon.com";
 
 fn make_cover(urls: Vec<String>, size: usize, title: &str, artist: &str) -> Cover {
     Cover {
@@ -96,7 +87,7 @@ fn make_cover(urls: Vec<String>, size: usize, title: &str, artist: &str) -> Cove
     }
 }
 
-pub async fn fetch_amazondigital(full_release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
+pub async fn fetch(full_release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
     let mut start = Instant::now();
     let mut covers = Vec::new();
     let (artists, title) = (
@@ -104,16 +95,17 @@ pub async fn fetch_amazondigital(full_release: &FullRelease, _: &Settings) -> Re
         full_release.release.title.clone(),
     );
 
-    info!("data {:?}", HEADERS.clone());
+    trace!("data {:?}", HEADERS.clone());
     let res = CLIENT
         .get(format!(
-            "https://www.amazon.com/s?i=digital-music&s=relevancerank&k={}",
+            "{}/s?i=digital-music&s=relevancerank&k={}",
+            AMAZON_BASE,
             artists.clone() + " " + title.as_str()
         ))
         .headers(HEADERS.clone())
         .send()
         .await?;
-    info!(
+    trace!(
         "Amazon digital HTTP request took {:?}, code {}",
         start.elapsed(),
         res.status()
@@ -127,7 +119,7 @@ pub async fn fetch_amazondigital(full_release: &FullRelease, _: &Settings) -> Re
         );
     }
     let html = Html::parse_document(res.text().await?.as_str());
-    info!("{}", html.html());
+    trace!("{}", html.html());
     let title_str = html
         .select(&TITLE_SELECTOR)
         .next()
@@ -137,64 +129,67 @@ pub async fn fetch_amazondigital(full_release: &FullRelease, _: &Settings) -> Re
         bail!("Amazon blocked the request");
     }
 
+    trace!("Amazon digital HTML parse took {:?}", start.elapsed());
+    start = Instant::now();
     for (result_selector, image_selector) in RESULT_AND_IMAGE_SELECTORS.iter() {
-        if let Some(thumbnail_url) = html
-            .select(result_selector)
-            .next()
-            .and_then(|result| result.select(image_selector).next())
-            .and_then(|image| image.value().attr("src"))
-        {
-            let thumb = thumbnail_url.replace("Stripe-Prime-Only", "");
-            let img_url = thumb.rsplit(".").take(2).join(".");
-            covers.push(make_cover(
-                vec![img_url],
-                500,
-                title.as_str(),
-                artists.as_str(),
-            ));
-        }
-    }
-    if let Some(product_url) = html
-        .select(&LINK_SELECTOR)
-        .next()
-        .and_then(|image| image.value().attr("href"))
-        .and_then(|product_url| Url::parse(product_url).ok())
-    {
-        if let Some(product_id) = product_url
-            .path_segments()
-            .and_then(|segments| segments.step_by(3).next())
-        {
-            for AmazonImageFormat(id, per_side, size) in IMAGE_FORMATS.iter() {
-                let mut urls = vec![];
-                for x in 0..*per_side {
-                    for y in 0..*per_side {
-                        urls.push(
-                            "https://z2-ec2.images-amazon.com/R/1/a=".to_string()
-                                + product_id
-                                + "+c="
-                                + &API_KEY
-                                + "+d=_SCR%28"
-                                + id.to_string().as_str()
-                                + ","
-                                + x.to_string().as_str()
-                                + ","
-                                + y.to_string().as_str()
-                                + "%29_=.jpg",
-                        )
+        let result_node = html.select(result_selector).next();
+        if let Some(result) = result_node {
+            if let Some(thumbnail_url) = result
+                .select(image_selector)
+                .next()
+                .and_then(|image| image.value().attr("src"))
+            {
+                let thumb = thumbnail_url.replace("Stripe-Prime-Only", "");
+                let mut thumb_parts = thumb.rsplitn(3, ".");
+                let img_url = thumb_parts.clone().last().unwrap_or_default().to_string()
+                    + "."
+                    + thumb_parts.next().unwrap_or_default();
+                covers.push(make_cover(
+                    vec![img_url],
+                    1400,
+                    title.as_str(),
+                    artists.as_str(),
+                ));
+            }
+            let a = result
+                .select(&LINK_SELECTOR)
+                .next()
+                .and_then(|link| link.value().attr("href"))
+                .and_then(|product_url| product_url.split("/").skip(2).next());
+
+            if let Some(product_id) = a {
+                for AmazonImageFormat(id, per_side, size) in IMAGE_FORMATS.iter() {
+                    let mut urls = vec![];
+                    for x in 0..*per_side {
+                        for y in 0..*per_side {
+                            urls.push(
+                                "http://z2-ec2.images-amazon.com/R/1/a=".to_string()
+                                    + product_id
+                                    + "+c="
+                                    + &API_KEY
+                                    + "+d=_SCR%28"
+                                    + id.to_string().as_str()
+                                    + ","
+                                    + x.to_string().as_str()
+                                    + ","
+                                    + y.to_string().as_str()
+                                    + "%29_=.jpg",
+                            )
+                        }
                     }
+                    trace!(
+                        "Amazon digital trying url (size: {}): {}",
+                        size,
+                        urls[urls.len() - 1]
+                    );
+                    trace!("URLS {:?}", urls);
+                    if probe(urls[urls.len() - 1].as_str(), Some(HEADERS.clone())).await {
+                        covers.push(make_cover(urls, *size, title.as_str(), artists.as_str()));
+                    };
                 }
-                info!(
-                    "Amazon digital trying url (size: {}): {}",
-                    size,
-                    urls[urls.len() - 1]
-                );
-                info!("URLS {:?}", urls);
-                if probe(urls[urls.len() - 1].as_str(), None).await.is_some() {
-                    covers.push(make_cover(urls, *size, title.as_str(), artists.as_str()));
-                };
             }
         }
     }
-    info!("Amazon digital HTML parse took {:?}", start.elapsed());
+    trace!("Amazon digital URL probing took {:?}", start.elapsed());
     Ok(covers)
 }

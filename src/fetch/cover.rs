@@ -3,19 +3,29 @@ use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::{io::Reader as ImageReader, GenericImage, ImageOutputFormat, RgbaImage};
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use setting::{get_settings, ArtProvider, Settings};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::time::Instant;
 
-use super::amazondigital::fetch_amazondigital;
+use super::amazondigital;
 use super::cover_art_archive::CoverArtArchive;
 use super::itunes::Itunes;
 use super::CLIENT;
+
+lazy_static! {
+    static ref HEADERS_FOR_PROVIDER: HashMap<ArtProvider, HeaderMap> =
+        [(ArtProvider::AmazonDigital, amazondigital::HEADERS.clone()),]
+            .iter()
+            .cloned()
+            .collect();
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cover {
@@ -63,12 +73,16 @@ static ITUNES_COUNTRIES: &[&str] = &[
     "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
 ];
 
-pub async fn probe(url: &str, option_headers: Option<HeaderMap>) -> Option<()> {
+pub async fn probe(url: &str, option_headers: Option<HeaderMap>) -> bool {
     let mut req = CLIENT.head(url);
     if let Some(headers) = option_headers {
         req = req.headers(headers);
     }
-    req.send().await.ok().map(|_| ())
+    req.send()
+        .await
+        .ok()
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
 }
 
 pub async fn fetch_itunes(release: &FullRelease, _: &Settings) -> Result<Vec<Cover>> {
@@ -112,12 +126,11 @@ pub async fn fetch_itunes(release: &FullRelease, _: &Settings) -> Result<Vec<Cov
             let url = item
                 .artwork_url_100
                 .replace("100x100", format!("{}x{}", size, size).as_str());
-            match probe(url.as_str(), None).await {
-                Some(_) => {
-                    item.max_size = Some(size);
-                    break;
-                }
-                None => continue,
+            if probe(url.as_str(), None).await {
+                item.max_size = Some(size);
+                break;
+            } else {
+                continue;
             }
         }
     }
@@ -176,7 +189,7 @@ pub async fn search_covers(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
         let res = match *provider {
             ArtProvider::CoverArtArchive => fetch_cover_art_archive(release, settings).await,
             ArtProvider::Itunes => fetch_itunes(release, settings).await,
-            ArtProvider::AmazonDigital => fetch_amazondigital(release, settings).await,
+            ArtProvider::AmazonDigital => amazondigital::fetch(release, settings).await,
         };
         match res {
             Ok(r) => v.push(r),
@@ -205,7 +218,12 @@ pub async fn get_cover(cover: Cover) -> Result<(Vec<u8>, Mime)> {
     );
     for (i, url) in cover.urls.into_iter().enumerate() {
         let mut start = Instant::now();
-        let res = CLIENT.get(url).send().await?;
+        let mut req = CLIENT.get(url);
+        if let Some(headers) = HEADERS_FOR_PROVIDER.get(&cover.provider) {
+            trace!("Applying headers for the download: {:?}", headers);
+            req = req.headers(headers.clone());
+        }
+        let res = req.send().await?;
         trace!("Download of cover art #{} took {:?}", i, start.elapsed());
         start = Instant::now();
         if !res.status().is_success() {
