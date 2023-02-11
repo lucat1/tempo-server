@@ -34,27 +34,6 @@ pub struct ItunesResult {
     pub collection_name: String,
     #[serde(rename = "artworkUrl100")]
     pub artwork_url_100: String,
-    pub max_size: Option<usize>,
-}
-
-impl From<Itunes> for Vec<super::cover::Cover> {
-    fn from(caa: Itunes) -> Self {
-        caa.results
-            .into_iter()
-            .filter_map(|i| {
-                i.max_size.map(|s| super::cover::Cover {
-                    provider: ArtProvider::Itunes,
-                    urls: vec![i
-                        .artwork_url_100
-                        .replace("100x100", format!("{}x{}", s, s).as_str())],
-                    width: s,
-                    height: s,
-                    title: i.collection_name,
-                    artist: i.artist_name,
-                })
-            })
-            .collect()
-    }
 }
 
 pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
@@ -87,21 +66,25 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
             res.text().await?
         );
     }
-    let mut json = res.json::<Itunes>().await?;
-    for item in json.results.iter_mut() {
-        for size in [5000, 1200, 600] {
-            let url = item
+    let json = res.json::<Itunes>().await?;
+    let mut res = vec![];
+    for result in json.results.iter() {
+        for size in [5000, 1200, 600].iter() {
+            let url = result
                 .artwork_url_100
                 .replace("100x100", format!("{}x{}", size, size).as_str());
-            if probe(url.as_str(), None).await {
-                item.max_size = Some(size);
-                break;
-            } else {
+            if !probe(url.as_str(), None).await {
                 continue;
             }
+            res.push(Cover {
+                provider: ArtProvider::Itunes,
+                urls: vec![url],
+                width: *size,
+                height: *size,
+                title: result.collection_name.clone(),
+                artist: result.artist_name.clone(),
+            })
         }
     }
-    let json_time = start.elapsed();
-    trace!("Itunes JSON parse took {:?}", json_time - req_time);
-    Ok(json.into())
+    Ok(res)
 }
