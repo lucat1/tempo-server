@@ -90,6 +90,7 @@ pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
     AmazonDigital,
+    Deezer,
 }
 
 impl Display for ArtProvider {
@@ -98,6 +99,7 @@ impl Display for ArtProvider {
             ArtProvider::CoverArtArchive => write!(f, "CoverArtArchive"),
             ArtProvider::Itunes => write!(f, "iTunes"),
             ArtProvider::AmazonDigital => write!(f, "AmazonDigital"),
+            ArtProvider::Deezer => write!(f, "Deezer"),
         }
     }
 }
@@ -154,6 +156,7 @@ pub struct Art {
 fn default_art_providers() -> Vec<ArtProvider> {
     vec![
         ArtProvider::Itunes,
+        ArtProvider::Deezer,
         ArtProvider::CoverArtArchive,
         ArtProvider::AmazonDigital,
     ]

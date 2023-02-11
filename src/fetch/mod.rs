@@ -1,9 +1,10 @@
-pub mod amazondigital;
-pub mod cover;
-pub mod cover_art_archive;
-pub mod itunes;
-pub mod music_brainz;
+mod amazondigital;
+mod cover_art_archive;
+mod deezer;
+mod itunes;
+mod music_brainz;
 
+pub mod cover;
 pub use cover::Cover;
 pub use music_brainz::ReleaseSearch;
 

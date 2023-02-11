@@ -9,8 +9,7 @@ use scraper::{Html, Selector};
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
-use entity::full::ArtistInfo;
-use entity::full::FullRelease;
+use entity::full::{ArtistInfo, FullRelease};
 use setting::ArtProvider;
 
 struct AmazonImageFormat(usize, usize, usize);

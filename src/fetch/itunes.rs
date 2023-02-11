@@ -1,11 +1,10 @@
 use eyre::{bail, Result};
-use itertools::Itertools;
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
-use entity::full::FullRelease;
+use entity::full::{ArtistInfo, FullRelease};
 use setting::ArtProvider;
 
 static DEFAULT_COUNTRY: &str = "US";
@@ -58,10 +57,8 @@ impl From<Itunes> for Vec<super::cover::Cover> {
     }
 }
 
-pub async fn fetch(release: &FullRelease) -> Result<Vec<Cover>> {
-    let FullRelease {
-        release, artist, ..
-    } = release;
+pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
+    let FullRelease { release, .. } = full_release;
     let start = Instant::now();
     let raw_country = release
         .country
@@ -73,14 +70,11 @@ pub async fn fetch(release: &FullRelease) -> Result<Vec<Cover>> {
         DEFAULT_COUNTRY
     };
 
-    // TODO: make "," configurable
     let res = CLIENT
         .get(format!(
             "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
             country,
-            artist.into_iter().map(|a| a.name.clone()).join(",")
-                + " "
-                + release.title.clone().as_str()
+            full_release.get_joined_artists()? + " " + release.title.clone().as_str()
         ))
         .send()
         .await?;
