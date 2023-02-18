@@ -16,9 +16,9 @@ pub fn get_database() -> Result<&'static DatabaseConnection> {
 }
 
 pub async fn open_database() -> Result<DatabaseConnection> {
-    let url = format!("sqlite://{}?mode=rwc", get_settings()?.db.to_owned());
+    let url = &get_settings()?.db;
     trace!("Connecting to {}", url);
-    let mut opt = ConnectOptions::new(url);
+    let mut opt = ConnectOptions::new(url.to_owned());
     opt.max_connections(100)
         .min_connections(5)
         .connect_timeout(Duration::from_secs(8))
