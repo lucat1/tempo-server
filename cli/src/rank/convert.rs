@@ -5,7 +5,7 @@ use tag::TagKey;
 use crate::internal::UNKNOWN_TITLE;
 use crate::internal::{Release, Track};
 use crate::track::TrackFile;
-use crate::util::{dedup, maybe_date};
+use shared::util::{dedup, maybe_date};
 
 fn artists_with_name(name: String, sep: Option<String>) -> Vec<String> {
     match sep {

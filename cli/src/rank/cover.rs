@@ -1,7 +1,7 @@
 use crate::fetch::Cover;
 use entity::full::{ArtistInfo, FullRelease};
 use levenshtein::levenshtein;
-use setting::{get_settings, ArtProvider};
+use shared::setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
 
 static MAX_COVER_SIZE: u64 = 5000 * 5000;

@@ -10,7 +10,7 @@ use id3::frame::{ExtendedText, Picture as ID3Picture};
 use id3::{Content, Frame, TagLike, Version};
 use itertools::Itertools;
 use log::debug;
-use setting::get_settings;
+use shared::setting::get_settings;
 use std::collections::HashMap;
 use std::path::Path;
 

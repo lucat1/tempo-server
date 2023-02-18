@@ -7,7 +7,7 @@ use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
-use setting::{get_settings, ArtProvider};
+use shared::setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::io::Cursor;

@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use super::{Cover, CLIENT};
 use entity::full::FullRelease;
-use setting::{get_settings, ArtProvider};
+use shared::setting::{get_settings, ArtProvider};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoverArtArchive {

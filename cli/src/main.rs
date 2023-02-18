@@ -3,23 +3,19 @@ mod internal;
 mod rank;
 mod theme;
 mod track;
-mod util;
 
 mod import;
 mod list;
 mod update;
 
-use async_once_cell::OnceCell;
 use clap::{arg, Command};
 use eyre::{eyre, Result};
-use lazy_static::lazy_static;
 use log::error;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use sea_orm_migration::MigratorTrait;
-use std::sync::Arc;
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
-use setting::get_settings;
+use shared::database::{get_database, open_database, DATABASE};
+use shared::setting::{load, print, SETTINGS};
 
 pub const CLI_NAME: &str = "tagger";
 pub const VERSION: &str = "0.1.0";
@@ -28,10 +24,6 @@ pub const GITHUB: &str = "github.com/lucat1/tagger";
 // logging constants
 pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
 pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
-
-lazy_static! {
-    pub static ref DB: Arc<OnceCell<DatabaseConnection>> = Arc::new(OnceCell::new());
-}
 
 fn cli() -> Command<'static> {
     Command::new(CLI_NAME)
@@ -67,47 +59,22 @@ fn cli() -> Command<'static> {
         )
 }
 
-pub fn get_database() -> Result<&'static DatabaseConnection> {
-    DB.get().ok_or(eyre!("Could not get the database"))
-}
-
-async fn open_database() -> Result<DatabaseConnection> {
-    let path = util::path_to_str(&get_settings()?.db)?;
-    let mut opt = ConnectOptions::new(format!("sqlite://{}?mode=rwc", path));
-    opt.max_connections(100)
-        .min_connections(5)
-        .connect_timeout(Duration::from_secs(8))
-        .acquire_timeout(Duration::from_secs(8))
-        .idle_timeout(Duration::from_secs(8))
-        .max_lifetime(Duration::from_secs(8))
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info);
-    let conn = Database::connect(opt).await.map_err(|e| eyre!(e))?;
-    migration::Migrator::up(&conn, None).await?;
-    // sqlx::query("PRAGMA journal_mode=WAL")
-    //     .execute(&pool)
-    //     .await?;
-    // sqlx::query("PRAGMA busy_timeout=60000")
-    //     .execute(&pool)
-    //     .await?;
-    Ok(conn)
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     theme::init_logger();
 
-    setting::SETTINGS
-        .get_or_try_init(async { setting::load() })
-        .await?;
+    SETTINGS.get_or_try_init(async { load() }).await?;
 
     let matches = cli().get_matches();
     match matches.subcommand() {
-        Some(("config", _)) => setting::print(),
+        Some(("config", _)) => print(),
         Some((a, b)) => {
             // all subcommands that require a database connection go in here
-            DB.get_or_try_init(open_database()).await?;
+            DATABASE
+                .get_or_try_init(async { open_database().await })
+                .await?;
+            migration::Migrator::up(get_database()?, None).await?;
 
             match (a, b) {
                 ("list", sub_matches) => {

@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
 use entity::full::{ArtistInfo, FullRelease};
-use setting::ArtProvider;
+use shared::setting::ArtProvider;
 
 struct AmazonImageFormat(usize, usize, usize);
 

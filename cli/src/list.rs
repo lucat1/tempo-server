@@ -1,4 +1,3 @@
-use crate::get_database;
 use entity::{
     ArtistCreditEntity, ArtistEntity, ArtistTrackRelationEntity, MediumEntity, ReleaseEntity,
     TrackEntity,
@@ -11,6 +10,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::Instant;
 use strfmt::strfmt;
+
+use shared::database::get_database;
 
 static DEFAULT_FORMAT_ARTIST: &str = "{name} ({sort_name})";
 static DEFAULT_FORMAT_ALBUM_ARTIST: &str = "{join_phrase}{name}";

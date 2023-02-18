@@ -1,3 +1,4 @@
+use super::util;
 use async_once_cell::OnceCell;
 use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
@@ -23,7 +24,7 @@ pub struct Settings {
     #[serde(default)]
     pub library: PathBuf,
     #[serde(default)]
-    pub db: PathBuf,
+    pub db: String,
     #[serde(default = "default_release_name")]
     pub release_name: String,
     #[serde(default = "default_track_name")]
@@ -224,8 +225,11 @@ pub fn load() -> Result<Settings> {
     if set.library == PathBuf::default() {
         set.library = lib.clone();
     }
-    if set.db == PathBuf::default() {
-        set.db = lib.join(DEFAULT_DB_FILE);
+    if set.db == String::default() {
+        set.db = format!(
+            "sqlite://{}?mode=rwc",
+            util::path_to_str(&lib.join(DEFAULT_DB_FILE))?
+        );
     }
     trace!("Loaded settings: {:?}", set);
     Ok(set)

@@ -1,11 +1,12 @@
 [package]
-name = "setting"
+name = "shared"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [dependencies]
 async-once-cell = "0.4.2"
+chrono = "0.4.22"
 directories = "4.0.1"
 eyre = "0.6.8"
 image = "0.24.5"
@@ -15,3 +16,5 @@ mime = "0.3.16"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 toml = "0.7.1"
+sea-orm = { version = "0.11", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time" ] }
+sea-orm-migration = "0.11"

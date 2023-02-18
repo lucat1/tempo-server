@@ -9,7 +9,6 @@ use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
     ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
-use setting::get_settings;
 use tag::{Picture, PictureType};
 
 use dialoguer::{Confirm, Input, Select};
@@ -32,12 +31,14 @@ use text_diff::{diff, Difference};
 
 use crate::fetch::cover::{get_cover, search_covers, Cover};
 use crate::fetch::{get, search, SearchResult};
-use crate::get_database;
 use crate::internal;
 use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
 use crate::track::TrackFile;
-use crate::util::{dedup, mkdirp, path_to_str};
+
+use shared::database::get_database;
+use shared::setting::get_settings;
+use shared::util::{dedup, mkdirp, path_to_str};
 
 struct Job {
     file: TrackFile,
