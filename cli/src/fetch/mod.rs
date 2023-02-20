@@ -19,8 +19,12 @@ use std::time::Instant;
 use self::music_brainz::TrackWithMediumId;
 
 static COUNT: u32 = 8;
-static MB_USER_AGENT: &str =
-    formatcp!("{}/{} ({})", crate::CLI_NAME, crate::VERSION, crate::GITHUB);
+static MB_USER_AGENT: &str = formatcp!(
+    "{}/{} ({})",
+    shared::CLI_NAME,
+    shared::VERSION,
+    shared::GITHUB
+);
 lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }

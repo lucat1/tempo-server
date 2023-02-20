@@ -1,4 +1,3 @@
-use crate::{TAGGER_LOGLEVEL, TAGGER_STYLE};
 use dialoguer::console::{style, Style, StyledObject};
 use dialoguer::theme::Theme;
 use env_logger::{fmt::Color, Builder, Env};
@@ -8,8 +7,8 @@ use std::io::Write;
 
 pub fn init_logger() {
     let env = Env::default()
-        .filter_or(TAGGER_LOGLEVEL, "info")
-        .write_style(TAGGER_STYLE);
+        .filter_or(shared::TAGGER_LOGLEVEL, "info")
+        .write_style(shared::TAGGER_STYLE);
 
     Builder::from_env(env)
         .filter(Some("sqlx"), LevelFilter::Warn)

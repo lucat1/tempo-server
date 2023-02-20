@@ -17,7 +17,7 @@ entity = { path = "../entity" }
 tag = { path = "../tag" }
 migration = { path = "../migration" }
 
-clap = "3.2"
+clap = { version = "3", features = ["derive"] }
 eyre = "0.6"
 color-eyre = "0.6"
 scan_dir = "0.3"

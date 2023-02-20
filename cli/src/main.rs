@@ -17,16 +17,8 @@ use std::path::PathBuf;
 use shared::database::{get_database, open_database, DATABASE};
 use shared::setting::{load, print, SETTINGS};
 
-pub const CLI_NAME: &str = "tagger";
-pub const VERSION: &str = "0.1.0";
-pub const GITHUB: &str = "github.com/lucat1/tagger";
-
-// logging constants
-pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
-pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
-
 fn cli() -> Command<'static> {
-    Command::new(CLI_NAME)
+    Command::new(shared::CLI_NAME)
         .about("Manage and tag your music collection")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -64,7 +56,7 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     theme::init_logger();
 
-    SETTINGS.get_or_try_init(async { load() }).await?;
+    SETTINGS.get_or_try_init(async { load(None) }).await?;
 
     let matches = cli().get_matches();
     match matches.subcommand() {

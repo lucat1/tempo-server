@@ -25,6 +25,8 @@ pub struct Settings {
     pub library: PathBuf,
     #[serde(default)]
     pub db: String,
+    #[serde(default)]
+    pub downloads: PathBuf,
     #[serde(default = "default_release_name")]
     pub release_name: String,
     #[serde(default = "default_track_name")]
@@ -214,10 +216,25 @@ fn get_library() -> Result<PathBuf> {
         .or_else(|_| PathBuf::from_str("/music").map_err(|e| eyre!(e)))
 }
 
-pub fn load() -> Result<Settings> {
-    let dirs = ProjectDirs::from("com", "github", CLI_NAME)
-        .ok_or(eyre!("Could not locate program directories"))?;
-    let path = dirs.config_dir().join(PathBuf::from("config.toml"));
+fn get_downloads() -> Result<PathBuf> {
+    UserDirs::new()
+        .ok_or(eyre!("Could not locate user directories"))
+        .and_then(|dirs| {
+            dirs.download_dir()
+                .map(|audio| audio.to_path_buf())
+                .ok_or(eyre!("Could not locate current user's Downloads directory"))
+        })
+        .or_else(|_| PathBuf::from_str("/downloads").map_err(|e| eyre!(e)))
+}
+
+pub fn load(path: Option<PathBuf>) -> Result<Settings> {
+    let path = if let Some(p) = path {
+        p
+    } else {
+        let dirs = ProjectDirs::from("com", "github", CLI_NAME)
+            .ok_or(eyre!("Could not locate program directories"))?;
+        dirs.config_dir().join(PathBuf::from("config.toml"))
+    };
     trace!("Loading config file: {:?}", path);
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
@@ -230,6 +247,9 @@ pub fn load() -> Result<Settings> {
             "sqlite://{}?mode=rwc",
             util::path_to_str(&lib.join(DEFAULT_DB_FILE))?
         );
+    }
+    if set.downloads == PathBuf::default() {
+        set.downloads = get_downloads()?.clone();
     }
     trace!("Loaded settings: {:?}", set);
     Ok(set)
