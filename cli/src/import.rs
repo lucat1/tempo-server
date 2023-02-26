@@ -15,11 +15,9 @@ use dialoguer::{Confirm, Input, Select};
 use eyre::{bail, eyre, Context, Result};
 use log::{debug, info, warn};
 use rayon::prelude::*;
-use scan_dir::ScanDir;
 use sea_orm::{DbErr, EntityTrait, TransactionTrait};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fs::canonicalize;
 use std::fs::write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -29,16 +27,15 @@ use strfmt::strfmt;
 use tag::{strs_from_combination, tags_from_combination, TagKey};
 use text_diff::{diff, Difference};
 
-use crate::fetch::cover::{get_cover, search_covers, Cover};
-use crate::fetch::{get, search, SearchResult};
-use crate::internal;
-use crate::rank::{rank_covers, rate_and_match, CoverRating};
 use crate::theme::DialoguerTheme;
-use crate::track::TrackFile;
+use common::fetch::cover::{get_cover, search, Cover};
+use common::fetch::{get, search, SearchResult};
+use common::rank::{rank, rate_and_match, CoverRating};
 
-use shared::database::get_database;
-use shared::setting::get_settings;
-use shared::util::{dedup, mkdirp, path_to_str};
+use base::database::get_database;
+use base::setting::get_settings;
+use base::util::{dedup, mkdirp, path_to_str};
+use common::track::TrackFile;
 
 struct Job {
     file: TrackFile,
@@ -82,17 +79,6 @@ where
     let filename = PathBuf::from_str((name + "." + ext).as_str())?;
     let path = root.as_ref().join(filename);
     write(path, &picture.data).map_err(|e| eyre!(e))
-}
-
-fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
-    ScanDir::files()
-        .walk(path_to_str(path)?, |iter| {
-            iter.map(|(ref entry, _)| entry.path()).collect()
-        })
-        .map_err(|errs| match errs.first().map(|e| eyre!(e.to_string())) {
-            Some(e) => e,
-            None => eyre!("No errors"),
-        })
 }
 
 pub fn print_diff(orig: &str, edit: &str) -> String {
@@ -222,22 +208,12 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     let settings = get_settings()?;
     let theme = DialoguerTheme::default();
 
-    let files = all_files(&canonicalize(path)?)?;
-    let (tracks, errors): (Vec<_>, Vec<_>) =
-        files.iter().map(TrackFile::open).partition(Result::is_ok);
-    let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
-    let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
-    debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
+    let tracks = common::import::all_tracks(path).await?;
     info!("Importing {} audio files from {:?}", tracks.len(), path);
-
-    if !errors.is_empty() {
-        errors
-            .iter()
-            .for_each(|e| debug!("Error while importing file:{}", e));
-    }
     if tracks.is_empty() {
         bail!("No tracks to import were found");
     }
+
     let source_release: internal::Release = tracks.clone().into();
     // TODO: reimplement artst & title manual input if they cannot be extracted from the tags
     // see here for the previous implementation:
@@ -279,7 +255,7 @@ pub async fn import(path: &PathBuf) -> Result<()> {
     }
 
     let SearchResult(full_release, full_tracks) = search_result;
-    let covers_by_provider = search_covers(&full_release).await?;
+    let covers_by_provider = search(&full_release).await?;
     let covers = rank_covers(covers_by_provider, &full_release);
     let maybe_cover = ask_cover(&theme, covers);
     let mut start = Instant::now();

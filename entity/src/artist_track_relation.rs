@@ -1,7 +1,8 @@
 use sea_orm::entity::prelude::*;
+use serde::Serialize;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i8", db_type = "Integer")]
 pub enum RelationType {
     #[sea_orm(num_value = 0)]
@@ -55,7 +56,7 @@ impl EntityName for Entity {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
 pub struct Model {
     pub artist_id: Uuid,
     pub track_id: Uuid,

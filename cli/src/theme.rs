@@ -7,8 +7,8 @@ use std::io::Write;
 
 pub fn init_logger() {
     let env = Env::default()
-        .filter_or(shared::TAGGER_LOGLEVEL, "info")
-        .write_style(shared::TAGGER_STYLE);
+        .filter_or(base::TAGGER_LOGLEVEL, "info")
+        .write_style(base::TAGGER_STYLE);
 
     Builder::from_env(env)
         .filter(Some("sqlx"), LevelFilter::Warn)

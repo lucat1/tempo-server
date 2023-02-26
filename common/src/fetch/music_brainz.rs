@@ -1,10 +1,10 @@
 use eyre::Report;
 use serde_derive::{Deserialize, Serialize};
-use shared::setting::get_settings;
 use std::cmp::Ordering;
 use uuid::Uuid;
 
-use shared::util::maybe_date;
+use base::setting::get_settings;
+use base::util::maybe_date;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {

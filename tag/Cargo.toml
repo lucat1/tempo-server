@@ -12,7 +12,7 @@ id3 = ["dep:id3"]
 mp4 = ["dep:mp4ameta"]
 
 [dependencies]
-shared = { path = "../shared" }
+base = { path = "../base" }
 entity = { path = "../entity" }
 
 chrono = "0.4.23"

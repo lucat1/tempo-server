@@ -12,7 +12,8 @@ id3 = ["tag/id3"]
 mp4 = ["tag/mp4"]
 
 [dependencies]
-shared = { path = "../shared" }
+base = { path = "../base" }
+common = { path = "../common" }
 entity = { path = "../entity" }
 tag = { path = "../tag" }
 migration = { path = "../migration" }
@@ -57,4 +58,5 @@ strum_macros = "0.24.3"
 axum = "0.6"
 jsonapi = "0.7.0"
 bytes = "1.4.0"
+axum-macros = "0.3.4"
 # ape = "0.4"

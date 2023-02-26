@@ -1,7 +1,8 @@
 use crate::*;
 use eyre::{bail, eyre};
+use serde::Serialize;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct FullRelease {
     pub release: Release,
     pub medium: Vec<Medium>,
@@ -48,7 +49,7 @@ pub struct FullTrackActive {
     pub artist: Vec<ArtistActive>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct FullTrack {
     pub track: Track,
     pub artist_credit_track: Vec<ArtistCreditTrack>,

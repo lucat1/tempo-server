@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-shared = { path = "../shared" }
+base = { path = "../base" }
 
 chrono = "0.4.23"
 eyre = "0.6.8"

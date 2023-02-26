@@ -1,12 +1,14 @@
-use crate::fetch::Cover;
-use entity::full::{ArtistInfo, FullRelease};
 use levenshtein::levenshtein;
-use shared::setting::{get_settings, ArtProvider};
+use serde::Serialize;
 use std::cmp::Ordering;
+
+use crate::fetch::Cover;
+use base::setting::{get_settings, ArtProvider};
+use entity::full::{ArtistInfo, FullRelease};
 
 static MAX_COVER_SIZE: u64 = 5000 * 5000;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct CoverRating(pub f64, pub Cover);
 
 impl PartialEq for CoverRating {

@@ -1,11 +1,10 @@
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
-use axum::{routing::get, Router};
+use base::setting::get_settings;
 use eyre::Result;
 use log::trace;
 use serde::{Deserialize, Serialize};
-use shared::setting::get_settings;
 use std::{fs::read_dir, path::PathBuf};
 
 #[derive(Deserialize)]
@@ -31,7 +30,7 @@ pub enum EntryType {
     Directory = 1,
 }
 
-pub async fn list(query: Query<ListRequest>) -> Result<(StatusCode, Json<List>), StatusCode> {
+pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
     let root_path = get_settings()
         .map_err(|e| {
             trace!("Could not get settings: {}", e);
@@ -63,14 +62,11 @@ pub async fn list(query: Query<ListRequest>) -> Result<(StatusCode, Json<List>),
             })
         })
         .collect();
-    Ok((
-        StatusCode::OK,
-        Json(List {
-            name: path
-                .file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or("/".to_string()),
-            entries: files,
-        }),
-    ))
+    Ok(Json(List {
+        name: path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or("/".to_string()),
+        entries: files,
+    }))
 }

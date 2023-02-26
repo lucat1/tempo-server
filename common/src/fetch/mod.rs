@@ -14,22 +14,18 @@ use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
 use log::trace;
 use reqwest::header::USER_AGENT;
+use serde::Serialize;
 use std::time::Instant;
 
 use self::music_brainz::TrackWithMediumId;
 
 static COUNT: u32 = 8;
-static MB_USER_AGENT: &str = formatcp!(
-    "{}/{} ({})",
-    shared::CLI_NAME,
-    shared::VERSION,
-    shared::GITHUB
-);
+static MB_USER_AGENT: &str = formatcp!("{}/{} ({})", base::CLI_NAME, base::VERSION, base::GITHUB);
 lazy_static! {
     pub static ref CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct SearchResult(
     pub entity::full::FullRelease,
     pub Vec<entity::full::FullTrack>,

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use strfmt::strfmt;
 
-use shared::database::get_database;
+use base::database::get_database;
 
 static DEFAULT_FORMAT_ARTIST: &str = "{name} ({sort_name})";
 static DEFAULT_FORMAT_ALBUM_ARTIST: &str = "{join_phrase}{name}";

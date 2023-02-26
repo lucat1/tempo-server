@@ -1,11 +1,6 @@
-mod fetch;
-mod internal;
-mod rank;
-mod theme;
-mod track;
-
 mod import;
 mod list;
+mod theme;
 mod update;
 
 use clap::{arg, Command};
@@ -14,11 +9,11 @@ use log::error;
 use sea_orm_migration::MigratorTrait;
 use std::path::PathBuf;
 
-use shared::database::{get_database, open_database, DATABASE};
-use shared::setting::{load, print, SETTINGS};
+use base::database::{get_database, open_database, DATABASE};
+use base::setting::{load, print, SETTINGS};
 
 fn cli() -> Command<'static> {
-    Command::new(shared::CLI_NAME)
+    Command::new(base::CLI_NAME)
         .about("Manage and tag your music collection")
         .subcommand_required(true)
         .arg_required_else_help(true)

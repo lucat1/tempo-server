@@ -5,12 +5,12 @@ use reqwest::header::{
     HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, CACHE_CONTROL, DNT, TE,
     UPGRADE_INSECURE_REQUESTS, USER_AGENT,
 };
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
+use base::setting::ArtProvider;
 use entity::full::{ArtistInfo, FullRelease};
-use shared::setting::ArtProvider;
 
 struct AmazonImageFormat(usize, usize, usize);
 

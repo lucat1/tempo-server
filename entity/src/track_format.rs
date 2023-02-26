@@ -1,8 +1,9 @@
 use eyre::{eyre, Report, Result, WrapErr};
 use sea_orm::entity::prelude::*;
+use serde::Serialize;
 use std::path::Path;
 
-#[derive(Debug, Clone, Copy, PartialEq, EnumIter, DeriveActiveEnum)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i8", db_type = "Integer")]
 pub enum TrackFormat {
     #[sea_orm(num_value = 0)]

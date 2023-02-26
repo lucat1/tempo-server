@@ -2,6 +2,7 @@ extern crate id3;
 
 use crate::picture::{Picture, PictureType};
 use crate::TagKey;
+use base::setting::get_settings;
 use core::convert::AsRef;
 use entity::TrackFormat;
 use eyre::{eyre, Result};
@@ -10,7 +11,6 @@ use id3::frame::{ExtendedText, Picture as ID3Picture};
 use id3::{Content, Frame, TagLike, Version};
 use itertools::Itertools;
 use log::debug;
-use shared::setting::get_settings;
 use std::collections::HashMap;
 use std::path::Path;
 

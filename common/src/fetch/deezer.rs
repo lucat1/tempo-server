@@ -6,8 +6,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use super::{Cover, CLIENT};
+use base::setting::ArtProvider;
 use entity::full::{ArtistInfo, FullRelease};
-use shared::setting::ArtProvider;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Deezer {

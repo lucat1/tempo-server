@@ -1,4 +1,3 @@
-mod convert;
 mod cover;
 mod diff;
 
@@ -13,7 +12,9 @@ use log::debug;
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
-pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> (i64, Vec<usize>) {
+pub struct Rating(pub i64, pub Vec<usize>);
+
+pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating {
     let SearchResult(full_release, full_tracks) = result;
     let release: Release = tracks.clone().into();
     let candidate_release: Release = full_release.clone().into();
@@ -29,7 +30,7 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> (i64, V
         }
     }
     if matrix_vec.is_empty() {
-        return (0, vec![]);
+        return Rating(0, vec![]);
     }
     debug!("kuhn_munkers matrix is {}x{}", rows, columns);
     if rows > columns {
@@ -49,5 +50,5 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> (i64, V
         "value for {:?} - {:?}: {:?}",
         candidate_release.artists, candidate_release.title, value
     );
-    (value, map)
+    Rating(value, map)
 }

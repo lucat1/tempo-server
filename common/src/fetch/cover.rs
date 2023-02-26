@@ -1,3 +1,4 @@
+use base::setting::{get_settings, ArtProvider};
 use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
@@ -7,7 +8,6 @@ use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
-use shared::setting::{get_settings, ArtProvider};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -68,7 +68,7 @@ pub async fn probe(url: &str, option_headers: Option<HeaderMap>) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn search_covers(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
+pub async fn search(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
     let settings = get_settings()?;
     let mut v = vec![];
     for provider in settings.art.providers.iter() {

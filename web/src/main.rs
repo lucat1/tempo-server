@@ -11,8 +11,8 @@ use sea_orm_migration::MigratorTrait;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use shared::database::{get_database, open_database, DATABASE};
-use shared::setting::{load, SETTINGS};
+use base::database::{get_database, open_database, DATABASE};
+use base::setting::{load, SETTINGS};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -31,8 +31,8 @@ async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
     let env = Env::default()
-        .filter_or(shared::TAGGER_LOGLEVEL, "info")
-        .write_style(shared::TAGGER_STYLE);
+        .filter_or(base::TAGGER_LOGLEVEL, "info")
+        .write_style(base::TAGGER_STYLE);
     Builder::from_env(env)
         .filter(Some("sqlx"), log::LevelFilter::Warn)
         .init();

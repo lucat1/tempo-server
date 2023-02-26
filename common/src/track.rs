@@ -36,7 +36,7 @@ impl TrackFile {
             TrackFormat::Id3 => id3::Tag::from_path(path),
             #[cfg(feature = "ape")]
             TrackFormat::Ape => ape::Tag::from_path(path),
-            _ => bail!("Unsupported format {}", String::from(format)),
+            _ => Err(eyre!("Unsupported format {}", String::from(format))),
         }
         .wrap_err(format!("Could not read metadata from file: {:?}", path))?;
         Ok(TrackFile {

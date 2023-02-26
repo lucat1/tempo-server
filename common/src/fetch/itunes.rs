@@ -4,8 +4,8 @@ use serde_derive::{Deserialize, Serialize};
 use std::time::Instant;
 
 use super::{cover::probe, Cover, CLIENT};
+use base::setting::ArtProvider;
 use entity::full::{ArtistInfo, FullRelease};
-use shared::setting::ArtProvider;
 
 static DEFAULT_COUNTRY: &str = "US";
 static ITUNES_COUNTRIES: &[&str] = &[

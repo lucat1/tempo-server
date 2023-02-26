@@ -31,8 +31,8 @@ async fn root() -> Response {
         Server {
             id: "0".to_string(),
             aura_version: "0.2.0".to_string(),
-            server: shared::CLI_NAME.to_string(),
-            server_version: shared::VERSION.to_string(),
+            server: base::CLI_NAME.to_string(),
+            server_version: base::VERSION.to_string(),
             auth_required: false,
             features: vec!["albums".to_string(), "artists".to_string()],
         }
