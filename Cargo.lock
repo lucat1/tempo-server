@@ -578,14 +578,11 @@ version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
 dependencies = [
- "atty",
  "bitflags",
  "clap_derive 3.2.18",
  "clap_lex 0.2.4",
  "indexmap",
  "once_cell",
- "strsim",
- "termcolor",
  "textwrap",
 ]
 
@@ -646,53 +643,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "783fe232adfca04f90f56201b26d79682d4cd2625e0bc7290b95123afe558ade"
 dependencies = [
  "os_str_bytes",
-]
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "async-once-cell",
- "async-trait",
- "base",
- "chrono",
- "clap 3.2.23",
- "color-eyre",
- "common",
- "const_format",
- "dialoguer",
- "entity",
- "env_logger",
- "eyre",
- "futures",
- "image",
- "indicatif",
- "itertools 0.10.5",
- "lazy_static",
- "levenshtein",
- "log",
- "migration",
- "mime",
- "pathfinding",
- "rayon",
- "regex 1.7.1",
- "reqwest",
- "scan_dir",
- "scraper",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_path_to_error",
- "strfmt",
- "strum",
- "strum_macros",
- "tag",
- "text-diff",
- "tokio",
- "tokio-stream",
- "uuid",
 ]
 
 [[package]]
@@ -768,6 +718,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tag",
+ "tokio",
  "toml 0.7.2",
  "uuid",
 ]
@@ -3806,9 +3757,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.25.0"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8e00990ebabbe4c14c08aca901caed183ecd5c09562a12c824bb53d3c3fd3af"
+checksum = "03201d01c3c27a29c8a5cee5b55a93ddae1ccf6f08f65365c2c918f8c1b76f64"
 dependencies = [
  "autocfg",
  "bytes",
@@ -3821,7 +3772,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]

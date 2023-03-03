@@ -1,28 +1,18 @@
-use base::setting::{get_settings, ArtProvider};
+use base::setting::{ArtProvider, Library};
 use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::{io::Reader as ImageReader, GenericImage, ImageOutputFormat, RgbaImage};
-use lazy_static::lazy_static;
 use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::io::Cursor;
 use std::time::Instant;
 
 use super::CLIENT;
-use super::{amazondigital, cover_art_archive, deezer, itunes};
-
-lazy_static! {
-    static ref HEADERS_FOR_PROVIDER: HashMap<ArtProvider, HeaderMap> =
-        [(ArtProvider::AmazonDigital, amazondigital::HEADERS.clone()),]
-            .iter()
-            .cloned()
-            .collect();
-}
+use super::{cover_art_archive, deezer, itunes};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cover {
@@ -68,14 +58,12 @@ pub async fn probe(url: &str, option_headers: Option<HeaderMap>) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn search(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
-    let settings = get_settings()?;
+pub async fn search(library: &Library, release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
     let mut v = vec![];
-    for provider in settings.art.providers.iter() {
+    for provider in library.art.providers.iter() {
         let res = match *provider {
-            ArtProvider::CoverArtArchive => cover_art_archive::fetch(release).await,
+            ArtProvider::CoverArtArchive => cover_art_archive::fetch(library, release).await,
             ArtProvider::Itunes => itunes::fetch(release).await,
-            ArtProvider::AmazonDigital => amazondigital::fetch(release).await,
             ArtProvider::Deezer => deezer::fetch(release).await,
         };
         match res {
@@ -86,15 +74,14 @@ pub async fn search(release: &FullRelease) -> Result<Vec<Vec<Cover>>> {
     if v.is_empty() {
         Err(eyre!(
             "No cover art found in all providers: {:?}",
-            settings.art.providers
+            library.art.providers
         ))
     } else {
         Ok(v)
     }
 }
 
-pub async fn get_cover(cover: Cover) -> Result<(Vec<u8>, Mime)> {
-    let settings = get_settings()?;
+pub async fn get_cover(library: &Library, cover: Cover) -> Result<(Vec<u8>, Mime)> {
     let mut img = RgbaImage::new(cover.width as u32, cover.height as u32);
     let per_side = f64::sqrt(cover.urls.len() as f64) as usize;
     let (mut x, mut y, quadrant_size_x, quadrant_size_y) = (
@@ -105,12 +92,7 @@ pub async fn get_cover(cover: Cover) -> Result<(Vec<u8>, Mime)> {
     );
     for (i, url) in cover.urls.into_iter().enumerate() {
         let mut start = Instant::now();
-        let mut req = CLIENT.get(url);
-        if let Some(headers) = HEADERS_FOR_PROVIDER.get(&cover.provider) {
-            trace!("Applying headers for the download: {:?}", headers);
-            req = req.headers(headers.clone());
-        }
-        let res = req.send().await?;
+        let res = CLIENT.get(url).send().await?;
         trace!("Download of cover art #{} took {:?}", i, start.elapsed());
         start = Instant::now();
         if !res.status().is_success() {
@@ -136,11 +118,11 @@ pub async fn get_cover(cover: Cover) -> Result<(Vec<u8>, Mime)> {
         }
     }
     let start = Instant::now();
-    let resized = if settings.art.width < img.width() || settings.art.height < img.height() {
+    let resized = if library.art.width < img.width() || library.art.height < img.height() {
         let converted = resize(
             &img,
-            settings.art.width,
-            settings.art.height,
+            library.art.width,
+            library.art.height,
             FilterType::Gaussian,
         );
         trace!(
@@ -156,7 +138,7 @@ pub async fn get_cover(cover: Cover) -> Result<(Vec<u8>, Mime)> {
         img
     };
     let mut bytes: Vec<u8> = Vec::new();
-    let format: ImageOutputFormat = settings.art.format.clone().into();
+    let format: ImageOutputFormat = library.art.format.clone().into();
     resized.write_to(&mut Cursor::new(&mut bytes), format)?;
-    Ok((bytes, settings.art.format.mime()))
+    Ok((bytes, library.art.format.mime()))
 }

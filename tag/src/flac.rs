@@ -1,5 +1,6 @@
 use crate::picture::{Picture, PictureType};
 use crate::TagKey;
+use base::setting::Library;
 use core::convert::AsRef;
 use entity::TrackFormat;
 use eyre::{eyre, Result};
@@ -13,7 +14,7 @@ pub struct Tag {
 }
 
 impl crate::TagFrom for Tag {
-    fn from_path<P>(path: P) -> Result<Box<dyn crate::Tag>>
+    fn from_path<P>(_library: &Library, path: P) -> Result<Box<dyn crate::Tag>>
     where
         P: AsRef<Path>,
     {

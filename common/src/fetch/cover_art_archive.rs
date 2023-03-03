@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use super::{Cover, CLIENT};
-use base::setting::{get_settings, ArtProvider};
+use base::setting::{ArtProvider, Library};
 use entity::full::FullRelease;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,8 +62,7 @@ pub struct Thumbnails {
     small: String,
 }
 
-pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
-    let settings = get_settings()?;
+pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<Cover>> {
     let FullRelease {
         release, artist, ..
     } = full_release;
@@ -71,12 +70,12 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
     let res = CLIENT
         .get(format!(
             "http://coverartarchive.org/{}/{}",
-            if settings.art.cover_art_archive_use_release_group {
+            if library.art.cover_art_archive_use_release_group {
                 "release-group"
             } else {
                 "release"
             },
-            if settings.art.cover_art_archive_use_release_group {
+            if library.art.cover_art_archive_use_release_group {
                 release.release_group_id.unwrap_or(release.id)
             } else {
                 release.id

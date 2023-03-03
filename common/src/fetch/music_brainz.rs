@@ -1,9 +1,10 @@
-use eyre::Report;
+use entity::full::FullRelease;
+use eyre::Result;
 use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use uuid::Uuid;
 
-use base::setting::get_settings;
+use base::setting::Library;
 use base::util::maybe_date;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,69 +271,67 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
     }
 }
 
-impl TryFrom<Release> for entity::full::FullRelease {
-    type Error = Report;
-    fn try_from(release: Release) -> Result<Self, Self::Error> {
+impl Release {
+    pub fn to_full_release(self, library: &Library) -> Result<FullRelease> {
         let original_date = maybe_date(
-            release
-                .release_group
+            self.release_group
                 .as_ref()
                 .and_then(|r| r.first_release_date.clone()),
         );
-        let label = release.label_info.first();
+        let label = self.label_info.first();
         Ok(entity::full::FullRelease {
             release: entity::Release {
-                id: release.id,
-                title: release.title,
-                release_group_id: release.release_group.as_ref().map(|r| r.id),
-                release_type: release
+                id: self.id,
+                title: self.title,
+                release_group_id: self.release_group.as_ref().map(|r| r.id),
+                release_type: self
                     .release_group
                     .as_ref()
                     .and_then(|r| r.primary_type.as_ref())
                     .map(|s| s.to_lowercase()),
-                asin: release.asin,
-                country: release.country,
+                asin: self.asin,
+                country: self.country,
                 label: label
                     .as_ref()
                     .and_then(|li| li.label.as_ref())
                     .map(|l| l.name.to_string()),
                 catalog_no: label.as_ref().and_then(|l| l.catalog_number.clone()),
-                status: release.status,
-                date: if get_settings()?.tagging.use_original_date {
+                status: self.status,
+                date: if library.tagging.use_original_date {
                     original_date
                 } else {
-                    maybe_date(release.date)
+                    maybe_date(self.date)
                 },
                 original_date,
-                script: release.text_representation.and_then(|t| t.script),
+                script: self.text_representation.and_then(|t| t.script),
             },
-            medium: release
+            medium: self
                 .media
                 .unwrap_or_default()
                 .iter()
                 .map(|m| entity::Medium {
                     id: m.id.unwrap_or_else(|| Uuid::new_v4()),
-                    release_id: release.id,
+                    release_id: self.id,
                     position: m.position.unwrap_or_default(),
                     tracks: m.track_count,
                     track_offset: m.track_offset.unwrap_or_default(),
                     format: m.format.clone(),
                 })
                 .collect(),
-            artist_credit_release: release
+            artist_credit_release: self
                 .artist_credit
                 .iter()
                 .map(|ac| entity::ArtistCreditRelease {
                     artist_credit_id: artist_credit_id(ac),
-                    release_id: release.id,
+                    release_id: self.id,
                 })
                 .collect(),
-            artist_credit: release
+            artist_credit: self
                 .artist_credit
                 .iter()
                 .map(|ac| ac.clone().into())
                 .collect(),
-            artist: release
+            artist: self
                 .artist_credit
                 .into_iter()
                 .map(|a| a.artist.into())

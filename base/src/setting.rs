@@ -22,11 +22,25 @@ static DEFAULT_DB_FILE: &str = "lib.db";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
-    pub library: PathBuf,
-    #[serde(default)]
     pub db: String,
     #[serde(default)]
+    pub libraries: Vec<Library>,
+    #[serde(default)]
     pub downloads: PathBuf,
+}
+
+fn default_release_name() -> String {
+    "{album_artist}/{album} ({release_year}) ({release_type})".to_string()
+}
+
+fn default_track_name() -> String {
+    "{disc_number} - {track_number} - {track_title}".to_string()
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Library {
+    #[serde(default)]
+    pub path: PathBuf,
     #[serde(default = "default_release_name")]
     pub release_name: String,
     #[serde(default = "default_track_name")]
@@ -36,14 +50,6 @@ pub struct Settings {
     pub tagging: Tagging,
     #[serde(default)]
     pub art: Art,
-}
-
-fn default_release_name() -> String {
-    "{album_artist}/{album} ({release_year}) ({release_type})".to_string()
-}
-
-fn default_track_name() -> String {
-    "{disc_number} - {track_number} - {track_title}".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,7 +98,6 @@ impl Default for Tagging {
 pub enum ArtProvider {
     CoverArtArchive,
     Itunes,
-    AmazonDigital,
     Deezer,
 }
 
@@ -101,7 +106,6 @@ impl Display for ArtProvider {
         match self {
             ArtProvider::CoverArtArchive => write!(f, "CoverArtArchive"),
             ArtProvider::Itunes => write!(f, "iTunes"),
-            ArtProvider::AmazonDigital => write!(f, "AmazonDigital"),
             ArtProvider::Deezer => write!(f, "Deezer"),
         }
     }
@@ -161,7 +165,6 @@ fn default_art_providers() -> Vec<ArtProvider> {
         ArtProvider::Itunes,
         ArtProvider::Deezer,
         ArtProvider::CoverArtArchive,
-        ArtProvider::AmazonDigital,
     ]
 }
 
@@ -238,14 +241,20 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     trace!("Loading config file: {:?}", path);
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
-    let lib = get_library()?;
-    if set.library == PathBuf::default() {
-        set.library = lib.clone();
+    if set.libraries.is_empty() {
+        set.libraries.push(Library {
+            path: get_library()?,
+            ..Default::default()
+        });
     }
     if set.db == String::default() {
+        let lib = set
+            .libraries
+            .first()
+            .ok_or(eyre!("No libraries have been defined"))?;
         set.db = format!(
             "sqlite://{}?mode=rwc",
-            util::path_to_str(&lib.join(DEFAULT_DB_FILE))?
+            util::path_to_str(&lib.path.join(DEFAULT_DB_FILE))?
         );
     }
     if set.downloads == PathBuf::default() {

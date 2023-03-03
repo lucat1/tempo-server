@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::cmp::Ordering;
 
 use crate::fetch::Cover;
-use base::setting::{get_settings, ArtProvider};
+use base::setting::{ArtProvider, Library};
 use entity::full::{ArtistInfo, FullRelease};
 
 static MAX_COVER_SIZE: u64 = 5000 * 5000;
@@ -33,9 +33,9 @@ fn in_range(val: f64, min: f64, max: f64) -> f64 {
     val / (max - min)
 }
 
-fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
-    let art_settings = &get_settings().unwrap().art;
-    let provider_index = art_settings
+fn valuate_cover(library: &Library, levenshtein: f64, cover: &Cover) -> f64 {
+    let provider_index = library
+        .art
         .providers
         .iter()
         .position(|p| *p == cover.provider)
@@ -44,17 +44,18 @@ fn valuate_cover(levenshtein: f64, cover: &Cover) -> f64 {
     in_range(
         provider_index as f64,
         0.0,
-        art_settings.providers.len() as f64,
-    ) * art_settings.provider_relevance
-        + levenshtein * art_settings.match_relevance
+        library.art.providers.len() as f64,
+    ) * library.art.provider_relevance
+        + levenshtein * library.art.match_relevance
         + in_range(
             (cover.width * cover.height) as f64,
             0.0,
             MAX_COVER_SIZE as f64,
-        ) * art_settings.size_relevance
+        ) * library.art.size_relevance
 }
 
 pub fn rank_covers(
+    library: &Library,
     covers_by_provider: Vec<Vec<Cover>>,
     full_release: &FullRelease,
 ) -> Vec<CoverRating> {
@@ -79,7 +80,7 @@ pub fn rank_covers(
                     distance = 0.9; // TODO: better way? otherwise art from the CoverArtArchive always
                                     // achieves the best score
                 }
-                Some(CoverRating(valuate_cover(distance, &cover), cover))
+                Some(CoverRating(valuate_cover(library, distance, &cover), cover))
             })
         })
         .collect();

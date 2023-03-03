@@ -11,6 +11,7 @@ pub mod key;
 pub mod map;
 pub mod picture;
 
+use base::setting::Library;
 pub use core::convert::AsRef;
 pub use eyre::{Report, Result};
 pub use key::TagKey;
@@ -33,7 +34,7 @@ pub enum TagError {
 }
 
 pub trait TagFrom {
-    fn from_path<P>(path: P) -> Result<Box<dyn Tag>>
+    fn from_path<P>(library: &Library, path: P) -> Result<Box<dyn Tag>>
     where
         P: AsRef<Path>;
 }

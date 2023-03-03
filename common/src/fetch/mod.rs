@@ -1,10 +1,10 @@
-mod amazondigital;
 mod cover_art_archive;
 mod deezer;
 mod itunes;
 mod music_brainz;
 
 pub mod cover;
+use base::setting::Library;
 pub use cover::Cover;
 pub use music_brainz::ReleaseSearch;
 
@@ -31,8 +31,8 @@ pub struct SearchResult(
     pub Vec<entity::full::FullTrack>,
 );
 
-fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
-    let release: entity::full::FullRelease = r.clone().try_into()?;
+fn release_to_result(library: &Library, r: music_brainz::Release) -> Result<SearchResult> {
+    let release: entity::full::FullRelease = r.clone().to_full_release(library)?;
     let tracks: Vec<entity::full::FullTrack> = r
         .media
         .unwrap_or_default()
@@ -52,7 +52,7 @@ fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
     Ok(SearchResult(release, tracks))
 }
 
-pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
+pub async fn search(library: &Library, release: &Release) -> Result<Vec<SearchResult>> {
     let start = Instant::now();
     let raw_artists = release.artists.join(", ");
     let artists = match raw_artists.as_str() {
@@ -88,10 +88,13 @@ pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    json.releases.into_iter().map(release_to_result).collect()
+    json.releases
+        .into_iter()
+        .map(|r| release_to_result(library, r))
+        .collect()
 }
 
-pub async fn get(id: &str) -> Result<SearchResult> {
+pub async fn get(library: &Library, id: &str) -> Result<SearchResult> {
     let start = Instant::now();
     let res = CLIENT
         .get(format!(
@@ -136,5 +139,5 @@ pub async fn get(id: &str) -> Result<SearchResult> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
-    release_to_result(json)
+    release_to_result(library, json)
 }

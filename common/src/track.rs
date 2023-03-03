@@ -1,3 +1,4 @@
+use base::setting::Library;
 use entity::TrackFormat;
 use eyre::{bail, eyre, Result, WrapErr};
 use std::collections::HashMap;
@@ -24,16 +25,16 @@ pub struct TrackFile {
 }
 
 impl TrackFile {
-    pub fn open(path: &PathBuf) -> Result<TrackFile> {
+    pub fn open(library: &Library, path: &PathBuf) -> Result<TrackFile> {
         let format = TrackFormat::from_path(path)
             .wrap_err(format!("Could not identify format for file: {:?}", path))?;
         let tag = match format {
             #[cfg(feature = "flac")]
-            TrackFormat::Flac => flac::Tag::from_path(path),
+            TrackFormat::Flac => flac::Tag::from_path(library, path),
             #[cfg(feature = "mp4")]
             TrackFormat::Mp4 => mp4::Tag::from_path(path),
             #[cfg(feature = "id3")]
-            TrackFormat::Id3 => id3::Tag::from_path(path),
+            TrackFormat::Id3 => id3::Tag::from_path(library, path),
             #[cfg(feature = "ape")]
             TrackFormat::Ape => ape::Tag::from_path(path),
             _ => Err(eyre!("Unsupported format {}", String::from(format))),
@@ -57,16 +58,16 @@ impl TrackFile {
         self.tag.set_pictures(pictures)
     }
 
-    pub fn duplicate_to(&mut self, path: &PathBuf) -> Result<()> {
+    pub fn duplicate_to(&mut self, library: &Library, path: &PathBuf) -> Result<()> {
         copy(&self.path, path)?;
         self.path = path.to_path_buf();
         self.tag = match self.format {
             #[cfg(feature = "flac")]
-            TrackFormat::Flac => flac::Tag::from_path(&self.path),
+            TrackFormat::Flac => flac::Tag::from_path(library, &self.path),
             #[cfg(feature = "mp4")]
             TrackFormat::Mp4 => mp4::Tag::from_path(&self.path),
             #[cfg(feature = "id3")]
-            TrackFormat::Id3 => id3::Tag::from_path(&self.path),
+            TrackFormat::Id3 => id3::Tag::from_path(library, &self.path),
             #[cfg(feature = "ape")]
             TrackFormat::Ape => ape::Tag::from_path(&self.path),
             _ => bail!("Unsupported format {}", String::from(self.format)),
