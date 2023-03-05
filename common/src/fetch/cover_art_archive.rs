@@ -28,7 +28,7 @@ impl CoverArtArchive {
                     sizes.keys().max().and_then(|size| {
                         sizes.get(size).map(|url| super::cover::Cover {
                             provider: ArtProvider::CoverArtArchive,
-                            urls: vec![url.to_string()],
+                            url: url.to_string(),
                             width: *size,
                             height: *size,
                             title: title.clone(),

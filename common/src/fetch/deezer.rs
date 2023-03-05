@@ -57,14 +57,6 @@ fn get_image_of_type(album: &Album, size: &Size) -> (String, usize) {
 pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
     let FullRelease { release, .. } = full_release;
     let start = Instant::now();
-    println!(
-        "{}",
-        format!(
-            "https://api.deezer.com/search?order=RANKING&q=artist:\"{}\" album:\"{}\"",
-            full_release.get_joined_artists()?,
-            release.title.clone().as_str()
-        )
-    );
     let res = CLIENT
         .get(format!(
             "https://api.deezer.com/search?order=RANKING&q=artist:\"{}\" album:\"{}\"",
@@ -91,7 +83,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
                 let (url, size) = get_image_of_type(&release.album, &size_type);
                 Cover {
                     provider: ArtProvider::Deezer,
-                    urls: vec![url],
+                    url,
                     width: size,
                     height: size,
                     title: release.album.title.clone(),

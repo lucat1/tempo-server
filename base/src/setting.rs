@@ -29,6 +29,10 @@ pub struct Settings {
     pub downloads: PathBuf,
 }
 
+fn default_library_name() -> String {
+    "Main library".to_string()
+}
+
 fn default_release_name() -> String {
     "{album_artist}/{album} ({release_year}) ({release_type})".to_string()
 }
@@ -39,6 +43,8 @@ fn default_track_name() -> String {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Library {
+    #[serde(default = "default_library_name")]
+    pub name: String,
     #[serde(default)]
     pub path: PathBuf,
     #[serde(default = "default_release_name")]
@@ -243,7 +249,10 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
     if set.libraries.is_empty() {
         set.libraries.push(Library {
+            name: default_library_name(),
             path: get_library()?,
+            release_name: default_release_name(),
+            track_name: default_track_name(),
             ..Default::default()
         });
     }

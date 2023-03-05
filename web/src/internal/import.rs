@@ -29,7 +29,7 @@ pub struct Import {
     path: PathBuf,
 
     #[serde(flatten)]
-    import: import::Import,
+    pub import: import::Import,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +65,17 @@ pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> 
     Ok(Json(import))
 }
 
+pub async fn get(Path(job): Path<Uuid>) -> Result<Json<Import>, StatusCode> {
+    let imports = JOBS.lock().map_err(|e| {
+        trace!("Could not lock imports table: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    imports
+        .get(&job)
+        .ok_or(StatusCode::NOT_FOUND)
+        .map(|v| Json(v.clone()))
+}
+
 pub async fn edit(
     Path(job): Path<Uuid>,
     edit: Json<ImportEdit>,
@@ -77,11 +88,11 @@ pub async fn edit(
         .get(&job)
         .ok_or(StatusCode::NOT_FOUND)
         .map(|v| v.clone())?;
-    // match edit.0 {
-    //     ImportEdit::MbId(id) => import.mbid = id,
-    //     ImportEdit::Cover(i) => import.cover = i,
-    // }
-    // imports.insert(job, import.clone());
+    match edit.0 {
+        ImportEdit::MbId(id) => import.import.selected.0 = id,
+        ImportEdit::Cover(i) => import.import.selected.1 = Some(i),
+    }
+    imports.insert(job, import.clone());
     Ok(Json(import))
 }
 

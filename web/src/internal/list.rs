@@ -3,6 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use base::setting::get_settings;
 use eyre::Result;
+use fs_extra::dir::get_size;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use std::{fs::read_dir, path::PathBuf};
@@ -23,6 +24,7 @@ pub struct Entry {
     name: String,
     path: PathBuf,
     r#type: EntryType,
+    size: u64,
 }
 #[derive(Serialize)]
 pub enum EntryType {
@@ -59,6 +61,7 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
                 } else {
                     EntryType::Directory
                 },
+                size: get_size(&f.path()).ok()?,
             })
         })
         .collect();

@@ -2,6 +2,7 @@ use base::setting::{ArtProvider, Library};
 use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
+use image::DynamicImage;
 use image::{io::Reader as ImageReader, GenericImage, ImageOutputFormat, RgbaImage};
 use log::{trace, warn};
 use mime::Mime;
@@ -17,7 +18,7 @@ use super::{cover_art_archive, deezer, itunes};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cover {
     pub provider: ArtProvider,
-    pub urls: Vec<String>,
+    pub url: String,
     pub width: usize,
     pub height: usize,
     pub title: String,
@@ -82,42 +83,23 @@ pub async fn search(library: &Library, release: &FullRelease) -> Result<Vec<Vec<
 }
 
 pub async fn get_cover(library: &Library, cover: Cover) -> Result<(Vec<u8>, Mime)> {
-    let mut img = RgbaImage::new(cover.width as u32, cover.height as u32);
-    let per_side = f64::sqrt(cover.urls.len() as f64) as usize;
-    let (mut x, mut y, quadrant_size_x, quadrant_size_y) = (
-        0,
-        0,
-        (cover.width / per_side) as u32,
-        (cover.height / per_side) as u32,
-    );
-    for (i, url) in cover.urls.into_iter().enumerate() {
-        let mut start = Instant::now();
-        let res = CLIENT.get(url).send().await?;
-        trace!("Download of cover art #{} took {:?}", i, start.elapsed());
-        start = Instant::now();
-        if !res.status().is_success() {
-            bail!(
-                "Fetch request for cover art returned non-success error code: {} {}",
-                res.status(),
-                res.text().await?
-            );
-        }
-        let bytes = res.bytes().await?;
-        img.copy_from(
-            &ImageReader::new(Cursor::new(bytes))
-                .with_guessed_format()?
-                .decode()?,
-            x,
-            y,
-        )?;
-        trace!("Parse of cover art #{} took {:?}", i, start.elapsed());
-        x += quadrant_size_x;
-        if i % per_side == 0 {
-            x = 0;
-            y += quadrant_size_y;
-        }
-    }
     let start = Instant::now();
+    let res = CLIENT.get(cover.url).send().await?;
+    let req_time = start.elapsed();
+    trace!("Fetch request for cover art took {:?}", req_time);
+    if !res.status().is_success() {
+        bail!(
+            "Fetch request for cover art returned non-success error code: {} {}",
+            res.status(),
+            res.text().await?
+        );
+    }
+    let bytes = res.bytes().await?;
+    let bytes_time = start.elapsed();
+    let img = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()?
+        .decode()?;
+    trace!("Parse of cover art took {:?}", bytes_time - req_time);
     let resized = if library.art.width < img.width() || library.art.height < img.height() {
         let converted = resize(
             &img,
@@ -125,15 +107,16 @@ pub async fn get_cover(library: &Library, cover: Cover) -> Result<(Vec<u8>, Mime
             library.art.height,
             FilterType::Gaussian,
         );
+        let convert_time = start.elapsed();
         trace!(
             "Conversion of cover art took {:?} (from {}x{} to {}x{})",
-            start.elapsed(),
+            convert_time - bytes_time - req_time,
             img.width(),
             img.height(),
             converted.width(),
             converted.height()
         );
-        converted
+        DynamicImage::ImageRgba8(converted)
     } else {
         img
     };

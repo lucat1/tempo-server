@@ -78,7 +78,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
             }
             res.push(Cover {
                 provider: ArtProvider::Itunes,
-                urls: vec![url],
+                url,
                 width: *size,
                 height: *size,
                 title: result.collection_name.clone(),

@@ -37,7 +37,7 @@ pub struct Import {
 
     search_results: Vec<RatedSearchResult>,
     covers: Vec<CoverRating>,
-    selected: (Uuid, Option<usize>),
+    pub selected: (Uuid, Option<usize>),
 }
 
 fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
