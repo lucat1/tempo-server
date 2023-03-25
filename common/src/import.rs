@@ -19,7 +19,7 @@ use crate::track::TrackFile;
 #[derive(Serialize, Clone)]
 pub struct RatedSearchResult {
     rating: i64,
-    search_result: fetch::SearchResult,
+    pub search_result: fetch::SearchResult,
     mapping: Vec<usize>,
 }
 
@@ -35,8 +35,8 @@ pub struct Import {
     release: internal::Release,
     tracks: Vec<internal::Track>,
 
-    search_results: Vec<RatedSearchResult>,
-    covers: Vec<CoverRating>,
+    pub search_results: Vec<RatedSearchResult>,
+    pub covers: Vec<CoverRating>,
     pub selected: (Uuid, Option<usize>),
 }
 

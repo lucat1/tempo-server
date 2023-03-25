@@ -89,10 +89,26 @@ pub async fn edit(
         .ok_or(StatusCode::NOT_FOUND)
         .map(|v| v.clone())?;
     match edit.0 {
-        ImportEdit::MbId(id) => import.import.selected.0 = id,
-        ImportEdit::Cover(i) => import.import.selected.1 = Some(i),
+        ImportEdit::MbId(id) => {
+            if !import
+                .import
+                .search_results
+                .iter()
+                .any(|r| r.search_result.0.release.id == id)
+            {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            import.import.selected.0 = id
+        }
+        ImportEdit::Cover(i) => {
+            if i >= import.import.covers.len() {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            import.import.selected.1 = Some(i)
+        }
     }
     imports.insert(job, import.clone());
+    // TODO: if MbId has been changed, update the cover options
     Ok(Json(import))
 }
 
