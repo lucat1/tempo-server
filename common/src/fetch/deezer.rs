@@ -78,7 +78,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
     Ok(json
         .data
         .iter()
-        .map(|release| {
+        .flat_map(|release| {
             Size::iter().map(|size_type| {
                 let (url, size) = get_image_of_type(&release.album, &size_type);
                 Cover {
@@ -91,6 +91,5 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
                 }
             })
         })
-        .flatten()
         .collect())
 }

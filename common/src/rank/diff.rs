@@ -81,12 +81,11 @@ impl Diff for Release {
             )
             .unwrap_or_default()
             + if_both(self.date, other.date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR) as i64
+                d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR
             })
             .unwrap_or_default()
             + if_both(self.original_date, other.original_date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR)
-                    as i64
+                d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR
             })
             .unwrap_or_default()
     }

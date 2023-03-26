@@ -7,8 +7,8 @@ use lazy_static::lazy_static;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::{collections::HashMap, path::PathBuf};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use common::import;
@@ -38,7 +38,6 @@ pub enum ImportEdit {
     Cover(usize),
 }
 
-#[axum_macros::debug_handler]
 pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> {
     let path = get_settings()
         .map_err(|e| {
@@ -57,19 +56,13 @@ pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> 
             StatusCode::BAD_REQUEST
         })?,
     };
-    let mut imports = JOBS.lock().map_err(|e| {
-        trace!("Could not lock imports table: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let mut imports = JOBS.lock().await;
     imports.insert(import.id, import.clone());
     Ok(Json(import))
 }
 
 pub async fn get(Path(job): Path<Uuid>) -> Result<Json<Import>, StatusCode> {
-    let imports = JOBS.lock().map_err(|e| {
-        trace!("Could not lock imports table: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let imports = JOBS.lock().await;
     imports
         .get(&job)
         .ok_or(StatusCode::NOT_FOUND)
@@ -80,10 +73,7 @@ pub async fn edit(
     Path(job): Path<Uuid>,
     edit: Json<ImportEdit>,
 ) -> Result<Json<Import>, StatusCode> {
-    let mut imports = JOBS.lock().map_err(|e| {
-        trace!("Could not lock imports table: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let mut imports = JOBS.lock().await;
     let mut import = imports
         .get(&job)
         .ok_or(StatusCode::NOT_FOUND)
@@ -98,6 +88,7 @@ pub async fn edit(
             {
                 return Err(StatusCode::BAD_REQUEST);
             }
+            // TODO: the MbId has been changed, update the cover options
             import.import.selected.0 = id
         }
         ImportEdit::Cover(i) => {
@@ -108,14 +99,20 @@ pub async fn edit(
         }
     }
     imports.insert(job, import.clone());
-    // TODO: if MbId has been changed, update the cover options
     Ok(Json(import))
 }
 
 pub async fn run(Path(job): Path<Uuid>) -> Result<Json<()>, StatusCode> {
+    let mut imports = JOBS.lock().await;
+    let import = imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
+    import::run(import.import)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(()))
 }
 
 pub async fn delete(Path(job): Path<Uuid>) -> Result<Json<()>, StatusCode> {
+    let mut imports = JOBS.lock().await;
+    imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
     Ok(Json(()))
 }

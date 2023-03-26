@@ -45,7 +45,7 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating 
     }
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
     let (val, map) = kuhn_munkres_min(&matrix);
-    let value = val + release.diff(&candidate_release) as i64;
+    let value = val + release.diff(&candidate_release);
     debug!(
         "value for {:?} - {:?}: {:?}",
         candidate_release.artists, candidate_release.title, value

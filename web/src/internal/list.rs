@@ -61,7 +61,7 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
                 } else {
                     EntryType::Directory
                 },
-                size: get_size(&f.path()).ok()?,
+                size: get_size(f.path()).ok()?,
             })
         })
         .collect();

@@ -8,14 +8,10 @@ use eyre::{eyre, Result};
 use std::collections::HashMap;
 
 pub type TagMap = HashMap<TagKey, Vec<String>>;
-pub type StringMap = HashMap<String, Vec<String>>;
+pub type StringMap = HashMap<String, String>;
 
 fn artist_names(artists: Vec<&Artist>) -> Vec<String> {
-    artists
-        .into_iter()
-        .into_iter()
-        .map(|a| a.name.to_string())
-        .collect()
+    artists.into_iter().map(|a| a.name.to_string()).collect()
 }
 
 pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
@@ -30,7 +26,6 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
         TagKey::MusicBrainzArtistID,
         full_track
             .get_artists()?
-            .into_iter()
             .into_iter()
             .map(|a| a.id.to_string())
             .collect(),
@@ -166,7 +161,7 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     map.insert(TagKey::TotalDiscs, vec![medium.len().to_string()]);
     map.insert(
         TagKey::TotalTracks,
-        vec![medium.into_iter().fold(0, |v, e| v + e.tracks).to_string()],
+        vec![medium.iter().fold(0, |v, e| v + e.tracks).to_string()],
     );
     Ok(map)
 }
@@ -186,21 +181,16 @@ pub fn tags_from_combination(full_release: &FullRelease, full_track: &FullTrack)
 pub fn strs_from_combination(
     full_release: &FullRelease,
     full_track: &FullTrack,
-) -> Result<HashMap<String, String>> {
-    let src = tag_to_string_map(tags_from_combination(full_release, full_track)?);
-    let mut map = HashMap::new();
-    for (key, value) in src.into_iter() {
-        if let Some(val) = value.first() {
-            map.insert(key, val.to_string());
-        }
-    }
-    Ok(map)
+) -> Result<StringMap> {
+    tags_from_combination(full_release, full_track).map(|t| tag_to_string_map(&t))
 }
 
-pub fn tag_to_string_map(input: TagMap) -> StringMap {
+pub fn tag_to_string_map(input: &TagMap) -> StringMap {
     let mut map: StringMap = HashMap::new();
-    for (k, v) in input.into_iter() {
-        map.insert(k.to_string(), v);
+    for (k, v) in input.iter() {
+        if let Some(val) = v.first() {
+            map.insert(k.to_string(), val.to_string());
+        }
     }
     map
 }

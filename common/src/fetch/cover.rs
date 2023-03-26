@@ -3,7 +3,7 @@ use entity::full::FullRelease;
 use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::DynamicImage;
-use image::{io::Reader as ImageReader, GenericImage, ImageOutputFormat, RgbaImage};
+use image::{io::Reader as ImageReader, ImageOutputFormat};
 use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
@@ -82,9 +82,9 @@ pub async fn search(library: &Library, release: &FullRelease) -> Result<Vec<Vec<
     }
 }
 
-pub async fn get_cover(library: &Library, cover: Cover) -> Result<(Vec<u8>, Mime)> {
+pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, Mime)> {
     let start = Instant::now();
-    let res = CLIENT.get(cover.url).send().await?;
+    let res = CLIENT.get(cover.url.clone()).send().await?;
     let req_time = start.elapsed();
     trace!("Fetch request for cover art took {:?}", req_time);
     if !res.status().is_success() {

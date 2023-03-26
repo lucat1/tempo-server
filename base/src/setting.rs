@@ -267,7 +267,7 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
         );
     }
     if set.downloads == PathBuf::default() {
-        set.downloads = get_downloads()?.clone();
+        set.downloads = get_downloads()?;
     }
     trace!("Loaded settings: {:?}", set);
     Ok(set)

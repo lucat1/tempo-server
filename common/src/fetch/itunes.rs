@@ -72,7 +72,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
         for size in [5000, 1200, 600].iter() {
             let url = result
                 .artwork_url_100
-                .replace("100x100", format!("{}x{}", size, size).as_str());
+                .replace("100x100", format!("{size}x{size}").as_str());
             if !probe(url.as_str(), None).await {
                 continue;
             }

@@ -27,7 +27,7 @@ pub struct TrackFile {
 impl TrackFile {
     pub fn open(library: &Library, path: &PathBuf) -> Result<TrackFile> {
         let format = TrackFormat::from_path(path)
-            .wrap_err(format!("Could not identify format for file: {:?}", path))?;
+            .wrap_err(format!("Could not identify format for file: {path:?}"))?;
         let tag = match format {
             #[cfg(feature = "flac")]
             TrackFormat::Flac => flac::Tag::from_path(library, path),
@@ -39,7 +39,7 @@ impl TrackFile {
             TrackFormat::Ape => ape::Tag::from_path(path),
             _ => Err(eyre!("Unsupported format {}", String::from(format))),
         }
-        .wrap_err(format!("Could not read metadata from file: {:?}", path))?;
+        .wrap_err(format!("Could not read metadata from file: {path:?}"))?;
         Ok(TrackFile {
             path: path.to_path_buf(),
             format,

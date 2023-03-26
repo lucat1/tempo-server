@@ -32,7 +32,7 @@ pub struct SearchResult(
 );
 
 fn release_to_result(library: &Library, r: music_brainz::Release) -> Result<SearchResult> {
-    let release: entity::full::FullRelease = r.clone().to_full_release(library)?;
+    let release: entity::full::FullRelease = r.clone().into_full_release(library)?;
     let tracks: Vec<entity::full::FullTrack> = r
         .media
         .unwrap_or_default()
@@ -42,7 +42,7 @@ fn release_to_result(library: &Library, r: music_brainz::Release) -> Result<Sear
             m.tracks.map(|tracks| {
                 tracks
                     .into_iter()
-                    .map(|t| music_brainz::TrackWithMediumId(t, release.medium[i].id.clone()))
+                    .map(|t| music_brainz::TrackWithMediumId(t, release.medium[i].id))
                     .collect::<Vec<TrackWithMediumId>>()
             })
         })

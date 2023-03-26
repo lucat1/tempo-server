@@ -98,6 +98,6 @@ pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<
     // TODO: make the "," configurable
     Ok(json.into(
         release.title.clone(),
-        artist.into_iter().map(|a| a.name.clone()).join(","),
+        artist.iter().map(|a| a.name.clone()).join(","),
     ))
 }

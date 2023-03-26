@@ -211,7 +211,7 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
             .artist_credit
             .as_ref()
             .map_or(vec![], |acs| {
-                acs.into_iter().map(|ac| ac.artist.clone().into()).collect()
+                acs.iter().map(|ac| ac.artist.clone().into()).collect()
             });
         // Append artists for all other relations
         artists.append(
@@ -272,7 +272,7 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
 }
 
 impl Release {
-    pub fn to_full_release(self, library: &Library) -> Result<FullRelease> {
+    pub fn into_full_release(self, library: &Library) -> Result<FullRelease> {
         let original_date = maybe_date(
             self.release_group
                 .as_ref()
@@ -310,7 +310,7 @@ impl Release {
                 .unwrap_or_default()
                 .iter()
                 .map(|m| entity::Medium {
-                    id: m.id.unwrap_or_else(|| Uuid::new_v4()),
+                    id: m.id.unwrap_or_else(Uuid::new_v4),
                     release_id: self.id,
                     position: m.position.unwrap_or_default(),
                     tracks: m.track_count,

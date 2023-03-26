@@ -2,7 +2,6 @@ mod import;
 mod library;
 mod list;
 
-use axum::http::Method;
 use axum::{
     routing::{delete, get, patch, post, put},
     Router,
