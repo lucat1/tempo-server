@@ -38,6 +38,11 @@ pub enum ImportEdit {
     Cover(usize),
 }
 
+#[derive(Serialize, Clone)]
+pub struct ImportError {
+    message: String,
+}
+
 pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> {
     let path = get_settings()
         .map_err(|e| {
@@ -102,12 +107,22 @@ pub async fn edit(
     Ok(Json(import))
 }
 
-pub async fn run(Path(job): Path<Uuid>) -> Result<Json<()>, StatusCode> {
+pub async fn run(Path(job): Path<Uuid>) -> Result<Json<()>, (StatusCode, Json<ImportError>)> {
     let mut imports = JOBS.lock().await;
-    let import = imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
-    import::run(import.import)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let import = imports.remove(&job).ok_or((
+        StatusCode::NOT_FOUND,
+        Json(ImportError {
+            message: "".to_string(),
+        }),
+    ))?;
+    import::run(import.import).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ImportError {
+                message: e.to_string(),
+            }),
+        )
+    })?;
     Ok(Json(()))
 }
 

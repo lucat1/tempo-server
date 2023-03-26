@@ -4,7 +4,7 @@ use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
-use log::trace;
+use log::{info, trace};
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
@@ -237,14 +237,12 @@ fn get_downloads() -> Result<PathBuf> {
 }
 
 pub fn load(path: Option<PathBuf>) -> Result<Settings> {
-    let path = if let Some(p) = path {
-        p
-    } else {
+    let path = path.unwrap_or({
         let dirs = ProjectDirs::from("com", "github", CLI_NAME)
             .ok_or(eyre!("Could not locate program directories"))?;
         dirs.config_dir().join(PathBuf::from("config.toml"))
-    };
-    trace!("Loading config file: {:?}", path);
+    });
+    info!("Loading config file: {:?}", path);
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
     if set.libraries.is_empty() {

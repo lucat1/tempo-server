@@ -9,15 +9,15 @@ use entity::conflict::{
     ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, MEDIUM_CONFLICT,
     RELEASE_CONFLICT, TRACK_CONFLICT,
 };
+use entity::full::ArtistInfo;
 use entity::full::FullReleaseActive;
 use entity::full::{FullTrack, FullTrackActive};
 use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
     ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
-use eyre::bail;
-use eyre::{eyre, Result, WrapErr};
-use log::debug;
+use eyre::{bail, eyre, Result, WrapErr};
+use log::{info, trace};
 use rayon::prelude::*;
 use scan_dir::ScanDir;
 use sea_orm::{DbErr, EntityTrait, TransactionTrait};
@@ -86,11 +86,15 @@ pub async fn all_tracks(library: &Library, path: &PathBuf) -> Result<Vec<TrackFi
         .partition(Result::is_ok);
     let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
     let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
-    debug!("Found {} tracks, {} errors", tracks.len(), errors.len());
+    info!(
+        "Found {} tracks, {} files were ignored due to errors",
+        tracks.len(),
+        errors.len()
+    );
     if !errors.is_empty() {
         errors
             .iter()
-            .for_each(|e| debug!("Error while importing file:{}", e));
+            .for_each(|e| trace!("Error while importing file:{}", e));
     }
     Ok(tracks)
 }
@@ -103,6 +107,7 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
         Ok(&settings.libraries[lib])
     }?;
 
+    info!("Importing {:?} for library {:?}", path, library.name);
     let tracks = all_tracks(library, path).await?;
     if tracks.is_empty() {
         return Err(eyre!("No tracks to import were found"));
@@ -110,6 +115,11 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
 
     let source_release: internal::Release = tracks.clone().into();
     let source_tracks: Vec<internal::Track> = tracks.iter().map(|t| t.clone().into()).collect();
+    info!(
+        "Searching for {} - {}",
+        source_release.artists.join(", "),
+        source_release.title
+    );
     let compressed_search_results = fetch::search(library, &source_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
@@ -137,7 +147,7 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
     let covers = rank::rank_covers(library, covers_by_provider, &full_release);
     let selected = (
         full_release.release.id,
-        if covers.is_empty() { Some(0) } else { None },
+        if !covers.is_empty() { Some(0) } else { None },
     );
     Ok(Import {
         track_files: tracks,
@@ -204,6 +214,11 @@ pub async fn run(import: Import) -> Result<()> {
         .iter()
         .find(|sr| sr.search_result.0.release.id == import.selected.0)
         .ok_or(eyre!("Invalid selected release id"))?;
+    info!(
+        "Adding {} - {} to the library",
+        full_release.get_joined_artists()?,
+        full_release.release.title
+    );
 
     let mut picture = None;
     if let Some(selected_cover) = import.selected.1 {
@@ -220,13 +235,13 @@ pub async fn run(import: Import) -> Result<()> {
         })
     }
 
-    let release_root = PathBuf::from_str(
+    let release_root = library.path.join(PathBuf::from_str(
         strfmt(
             library.release_name.as_str(),
             &tag_to_string_map(&tags_from_full_release(full_release)?),
         )?
         .as_str(),
-    )?;
+    )?);
     let mut tasks: Vec<Job> = mapping
         .iter()
         .enumerate()
@@ -235,7 +250,14 @@ pub async fn run(import: Import) -> Result<()> {
             let tags = tags_from_combination(full_release, &full_track)?;
             let vars = tag_to_string_map(&tags);
             let track_name = strfmt(library.track_name.as_str(), &vars)?;
-            let dest = release_root.join(PathBuf::from_str(track_name.as_str())?);
+            let dest = release_root.join(PathBuf::from_str(
+                format!(
+                    "{}.{}",
+                    track_name.as_str(),
+                    import.track_files[from].format.ext()
+                )
+                .as_str(),
+            )?);
             full_track.track.format = Some(import.track_files[from].format);
             full_track.track.path = Some(path_to_str(&dest)?);
             Ok(Job {
@@ -260,16 +282,16 @@ pub async fn run(import: Import) -> Result<()> {
     );
 
     for dest in folders.iter() {
-        mkdirp(dest)?;
+        mkdirp(dest).wrap_err(eyre!("Could not create folder {:?} for release", dest))?;
     }
     if let Some(ref picture) = picture {
-        write_picture(library, picture, &release_root)?;
+        write_picture(library, picture, &release_root)
+            .wrap_err("Could not write the picture file")?;
     }
 
     tasks
         .par_iter_mut()
         .try_for_each(|task: &mut Job| -> Result<()> {
-            debug!("Beofre tagging {:?}", task.file);
             task.file.duplicate_to(library, &task.dest).wrap_err(eyre!(
                 "Could not copy track {:?} to its new location: {:?}",
                 task.file.path,
@@ -283,17 +305,14 @@ pub async fn run(import: Import) -> Result<()> {
             task.file
                 .apply(task.tags.clone())
                 .wrap_err(eyre!("Could not apply new tags to track: {:?}", task.dest))?;
-            if let Some(ref picture) = task.cover {
-                task.file.set_pictures(vec![picture.clone()])?;
-            }
             task.file
                 .write()
                 .wrap_err(eyre!("Could not write tags to track: {:?}", task.dest))?;
-
-            debug!(
-                "After tagging. Moved {:?} over to {:?}",
-                task.file, task.dest
-            );
+            if let Some(ref picture) = task.cover {
+                task.file
+                    .set_pictures(vec![picture.clone()])
+                    .wrap_err(eyre!("Could not add picture tag to file: {:?}", task.dest))?;
+            }
             Ok(())
         })?;
 
