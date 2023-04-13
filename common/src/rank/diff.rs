@@ -1,7 +1,7 @@
 use crate::rank::{Release, Track};
 use levenshtein::levenshtein;
 
-static TRACK_TITLE_FACTOR: usize = 1000;
+static TRACK_TITLE_FACTOR: usize = 5000;
 static TRACK_LENGTH_FACTOR: u64 = 300;
 static TRACK_DISC_FACTOR: u64 = 100;
 static TRACK_NUMBER_FACTOR: u64 = 200;
