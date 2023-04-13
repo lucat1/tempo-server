@@ -44,7 +44,7 @@ impl From<FullRelease> for Release {
         } = full_release;
         Release {
             title: release.title,
-            artists: artist.into_iter().map(|a| a.name.clone()).collect(),
+            artists: artist.into_iter().map(|a| a.name).collect(),
             discs: Some(medium.len() as u64),
             media: medium.first().as_ref().and_then(|m| m.format.clone()),
             tracks: None, // TODO: consider adding a track count in the media structure
@@ -62,7 +62,7 @@ impl From<FullTrack> for Track {
         let FullTrack { track, artist, .. } = full_track;
         Track {
             title: track.title,
-            artists: artist.into_iter().map(|a| a.name.clone()).collect(),
+            artists: artist.into_iter().map(|a| a.name).collect(),
             length: Some(track.length),
             disc: None, // TODO: see above
             number: Some(track.number),

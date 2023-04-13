@@ -28,9 +28,10 @@ use tag::{strs_from_combination, tags_from_combination, TagKey};
 use text_diff::{diff, Difference};
 
 use crate::theme::DialoguerTheme;
-use common::fetch::cover::{get_cover, search, Cover};
+use common::fetch::cover::{get_cover, search as fetch_search, Cover};
 use common::fetch::{get, search, SearchResult};
-use common::rank::{rank, rate_and_match, CoverRating};
+use common::internal;
+use common::rank::{rate_and_match, CoverRating};
 
 use base::database::get_database;
 use base::setting::get_settings;

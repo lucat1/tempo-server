@@ -318,7 +318,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tower",
- "tower-http",
+ "tower-http 0.3.5",
  "tower-layer",
  "tower-service",
 ]
@@ -578,14 +578,11 @@ version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
 dependencies = [
- "atty",
  "bitflags",
  "clap_derive 3.2.18",
  "clap_lex 0.2.4",
  "indexmap",
  "once_cell",
- "strsim",
- "termcolor",
  "textwrap",
 ]
 
@@ -649,53 +646,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "async-once-cell",
- "async-trait",
- "base",
- "chrono",
- "clap 3.2.23",
- "color-eyre",
- "common",
- "const_format",
- "dialoguer",
- "entity",
- "env_logger",
- "eyre",
- "futures",
- "image",
- "indicatif",
- "itertools 0.10.5",
- "lazy_static",
- "levenshtein",
- "log",
- "migration",
- "mime",
- "pathfinding",
- "rayon",
- "regex 1.7.1",
- "reqwest",
- "scan_dir",
- "scraper",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_path_to_error",
- "strfmt",
- "strum",
- "strum_macros",
- "tag",
- "text-diff",
- "tokio",
- "tokio-stream",
- "uuid",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -756,6 +706,7 @@ dependencies = [
  "log",
  "mime",
  "pathfinding",
+ "rayon",
  "reqwest",
  "scan_dir",
  "scraper",
@@ -765,9 +716,11 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_path_to_error",
+ "strfmt",
  "strum",
  "strum_macros",
  "tag",
+ "tokio",
  "toml 0.7.2",
  "uuid",
 ]
@@ -1237,6 +1190,12 @@ checksum = "a9c384f161156f5260c24a097c56119f9be8c798586aecc13afbcbe7b7e26bf8"
 dependencies = [
  "percent-encoding 2.2.0",
 ]
+
+[[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "futf"
@@ -2718,9 +2677,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db3a213adf02b3bcfd2d3846bb41cb22857d131789e01df434fb7e7bc0759b7"
+checksum = "1d2df5196e37bcc87abebc0053e20787d73847bb33134a69841207dd0a47f03b"
 dependencies = [
  "either",
  "rayon-core",
@@ -2728,9 +2687,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.10.2"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "356a0625f1954f730c0201cdab48611198dc6ce21f4acff55089b5a78e6e835b"
+checksum = "4b8f95bd6966f5c87776639160a66bd8ab9895d9d4ab01ddba9fc60661aebe8d"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
@@ -3806,9 +3765,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.25.0"
+version = "1.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8e00990ebabbe4c14c08aca901caed183ecd5c09562a12c824bb53d3c3fd3af"
+checksum = "03201d01c3c27a29c8a5cee5b55a93ddae1ccf6f08f65365c2c918f8c1b76f64"
 dependencies = [
  "autocfg",
  "bytes",
@@ -3821,7 +3780,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -3955,6 +3914,24 @@ dependencies = [
  "http-range-header",
  "pin-project-lite",
  "tower",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d1d42a9b3f3ec46ba828e8d376aec14592ea199f70a06a548587ecd1c4ab658"
+dependencies = [
+ "bitflags",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "http-range-header",
+ "pin-project-lite",
  "tower-layer",
  "tower-service",
 ]
@@ -4284,6 +4261,7 @@ dependencies = [
  "entity",
  "env_logger",
  "eyre",
+ "fs_extra",
  "futures",
  "image",
  "indicatif",
@@ -4313,6 +4291,7 @@ dependencies = [
  "text-diff",
  "tokio",
  "tokio-stream",
+ "tower-http 0.4.0",
  "uuid",
 ]
 

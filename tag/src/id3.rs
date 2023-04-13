@@ -2,7 +2,7 @@ extern crate id3;
 
 use crate::picture::{Picture, PictureType};
 use crate::TagKey;
-use base::setting::get_settings;
+use base::setting::Library;
 use core::convert::AsRef;
 use entity::TrackFormat;
 use eyre::{eyre, Result};
@@ -32,13 +32,13 @@ pub struct Tag {
 static EXTENDED_LEN_4: [&str; 1] = ["ASIN"];
 
 impl super::TagFrom for Tag {
-    fn from_path<P>(path: P) -> Result<Box<dyn crate::Tag>>
+    fn from_path<P>(library: &Library, path: P) -> Result<Box<dyn crate::Tag>>
     where
         P: AsRef<Path>,
     {
         Ok(Box::new(Tag {
             tag: id3::Tag::read_from_path(path)?,
-            separator: get_settings()?.tagging.id3_separator.to_string(),
+            separator: library.tagging.id3_separator.to_string(),
         }))
     }
 }

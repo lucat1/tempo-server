@@ -1,7 +1,7 @@
 use crate::rank::{Release, Track};
 use levenshtein::levenshtein;
 
-static TRACK_TITLE_FACTOR: usize = 1000;
+static TRACK_TITLE_FACTOR: usize = 5000;
 static TRACK_LENGTH_FACTOR: u64 = 300;
 static TRACK_DISC_FACTOR: u64 = 100;
 static TRACK_NUMBER_FACTOR: u64 = 200;
@@ -81,12 +81,11 @@ impl Diff for Release {
             )
             .unwrap_or_default()
             + if_both(self.date, other.date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR) as i64
+                d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR
             })
             .unwrap_or_default()
             + if_both(self.original_date, other.original_date, |d1, d2| {
-                (d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR)
-                    as i64
+                d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR
             })
             .unwrap_or_default()
     }
