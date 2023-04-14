@@ -2,16 +2,16 @@ pipeline:
   build:
     image: ghcr.io/rust-cross/rust-musl-cross:${IMAGE}
     commands:
-      - cargo build --release --target=${PLATFORM}
-      - musl-strip target/${PLATFORM}/release/tagger
-      - mv target/${PLATFORM}/release/tagger target/tagger-${ARCH}
-  deploy: 
+      - cargo build --package web --release --target=${PLATFORM}
+      - musl-strip target/${PLATFORM}/release/web
+      - mv target/${PLATFORM}/release/web target/web-${ARCH}
+  deploy:
     image: plugins/gitea-release
     settings:
       api_key:
         from_secret: gitea_token
       base_url: https://codeberg.org
-      files: target/tagger-${ARCH}
+      files: target/web-${ARCH}
 
 matrix:
   include:
