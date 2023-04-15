@@ -15,9 +15,9 @@ pub const UNKNOWN_TITLE: &str = "(unkown title)";
 pub struct Track {
     pub title: String,
     pub artists: Vec<String>,
-    pub length: Option<u64>,
-    pub disc: Option<u64>,
-    pub number: Option<u64>,
+    pub length: Option<u32>,
+    pub disc: Option<u32>,
+    pub number: Option<u32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -25,8 +25,8 @@ pub struct Release {
     pub title: String,
     pub artists: Vec<String>,
     pub media: Option<String>,
-    pub discs: Option<u64>,
-    pub tracks: Option<u64>,
+    pub discs: Option<u32>,
+    pub tracks: Option<u32>,
     pub country: Option<String>,
     pub label: Option<String>,
     pub release_type: Option<String>,
@@ -45,7 +45,7 @@ impl From<FullRelease> for Release {
         Release {
             title: release.title,
             artists: artist.into_iter().map(|a| a.name).collect(),
-            discs: Some(medium.len() as u64),
+            discs: Some(medium.len() as u32),
             media: medium.first().as_ref().and_then(|m| m.format.clone()),
             tracks: None, // TODO: consider adding a track count in the media structure
             country: release.country,
@@ -110,11 +110,11 @@ impl From<TrackFile> for Track {
                 .unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists: artists_from_tag(&file_singleton, TagKey::Artists),
             length: first_tag(&file_singleton, TagKey::Duration)
-                .and_then(|d| d.parse::<u64>().ok()),
+                .and_then(|d| d.parse::<u32>().ok()),
             disc: first_tag(&file_singleton, TagKey::DiscNumber)
-                .and_then(|d| d.parse::<u64>().ok()),
+                .and_then(|d| d.parse::<u32>().ok()),
             number: first_tag(&file_singleton, TagKey::TrackNumber)
-                .and_then(|d| d.parse::<u64>().ok()),
+                .and_then(|d| d.parse::<u32>().ok()),
         }
     }
 }
@@ -135,9 +135,9 @@ impl From<Vec<TrackFile>> for Release {
         Release {
             title: first_tag(&tracks, TagKey::Album).unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists,
-            discs: first_tag(&tracks, TagKey::TotalDiscs).and_then(|d| d.parse::<u64>().ok()),
+            discs: first_tag(&tracks, TagKey::TotalDiscs).and_then(|d| d.parse::<u32>().ok()),
             media: first_tag(&tracks, TagKey::Media),
-            tracks: first_tag(&tracks, TagKey::TotalTracks).and_then(|d| d.parse::<u64>().ok()),
+            tracks: first_tag(&tracks, TagKey::TotalTracks).and_then(|d| d.parse::<u32>().ok()),
             country: first_tag(&tracks, TagKey::ReleaseCountry),
             label: first_tag(&tracks, TagKey::RecordLabel),
             release_type: first_tag(&tracks, TagKey::ReleaseType),

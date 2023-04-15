@@ -13,9 +13,10 @@ pub struct Model {
     pub id: Uuid,
     pub medium_id: Uuid,
     pub title: String,
-    pub length: u64,
-    pub number: u64,
+    pub length: u32,
+    pub number: u32,
     pub genres: Genres,
+    pub recording_id: Uuid,
 
     pub format: Option<TrackFormat>,
     pub path: Option<String>,

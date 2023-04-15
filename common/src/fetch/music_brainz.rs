@@ -80,11 +80,11 @@ pub struct Area {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Medium {
     pub id: Option<Uuid>,
-    pub position: Option<u64>,
+    pub position: Option<u32>,
     #[serde(rename = "track-offset")]
-    pub track_offset: Option<u64>,
+    pub track_offset: Option<u32>,
     #[serde(rename = "track-count")]
-    pub track_count: u64,
+    pub track_count: u32,
     pub tracks: Option<Vec<Track>>,
     pub format: Option<String>,
 }
@@ -94,8 +94,8 @@ pub struct Track {
     pub id: Uuid,
     pub recording: Recording,
     pub number: String,
-    pub position: u64,
-    pub length: Option<u64>,
+    pub position: u32,
+    pub length: Option<u32>,
     pub title: String,
 }
 
@@ -104,7 +104,7 @@ pub struct Recording {
     pub relations: Vec<Relation>,
     pub disambiguation: String,
     pub id: Uuid,
-    pub length: Option<u64>,
+    pub length: Option<u32>,
     pub video: bool,
     #[serde(rename = "first-release-date")]
     pub first_release_date: Option<String>,
@@ -131,7 +131,7 @@ pub struct Work {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Genre {
     pub id: Uuid,
-    pub count: u64,
+    pub count: u32,
     pub disambiguation: String,
     pub name: String,
 }
@@ -234,6 +234,7 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
                         .map(|g| g.name)
                         .collect::<Vec<_>>(),
                 ),
+                recording_id: track.recording.id,
                 format: None,
                 path: None,
             },

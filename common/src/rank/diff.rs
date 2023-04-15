@@ -2,14 +2,14 @@ use crate::rank::{Release, Track};
 use levenshtein::levenshtein;
 
 static TRACK_TITLE_FACTOR: usize = 5000;
-static TRACK_LENGTH_FACTOR: u64 = 300;
-static TRACK_DISC_FACTOR: u64 = 100;
-static TRACK_NUMBER_FACTOR: u64 = 200;
+static TRACK_LENGTH_FACTOR: u32 = 300;
+static TRACK_DISC_FACTOR: u32 = 100;
+static TRACK_NUMBER_FACTOR: u32 = 200;
 
 static RELEASE_TITLE_FACTOR: usize = 1000;
 static RELEASE_MEDIA_FACTOR: usize = 10;
-static RELEASE_DISCS_FACTOR: u64 = 100;
-static RELEASE_TRACKS_FACTOR: u64 = 1000;
+static RELEASE_DISCS_FACTOR: u32 = 100;
+static RELEASE_TRACKS_FACTOR: u32 = 1000;
 static RELEASE_COUNTRY_FACTOR: usize = 5;
 static RELEASE_LABEL_FACTOR: usize = 5;
 static RELEASE_RELEASE_TYPE_FACTOR: usize = 50;

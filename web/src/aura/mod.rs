@@ -1,14 +1,17 @@
+mod tracks;
+
 use axum::{routing::get, Router};
 use jsonapi::api::*;
 use jsonapi::jsonapi_model;
 use jsonapi::model::*;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::response::Response;
 
 pub fn router() -> Router {
-    Router::new().route("/", get(root))
+    Router::new()
+        .route("/server", get(server))
+        .route("/tracks", get(tracks::tracks))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -26,7 +29,7 @@ struct Server {
 
 jsonapi_model!(Server; "server");
 
-async fn root() -> Response {
+async fn server() -> Response {
     Response(
         Server {
             id: "0".to_string(),
@@ -34,7 +37,9 @@ async fn root() -> Response {
             server: base::CLI_NAME.to_string(),
             server_version: base::VERSION.to_string(),
             auth_required: false,
-            features: vec!["albums".to_string(), "artists".to_string()],
+            features: vec![],
+            // TODO
+            // features: vec!["albums".to_string(), "artists".to_string()],
         }
         .to_jsonapi_document(),
     )

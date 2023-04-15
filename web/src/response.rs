@@ -34,3 +34,22 @@ impl IntoResponse for Response {
         }
     }
 }
+
+pub struct Error(pub StatusCode, pub String, pub Box<dyn std::error::Error>);
+
+impl IntoResponse for Error {
+    fn into_response(self) -> axum::response::Response {
+        let Error(code, title, err) = self;
+        (
+            code,
+            [(header::CONTENT_TYPE, "application/vnd.api+json")],
+            json_to_response(JsonApiError {
+                status: Some(code.to_string()),
+                title: Some(title),
+                detail: Some(err.to_string()),
+                ..Default::default()
+            }),
+        )
+            .into_response()
+    }
+}
