@@ -68,3 +68,12 @@ pub struct Track {
 }
 
 jsonapi_model!(Track; "tracks"; has many artists, albumartists, engigneers, instrumentalists, performers, mixers, producers, vocalists, lyricists, writers, composers, others);
+
+pub fn dedup_document(doc: &mut JsonApiDocument) {
+    if let JsonApiDocument::Data(d) = doc {
+        if let Some(ref mut included) = &mut d.included {
+            included.sort_by_key(|e| e.id.to_owned());
+            included.dedup_by_key(|e| e.id.to_owned());
+        }
+    }
+}

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use base::database::get_database;
 use chrono::Datelike;
 use entity::RelationType;
 use eyre::{eyre, Result};
@@ -9,8 +9,9 @@ use jsonapi::model::*;
 use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
 use uuid::Uuid;
 
-use super::documents::{Artist, ArtistCredit, Track};
+use super::documents::{dedup_document, Artist, ArtistCredit, Track};
 use crate::response::{Error, Response};
+use web::AppState;
 
 #[derive(Debug)]
 struct RelatedToTracks(
@@ -224,14 +225,7 @@ fn related_to_tracks(r: &RelatedToTracks) -> Result<Vec<Track>> {
     Ok(results)
 }
 
-pub async fn tracks() -> Result<Response, Error> {
-    let db = get_database().map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not get database connection".to_string(),
-            e.into(),
-        )
-    })?;
+pub async fn tracks(State(AppState(db)): State<AppState>) -> Result<Response, Error> {
     let tx = db.begin().await.map_err(|e| {
         Error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -263,11 +257,62 @@ pub async fn tracks() -> Result<Response, Error> {
     })?;
 
     let mut doc = vec_to_jsonapi_document(tracks);
-    if let JsonApiDocument::Data(d) = &mut doc {
-        if let Some(ref mut included) = &mut d.included {
-            included.sort_by_key(|e| e.id.to_owned());
-            included.dedup_by_key(|e| e.id.to_owned());
-        }
-    }
+    dedup_document(&mut doc);
+    Ok(Response(doc))
+}
+
+pub async fn track(
+    State(AppState(db)): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, Error> {
+    let tx = db.begin().await.map_err(|e| {
+        Error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Couldn't being database transaction".to_string(),
+            e.into(),
+        )
+    })?;
+    let tracks = entity::TrackEntity::find_by_id(id)
+        .all(&tx)
+        .await
+        .map_err(|e| {
+            Error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not fetch track".to_string(),
+                e.into(),
+            )
+        })?;
+    let RelatedToTracks(artists, mediums, releases, tracks) =
+        find_related_to_tracks(&tx, tracks).await.map_err(|e| {
+            println!("{:?}", e);
+            Error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not fetch entites related to the tracks".to_string(),
+                e.into(),
+            )
+        })?;
+    let (track, track_artist_credits, artist_relations) = tracks.first().ok_or(Error(
+        StatusCode::NOT_FOUND,
+        "Track not found".to_string(),
+        "Track not found".into(),
+    ))?;
+    let track = related_to_track(
+        track,
+        track_artist_credits,
+        artist_relations,
+        &artists,
+        &mediums,
+        &releases,
+    )
+    .map_err(|e| {
+        Error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Could not aggregate relation data".to_string(),
+            e.into(),
+        )
+    })?;
+
+    let mut doc = track.to_jsonapi_document();
+    dedup_document(&mut doc);
     Ok(Response(doc))
 }

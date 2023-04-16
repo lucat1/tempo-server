@@ -8,7 +8,9 @@ use axum::{
 };
 use tower_http::cors::{Any, CorsLayer};
 
-pub fn router() -> Router {
+use web::AppState;
+
+pub fn router() -> Router<AppState> {
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)

@@ -8,11 +8,13 @@ use jsonapi::model::*;
 use serde::{Deserialize, Serialize};
 
 use crate::response::Response;
+use web::AppState;
 
-pub fn router() -> Router {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/server", get(server))
         .route("/tracks", get(tracks::tracks))
+        .route("/tracks/:id", get(tracks::track))
 }
 
 #[derive(Serialize, Deserialize)]

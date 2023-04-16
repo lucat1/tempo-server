@@ -48,9 +48,11 @@ async fn main() -> Result<()> {
         .await?;
     migration::Migrator::up(get_database()?, None).await?;
 
+    let conn = get_database()?.clone();
     let app = Router::new()
         .nest("/aura", aura::router())
-        .nest("/internal", internal::router());
+        .nest("/internal", internal::router())
+        .with_state(web::AppState(conn));
 
     let addr: SocketAddr = cli
         .listen_address
