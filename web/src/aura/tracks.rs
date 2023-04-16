@@ -1,12 +1,15 @@
 use std::collections::VecDeque;
 
+use axum::body::StreamBody;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderName, StatusCode};
+use axum::response::AppendHeaders;
 use chrono::Datelike;
 use entity::RelationType;
 use eyre::{eyre, Result};
 use jsonapi::model::*;
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
+use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
+use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 
 use super::documents::{dedup_document, Artist, ArtistCredit, Track};
@@ -25,8 +28,8 @@ struct RelatedToTracks(
     )>,
 );
 
-async fn find_related_to_tracks<'a, C>(
-    db: &'a C,
+async fn find_related_to_tracks<C>(
+    db: &C,
     src_tracks: Vec<entity::Track>,
 ) -> Result<RelatedToTracks>
 where
@@ -132,7 +135,7 @@ fn artist_credit_to_artist_credit(
 fn related_to_track(
     track: &entity::Track,
     track_artist_credits: &Vec<entity::ArtistCredit>,
-    artist_relations: &Vec<entity::ArtistTrackRelation>,
+    artist_relations: &[entity::ArtistTrackRelation],
     artists: &HashMap<Uuid, entity::Artist>,
     mediums: &HashMap<Uuid, entity::Medium>,
     releases: &HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>)>,
@@ -146,7 +149,7 @@ fn related_to_track(
 
     let intersect = |credits: &Vec<entity::ArtistCredit>| -> Vec<ArtistCredit> {
         credits
-            .into_iter()
+            .iter()
             .filter_map(|ac| {
                 artists
                     .get(&ac.artist_id)
@@ -160,7 +163,7 @@ fn related_to_track(
             .iter()
             .filter(|ar| ar.relation_type == rel_type)
             .filter_map(|ar| artists.get(&ar.artist_id))
-            .map(|a| artist_to_artist(a))
+            .map(artist_to_artist)
             .collect()
     };
 
@@ -212,7 +215,7 @@ fn related_to_track(
 fn related_to_tracks(r: &RelatedToTracks) -> Result<Vec<Track>> {
     let RelatedToTracks(artists, mediums, releases, tracks) = r;
     let mut results = vec![];
-    for (track, track_artist_credits, artist_relations) in tracks.into_iter() {
+    for (track, track_artist_credits, artist_relations) in tracks.iter() {
         results.push(related_to_track(
             track,
             track_artist_credits,
@@ -241,7 +244,6 @@ pub async fn tracks(State(AppState(db)): State<AppState>) -> Result<Response, Er
         )
     })?;
     let r = find_related_to_tracks(&tx, tracks).await.map_err(|e| {
-        println!("{:?}", e);
         Error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "Could not fetch entites related to the tracks".to_string(),
@@ -261,6 +263,24 @@ pub async fn tracks(State(AppState(db)): State<AppState>) -> Result<Response, Er
     Ok(Response(doc))
 }
 
+async fn find_track_by_id(db: &DbConn, id: Uuid) -> Result<entity::Track, Error> {
+    entity::TrackEntity::find_by_id(id)
+        .one(db)
+        .await
+        .map_err(|e| {
+            Error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not fetch tracks".to_string(),
+                e.into(),
+            )
+        })?
+        .ok_or(Error(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+            "Not found".into(),
+        ))
+}
+
 pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
@@ -272,30 +292,18 @@ pub async fn track(
             e.into(),
         )
     })?;
-    let tracks = entity::TrackEntity::find_by_id(id)
-        .all(&tx)
-        .await
-        .map_err(|e| {
-            Error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not fetch track".to_string(),
-                e.into(),
-            )
-        })?;
+    let track = find_track_by_id(&db, id).await?;
     let RelatedToTracks(artists, mediums, releases, tracks) =
-        find_related_to_tracks(&tx, tracks).await.map_err(|e| {
-            println!("{:?}", e);
-            Error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not fetch entites related to the tracks".to_string(),
-                e.into(),
-            )
-        })?;
-    let (track, track_artist_credits, artist_relations) = tracks.first().ok_or(Error(
-        StatusCode::NOT_FOUND,
-        "Track not found".to_string(),
-        "Track not found".into(),
-    ))?;
+        find_related_to_tracks(&tx, vec![track])
+            .await
+            .map_err(|e| {
+                Error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Could not fetch entites related to the tracks".to_string(),
+                    e.into(),
+                )
+            })?;
+    let (track, track_artist_credits, artist_relations) = tracks.first().unwrap();
     let track = related_to_track(
         track,
         track_artist_credits,
@@ -315,4 +323,38 @@ pub async fn track(
     let mut doc = track.to_jsonapi_document();
     dedup_document(&mut doc);
     Ok(Response(doc))
+}
+
+pub async fn audio(
+    State(AppState(db)): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<
+    (
+        AppendHeaders<[(HeaderName, String); 1]>,
+        StreamBody<ReaderStream<tokio::fs::File>>,
+    ),
+    Error,
+> {
+    let track = find_track_by_id(&db, id).await?;
+    let path = track.path.ok_or(Error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Track does not have an associated path".to_string(),
+        "Track does not have an associated path".into(),
+    ))?;
+    let format = track.format.ok_or(Error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Track does not have an associated format".to_string(),
+        "Track does not have an associated format".into(),
+    ))?;
+    let file = tokio::fs::File::open(path).await.map_err(|e| {
+        Error(
+            StatusCode::NOT_FOUND,
+            "File not found".to_string(),
+            e.into(),
+        )
+    })?;
+    let stream = ReaderStream::new(file);
+    let body = StreamBody::new(stream);
+    let headers = AppendHeaders([(header::CONTENT_TYPE, format.mime())]);
+    Ok((headers, body))
 }

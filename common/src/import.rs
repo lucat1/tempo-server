@@ -248,7 +248,7 @@ pub async fn run(import: Import) -> Result<()> {
         .enumerate()
         .map(|(from, to)| -> Result<Job> {
             let mut full_track = &mut full_tracks[*to];
-            let tags = tags_from_combination(full_release, &full_track)?;
+            let tags = tags_from_combination(full_release, full_track)?;
             let vars = tag_to_string_map(&tags);
             let track_name = strfmt(library.track_name.as_str(), &vars)?;
             let dest = release_root.join(PathBuf::from_str(
