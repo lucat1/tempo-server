@@ -1,12 +1,12 @@
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
-use uuid::Uuid;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "image")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
+    // hash of path
+    pub id: String,
     pub format: base::ImageFormat,
     pub width: u32,
     pub height: u32,

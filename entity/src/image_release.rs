@@ -6,7 +6,7 @@ use uuid::Uuid;
 #[sea_orm(table_name = "image_release")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub image_id: Uuid,
+    pub image_id: String,
     #[sea_orm(primary_key)]
     pub release_id: Uuid,
 }
