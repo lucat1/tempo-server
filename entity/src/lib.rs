@@ -9,6 +9,10 @@ mod artist_credit_release;
 mod artist_credit_track;
 mod artist_track_relation;
 
+mod image;
+mod image_artist;
+mod image_release;
+
 pub mod conflict;
 pub mod full;
 
@@ -54,3 +58,16 @@ pub use artist_credit_track::ActiveModel as ArtistCreditTrackActive;
 pub use artist_credit_track::Column as ArtistCreditTrackColumn;
 pub use artist_credit_track::Entity as ArtistCreditTrackEntity;
 pub use artist_credit_track::Model as ArtistCreditTrack;
+
+pub use image::ActiveModel as ImageActive;
+pub use image::Column as ImageColumn;
+pub use image::Entity as ImageEntity;
+pub use image::Model as Image;
+pub use image_artist::ActiveModel as ImageArtistActive;
+pub use image_artist::Column as ImageArtistColumn;
+pub use image_artist::Entity as ImageArtistEntity;
+pub use image_artist::Model as ImageArtist;
+pub use image_release::ActiveModel as ImageReleaseActive;
+pub use image_release::Column as ImageReleaseColumn;
+pub use image_release::Entity as ImageReleaseEntity;
+pub use image_release::Model as ImageRelease;
