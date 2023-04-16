@@ -168,7 +168,7 @@ impl From<Artist> for entity::Artist {
 }
 
 fn artist_credit_id(ac: &ArtistCredit) -> String {
-    return ac.artist.id.to_string() + ac.joinphrase.as_ref().map_or("", |s| s.as_str());
+    return ac.artist.id.to_string() + "-" + ac.joinphrase.as_ref().map_or("", |s| s.as_str());
 }
 
 impl From<ArtistCredit> for entity::ArtistCredit {

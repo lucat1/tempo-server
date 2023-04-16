@@ -1,3 +1,4 @@
+mod documents;
 mod tracks;
 
 use axum::{routing::get, Router};

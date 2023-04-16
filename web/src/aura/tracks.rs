@@ -5,61 +5,12 @@ use base::database::get_database;
 use chrono::Datelike;
 use entity::RelationType;
 use eyre::{eyre, Result};
-use jsonapi::api::*;
-use jsonapi::jsonapi_model;
 use jsonapi::model::*;
 use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::documents::{Artist, ArtistCredit, Track};
 use crate::response::{Error, Response};
-
-#[derive(Serialize, Deserialize, Default)]
-struct Track {
-    // mandatory
-    id: Uuid,
-    title: String,
-    artists: Vec<String>,
-    album: String,
-
-    track: u32,
-    tracktotal: u32,
-    disc: u32,
-    disctotal: u32,
-    year: Option<i32>,
-    month: Option<u32>,
-    day: Option<u32>,
-    bpm: Option<u32>,
-    genres: Vec<String>,
-    #[serde(rename = "recording-mbid")]
-    recording_mbid: Uuid,
-    #[serde(rename = "track-mbid")]
-    track_mbid: Uuid,
-    albumartists: Vec<String>,
-    comments: Option<String>,
-
-    mimetype: String,
-    duration: Option<f32>,
-    framerate: Option<u32>,
-    framecount: Option<u32>,
-    channels: Option<u32>,
-    bitrate: Option<u32>,
-    bitdepth: Option<u32>,
-    size: Option<u32>,
-
-    engigneers: Vec<String>,
-    instrumentalists: Vec<String>,
-    performers: Vec<String>,
-    mixers: Vec<String>,
-    producers: Vec<String>,
-    vocalists: Vec<String>,
-    lyricists: Vec<String>,
-    writers: Vec<String>,
-    composers: Vec<String>,
-    others: Vec<String>,
-}
-
-jsonapi_model!(Track; "track");
 
 #[derive(Debug)]
 struct RelatedToTracks(
@@ -158,75 +109,117 @@ where
     Ok(RelatedToTracks(artists, mediums, releases, tracks))
 }
 
-fn related_to_tracks(r: RelatedToTracks) -> Result<Vec<Track>> {
+fn artist_to_artist(artist: &entity::Artist) -> Artist {
+    Artist {
+        id: artist.id,
+        name: artist.name.clone(),
+        sort_name: artist.sort_name.clone(),
+    }
+}
+
+fn artist_credit_to_artist_credit(
+    artist_credit: &entity::ArtistCredit,
+    artist: &entity::Artist,
+) -> ArtistCredit {
+    ArtistCredit {
+        id: artist_credit.id.clone(),
+        join_phrase: artist_credit.join_phrase.clone(),
+        artist: artist_to_artist(artist),
+    }
+}
+
+fn related_to_track(
+    track: &entity::Track,
+    track_artist_credits: &Vec<entity::ArtistCredit>,
+    artist_relations: &Vec<entity::ArtistTrackRelation>,
+    artists: &HashMap<Uuid, entity::Artist>,
+    mediums: &HashMap<Uuid, entity::Medium>,
+    releases: &HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>)>,
+) -> Result<Track> {
+    let medium = mediums
+        .get(&track.medium_id)
+        .ok_or(eyre!("Track {} doesn't belong to any medium", track.id))?;
+    let (release, release_artist_credits) = releases
+        .get(&medium.release_id)
+        .ok_or(eyre!("Medium {} doesn't belong to any release", medium.id))?;
+
+    let intersect = |credits: &Vec<entity::ArtistCredit>| -> Vec<ArtistCredit> {
+        credits
+            .into_iter()
+            .filter_map(|ac| {
+                artists
+                    .get(&ac.artist_id)
+                    .map(|artist| artist_credit_to_artist_credit(ac, artist))
+            })
+            .collect()
+    };
+
+    let get_artists_for_relation_type = |rel_type: RelationType| -> Vec<Artist> {
+        artist_relations
+            .iter()
+            .filter(|ar| ar.relation_type == rel_type)
+            .filter_map(|ar| artists.get(&ar.artist_id))
+            .map(|a| artist_to_artist(a))
+            .collect()
+    };
+
+    Ok(Track {
+        id: track.id,
+        title: track.title.clone(),
+        artists: intersect(track_artist_credits),
+        album: release.title.clone(),
+
+        track: track.number,
+        tracktotal: mediums
+            .iter()
+            .filter(|(_, med)| med.release_id == release.id)
+            .fold(0, |sum, (_, med)| sum + med.tracks),
+        disc: medium.position + 1,
+        disctotal: mediums
+            .iter()
+            .filter(|(_, med)| med.release_id == release.id)
+            .count() as u32,
+        year: release.date.map(|d| d.year()),
+        month: release.date.map(|d| d.month()),
+        day: release.date.map(|d| d.day()),
+        // TODO: bpm somehow?
+        genres: track.genres.0.clone(),
+        recording_mbid: track.recording_id,
+        track_mbid: track.id,
+        albumartists: intersect(release_artist_credits),
+
+        mimetype: track
+            .format
+            .ok_or(eyre!("Track doesn't have a format specified"))?
+            .mime(),
+
+        engigneers: get_artists_for_relation_type(RelationType::Engineer),
+        instrumentalists: get_artists_for_relation_type(RelationType::Instrument),
+        performers: get_artists_for_relation_type(RelationType::Performer),
+        mixers: get_artists_for_relation_type(RelationType::Mix),
+        producers: get_artists_for_relation_type(RelationType::Producer),
+        vocalists: get_artists_for_relation_type(RelationType::Vocal),
+        lyricists: get_artists_for_relation_type(RelationType::Lyricist),
+        writers: get_artists_for_relation_type(RelationType::Writer),
+        composers: get_artists_for_relation_type(RelationType::Composer),
+        // TODO: how to call "RelationType::Performance"
+        others: get_artists_for_relation_type(RelationType::Other),
+        ..Default::default()
+    })
+}
+
+fn related_to_tracks(r: &RelatedToTracks) -> Result<Vec<Track>> {
     let RelatedToTracks(artists, mediums, releases, tracks) = r;
     let mut results = vec![];
     for (track, track_artist_credits, artist_relations) in tracks.into_iter() {
-        let medium = mediums
-            .get(&track.medium_id)
-            .ok_or(eyre!("Track {} doesn't belong to any medium", track.id))?;
-        let (release, release_artist_credits) = releases
-            .get(&medium.release_id)
-            .ok_or(eyre!("Medium {} doesn't belong to any release", medium.id))?;
-
-        let get_artists_for_relation_type = |rel_type: RelationType| -> Vec<String> {
-            artist_relations
-                .iter()
-                .filter(|ar| ar.relation_type == rel_type)
-                .filter_map(|ar| artists.get(&ar.artist_id))
-                .map(|a| a.name.clone())
-                .collect()
-        };
-
-        results.push(Track {
-            id: track.id,
-            title: track.title,
-            artists: track_artist_credits
-                .into_iter()
-                .filter_map(|ac| artists.get(&ac.artist_id).map(|a| a.name.clone()))
-                .collect(),
-            album: release.title.clone(),
-
-            track: track.number,
-            tracktotal: mediums
-                .iter()
-                .filter(|(_, med)| med.release_id == release.id)
-                .fold(0, |sum, (_, med)| sum + med.tracks),
-            disc: medium.position + 1,
-            disctotal: mediums
-                .iter()
-                .filter(|(_, med)| med.release_id == release.id)
-                .count() as u32,
-            year: release.date.map(|d| d.year()),
-            month: release.date.map(|d| d.month()),
-            day: release.date.map(|d| d.day()),
-            // TODO: bpm somehow?
-            genres: track.genres.0,
-            recording_mbid: track.recording_id,
-            track_mbid: track.id,
-            albumartists: release_artist_credits
-                .into_iter()
-                .filter_map(|ac| artists.get(&ac.artist_id).map(|a| a.name.clone()))
-                .collect(),
-
-            mimetype: track
-                .format
-                .ok_or(eyre!("Track doesn't have a format specified"))?
-                .mime(),
-
-            engigneers: get_artists_for_relation_type(RelationType::Engineer),
-            instrumentalists: get_artists_for_relation_type(RelationType::Instrument),
-            performers: get_artists_for_relation_type(RelationType::Performer),
-            mixers: get_artists_for_relation_type(RelationType::Mix),
-            producers: get_artists_for_relation_type(RelationType::Producer),
-            vocalists: get_artists_for_relation_type(RelationType::Vocal),
-            lyricists: get_artists_for_relation_type(RelationType::Lyricist),
-            writers: get_artists_for_relation_type(RelationType::Writer),
-            composers: get_artists_for_relation_type(RelationType::Composer),
-            // TODO: how to call "RelationType::Performance"
-            others: get_artists_for_relation_type(RelationType::Other),
-            ..Default::default()
-        });
+        results.push(related_to_track(
+            track,
+            track_artist_credits,
+            artist_relations,
+            artists,
+            mediums,
+            releases,
+        )?);
     }
     Ok(results)
 }
@@ -261,7 +254,7 @@ pub async fn tracks() -> Result<Response, Error> {
             e.into(),
         )
     })?;
-    let tracks = related_to_tracks(r).map_err(|e| {
+    let tracks = related_to_tracks(&r).map_err(|e| {
         Error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "Could not aggregate relation data".to_string(),
@@ -269,5 +262,12 @@ pub async fn tracks() -> Result<Response, Error> {
         )
     })?;
 
-    Ok(Response(vec_to_jsonapi_document(tracks)))
+    let mut doc = vec_to_jsonapi_document(tracks);
+    if let JsonApiDocument::Data(d) = &mut doc {
+        if let Some(ref mut included) = &mut d.included {
+            included.sort_by_key(|e| e.id.to_owned());
+            included.dedup_by_key(|e| e.id.to_owned());
+        }
+    }
+    Ok(Response(doc))
 }
