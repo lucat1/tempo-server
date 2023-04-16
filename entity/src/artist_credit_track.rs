@@ -27,4 +27,16 @@ pub enum Relation {
     Track,
 }
 
+impl Related<super::artist_credit::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ArtistCredit.def()
+    }
+}
+
+impl Related<super::track::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Track.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}

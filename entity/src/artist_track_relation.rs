@@ -3,29 +3,29 @@ use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "i8", db_type = "Integer")]
+#[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum RelationType {
-    #[sea_orm(num_value = 0)]
+    #[sea_orm(string_value = "a")]
     Engineer,
-    #[sea_orm(num_value = 1)]
+    #[sea_orm(string_value = "b")]
     Instrument,
-    #[sea_orm(num_value = 2)]
+    #[sea_orm(string_value = "c")]
     Performer,
-    #[sea_orm(num_value = 3)]
+    #[sea_orm(string_value = "d")]
     Mix,
-    #[sea_orm(num_value = 4)]
+    #[sea_orm(string_value = "e")]
     Producer,
-    #[sea_orm(num_value = 5)]
+    #[sea_orm(string_value = "f")]
     Vocal,
-    #[sea_orm(num_value = 6)]
+    #[sea_orm(string_value = "g")]
     Lyricist,
-    #[sea_orm(num_value = 7)]
+    #[sea_orm(string_value = "h")]
     Writer,
-    #[sea_orm(num_value = 8)]
+    #[sea_orm(string_value = "i")]
     Composer,
-    #[sea_orm(num_value = 9)]
+    #[sea_orm(string_value = "j")]
     Performance,
-    #[sea_orm(num_value = 10)]
+    #[sea_orm(string_value = "k")]
     Other,
 }
 
@@ -56,48 +56,16 @@ impl EntityName for Entity {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 pub struct Model {
+    #[sea_orm(primary_key)]
     pub artist_id: Uuid,
+    #[sea_orm(primary_key)]
     pub track_id: Uuid,
+    #[sea_orm(primary_key)]
     pub relation_type: RelationType,
+    #[sea_orm(primary_key)]
     pub relation_value: String,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
-pub enum Column {
-    ArtistId,
-    TrackId,
-    RelationType,
-    RelationValue,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
-pub enum PrimaryKey {
-    ArtistId,
-    TrackId,
-    RelationType,
-}
-
-impl PrimaryKeyTrait for PrimaryKey {
-    type ValueType = (Uuid, Uuid, RelationType);
-
-    fn auto_increment() -> bool {
-        false
-    }
-}
-
-impl ColumnTrait for Column {
-    type EntityName = Entity;
-
-    fn def(&self) -> ColumnDef {
-        match self {
-            Self::ArtistId => ColumnType::Uuid.def(),
-            Self::TrackId => ColumnType::Uuid.def(),
-            Self::RelationType => ColumnType::Json.def(),
-            Self::RelationValue => ColumnType::String(None).def(),
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -114,6 +82,18 @@ pub enum Relation {
         to = "super::track::Column::Id"
     )]
     Track,
+}
+
+impl Related<super::artist::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Artist.def()
+    }
+}
+
+impl Related<super::track::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Track.def()
+    }
 }
 
 impl ActiveModelBehavior for ActiveModel {}

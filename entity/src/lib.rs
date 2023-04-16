@@ -41,6 +41,9 @@ pub use track::Column as TrackColumn;
 pub use track::Entity as TrackEntity;
 pub use track::Genres;
 pub use track::Model as Track;
+pub use track::TrackToArtist;
+pub use track::TrackToPerformer;
+pub use track::TrackToRelease;
 pub use track_format::TrackFormat;
 
 pub use artist_credit_release::ActiveModel as ArtistCreditReleaseActive;

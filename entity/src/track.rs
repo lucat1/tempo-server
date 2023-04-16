@@ -30,6 +30,8 @@ pub enum Relation {
         to = "super::medium::Column::Id"
     )]
     Medium,
+    #[sea_orm(has_many = "super::artist_track_relation::Entity")]
+    ArtistRelation,
 }
 
 impl Related<super::medium::Entity> for Entity {
@@ -50,11 +52,56 @@ impl Related<super::artist_credit::Entity> for Entity {
 
 impl Related<super::artist_track_relation::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_track_relation::Relation::Artist.def()
+        Relation::ArtistRelation.def()
     }
+}
 
-    fn via() -> Option<RelationDef> {
-        Some(super::artist_track_relation::Relation::Track.def().rev())
+#[derive(Debug)]
+pub struct TrackToRelease;
+
+impl Linked for TrackToRelease {
+    type FromEntity = super::track::Entity;
+
+    type ToEntity = super::release::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![
+            super::track::Relation::Medium.def(),
+            super::medium::Relation::Release.def(),
+        ]
+    }
+}
+
+#[derive(Debug)]
+pub struct TrackToArtist;
+
+impl Linked for TrackToArtist {
+    type FromEntity = super::track::Entity;
+
+    type ToEntity = super::artist::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![
+            super::artist_credit_track::Relation::Track.def(),
+            super::artist_credit_track::Relation::ArtistCredit.def(),
+            super::artist_credit::Relation::Artist.def(),
+        ]
+    }
+}
+
+#[derive(Debug)]
+pub struct TrackToPerformer;
+
+impl Linked for TrackToPerformer {
+    type FromEntity = super::track::Entity;
+
+    type ToEntity = super::artist::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![
+            super::artist_track_relation::Relation::Track.def(),
+            super::artist_track_relation::Relation::Artist.def(),
+        ]
     }
 }
 

@@ -29,21 +29,6 @@ impl TrackFormat {
         )
     }
 
-    pub fn from_mime(mime: &str) -> Result<TrackFormat> {
-        // Complete list here:
-        // https://crates.io/crates/infer#audio
-        match mime {
-            "audio/mpeg" => Ok(TrackFormat::Id3),
-            "audio/m4a" => Ok(TrackFormat::Mp4),
-            "audio/x-flac" => Ok(TrackFormat::Flac),
-            "audio/x-ape" => Ok(TrackFormat::Ape),
-            _ => Err(eyre!(
-                "Invalid file: either not an audio file or not a supported format:\n{:?}",
-                mime
-            )),
-        }
-    }
-
     pub fn from_ext(ext: &str) -> Result<TrackFormat> {
         match ext {
             "flac" => Ok(TrackFormat::Flac),
@@ -61,6 +46,31 @@ impl TrackFormat {
             TrackFormat::Id3 => "mp3",
             TrackFormat::Ape => "ape",
         }
+    }
+
+    pub fn from_mime(mime: &str) -> Result<TrackFormat> {
+        // Complete list here:
+        // https://crates.io/crates/infer#audio
+        match mime {
+            "audio/mpeg" => Ok(TrackFormat::Id3),
+            "audio/m4a" => Ok(TrackFormat::Mp4),
+            "audio/x-flac" => Ok(TrackFormat::Flac),
+            "audio/x-ape" => Ok(TrackFormat::Ape),
+            _ => Err(eyre!(
+                "Invalid file: either not an audio file or not a supported format:\n{:?}",
+                mime
+            )),
+        }
+    }
+
+    pub fn mime(&self) -> String {
+        match self {
+            TrackFormat::Id3 => "audio/mpeg",
+            TrackFormat::Mp4 => "audio/m4a",
+            TrackFormat::Flac => "audio/x-flac",
+            TrackFormat::Ape => "audio/x-ape",
+        }
+        .to_string()
     }
 }
 
