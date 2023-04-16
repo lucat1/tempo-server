@@ -11,7 +11,7 @@ use entity::conflict::{
 };
 use entity::full::ArtistInfo;
 use entity::full::FullReleaseActive;
-use entity::full::{FullTrack, FullTrackActive};
+use entity::full::FullTrackActive;
 use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
     ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
@@ -214,6 +214,7 @@ pub async fn run(import: Import) -> Result<()> {
         .iter()
         .find(|sr| sr.search_result.0.release.id == import.selected.0)
         .ok_or(eyre!("Invalid selected release id"))?;
+    let mut full_tracks = full_tracks.clone();
     info!(
         "Adding {} - {} to the library",
         full_release.get_joined_artists()?,
@@ -246,7 +247,7 @@ pub async fn run(import: Import) -> Result<()> {
         .iter()
         .enumerate()
         .map(|(from, to)| -> Result<Job> {
-            let mut full_track: FullTrack = full_tracks[*to].clone();
+            let mut full_track = &mut full_tracks[*to];
             let tags = tags_from_combination(full_release, &full_track)?;
             let vars = tag_to_string_map(&tags);
             let track_name = strfmt(library.track_name.as_str(), &vars)?;

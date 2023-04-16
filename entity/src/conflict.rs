@@ -60,6 +60,7 @@ lazy_static! {
         ArtistTrackRelationColumn::ArtistId,
         ArtistTrackRelationColumn::TrackId,
         ArtistTrackRelationColumn::RelationType,
+        ArtistTrackRelationColumn::RelationValue,
     ])
     .update_column(ArtistTrackRelationColumn::RelationValue)
     .to_owned();

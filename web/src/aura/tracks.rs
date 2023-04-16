@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use axum::http::StatusCode;
 use base::database::get_database;
 use chrono::Datelike;
+use entity::RelationType;
 use eyre::{eyre, Result};
 use jsonapi::api::*;
 use jsonapi::jsonapi_model;
@@ -34,10 +35,28 @@ struct Track {
     recording_mbid: Uuid,
     #[serde(rename = "track-mbid")]
     track_mbid: Uuid,
-    composers: Vec<String>,
     albumartists: Vec<String>,
     comments: Option<String>,
-    // mimetype: String,
+
+    mimetype: String,
+    duration: Option<f32>,
+    framerate: Option<u32>,
+    framecount: Option<u32>,
+    channels: Option<u32>,
+    bitrate: Option<u32>,
+    bitdepth: Option<u32>,
+    size: Option<u32>,
+
+    engigneers: Vec<String>,
+    instrumentalists: Vec<String>,
+    performers: Vec<String>,
+    mixers: Vec<String>,
+    producers: Vec<String>,
+    vocalists: Vec<String>,
+    lyricists: Vec<String>,
+    writers: Vec<String>,
+    composers: Vec<String>,
+    others: Vec<String>,
 }
 
 jsonapi_model!(Track; "track");
@@ -149,6 +168,16 @@ fn related_to_tracks(r: RelatedToTracks) -> Result<Vec<Track>> {
         let (release, release_artist_credits) = releases
             .get(&medium.release_id)
             .ok_or(eyre!("Medium {} doesn't belong to any release", medium.id))?;
+
+        let get_artists_for_relation_type = |rel_type: RelationType| -> Vec<String> {
+            artist_relations
+                .iter()
+                .filter(|ar| ar.relation_type == rel_type)
+                .filter_map(|ar| artists.get(&ar.artist_id))
+                .map(|a| a.name.clone())
+                .collect()
+        };
+
         results.push(Track {
             id: track.id,
             title: track.title,
@@ -180,12 +209,22 @@ fn related_to_tracks(r: RelatedToTracks) -> Result<Vec<Track>> {
                 .filter_map(|ac| artists.get(&ac.artist_id).map(|a| a.name.clone()))
                 .collect(),
 
-            // mimetype: track
-            //     .format
-            //     .ok_or(eyre!("Track doesn't have a format specified"))?
-            //     .mime(),
-            composers: vec![],
+            mimetype: track
+                .format
+                .ok_or(eyre!("Track doesn't have a format specified"))?
+                .mime(),
 
+            engigneers: get_artists_for_relation_type(RelationType::Engineer),
+            instrumentalists: get_artists_for_relation_type(RelationType::Instrument),
+            performers: get_artists_for_relation_type(RelationType::Performer),
+            mixers: get_artists_for_relation_type(RelationType::Mix),
+            producers: get_artists_for_relation_type(RelationType::Producer),
+            vocalists: get_artists_for_relation_type(RelationType::Vocal),
+            lyricists: get_artists_for_relation_type(RelationType::Lyricist),
+            writers: get_artists_for_relation_type(RelationType::Writer),
+            composers: get_artists_for_relation_type(RelationType::Composer),
+            // TODO: how to call "RelationType::Performance"
+            others: get_artists_for_relation_type(RelationType::Other),
             ..Default::default()
         });
     }
