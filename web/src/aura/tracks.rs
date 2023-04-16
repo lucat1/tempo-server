@@ -1,15 +1,15 @@
 use std::collections::VecDeque;
 
-use axum::body::StreamBody;
+use axum::body::Body;
 use axum::extract::{Path, State};
-use axum::http::{header, HeaderName, StatusCode};
-use axum::response::AppendHeaders;
+use axum::http::{Request, StatusCode};
+use axum::response::IntoResponse;
 use chrono::Datelike;
 use entity::RelationType;
 use eyre::{eyre, Result};
 use jsonapi::model::*;
 use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
-use tokio_util::io::ReaderStream;
+use tower::util::ServiceExt;
 use uuid::Uuid;
 
 use super::documents::{dedup_document, Artist, ArtistCredit, Track};
@@ -195,7 +195,8 @@ fn related_to_track(
         mimetype: track
             .format
             .ok_or(eyre!("Track doesn't have a format specified"))?
-            .mime(),
+            .mime()
+            .to_string(),
 
         engigneers: get_artists_for_relation_type(RelationType::Engineer),
         instrumentalists: get_artists_for_relation_type(RelationType::Instrument),
@@ -328,33 +329,25 @@ pub async fn track(
 pub async fn audio(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<
-    (
-        AppendHeaders<[(HeaderName, String); 1]>,
-        StreamBody<ReaderStream<tokio::fs::File>>,
-    ),
-    Error,
-> {
+    request: Request<Body>,
+) -> Result<impl IntoResponse, Error> {
     let track = find_track_by_id(&db, id).await?;
     let path = track.path.ok_or(Error(
         StatusCode::INTERNAL_SERVER_ERROR,
         "Track does not have an associated path".to_string(),
         "Track does not have an associated path".into(),
     ))?;
-    let format = track.format.ok_or(Error(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Track does not have an associated format".to_string(),
-        "Track does not have an associated format".into(),
-    ))?;
-    let file = tokio::fs::File::open(path).await.map_err(|e| {
-        Error(
-            StatusCode::NOT_FOUND,
-            "File not found".to_string(),
-            e.into(),
-        )
-    })?;
-    let stream = ReaderStream::new(file);
-    let body = StreamBody::new(stream);
-    let headers = AppendHeaders([(header::CONTENT_TYPE, format.mime())]);
-    Ok((headers, body))
+    let mime = track
+        .format
+        .ok_or(Error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Track does not have an associated format".to_string(),
+            "Track does not have an associated format".into(),
+        ))?
+        .mime();
+    Ok(
+        tower_http::services::fs::ServeFile::new_with_mime(path, &mime)
+            .oneshot(request)
+            .await,
+    )
 }

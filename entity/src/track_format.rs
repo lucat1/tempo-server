@@ -63,14 +63,13 @@ impl TrackFormat {
         }
     }
 
-    pub fn mime(&self) -> String {
+    pub fn mime(&self) -> mime::Mime {
         match self {
-            TrackFormat::Id3 => "audio/mpeg",
-            TrackFormat::Mp4 => "audio/m4a",
-            TrackFormat::Flac => "audio/x-flac",
-            TrackFormat::Ape => "audio/x-ape",
+            TrackFormat::Id3 => "audio/mpeg".parse().unwrap(),
+            TrackFormat::Mp4 => "audio/m4a".parse().unwrap(),
+            TrackFormat::Flac => "audio/x-flac".parse().unwrap(),
+            TrackFormat::Ape => "audio/x-ape".parse().unwrap(),
         }
-        .to_string()
     }
 }
 
