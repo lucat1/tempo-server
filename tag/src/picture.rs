@@ -23,6 +23,35 @@ pub enum PictureType {
     PublisherLogo,
 }
 
+impl ToString for PictureType {
+    fn to_string(&self) -> String {
+        match self {
+            PictureType::PublisherLogo => "publisher_logo",
+            PictureType::Other => "other",
+            PictureType::OtherIcon => "other_icon",
+            PictureType::Icon => "icon",
+            PictureType::CoverFront => "cover_front",
+            PictureType::CoverBack => "cover_back",
+            PictureType::Leaflet => "leaflet",
+            PictureType::Media => "media",
+            PictureType::LeadArtist => "lead_artist",
+            PictureType::Artist => "artist",
+            PictureType::Conductor => "conductor",
+            PictureType::Band => "band",
+            PictureType::BandLogo => "band_logo",
+            PictureType::Composer => "composer",
+            PictureType::Lyricist => "lyricist",
+            PictureType::RecordingLocation => "recording_location",
+            PictureType::DuringRecording => "during_recording",
+            PictureType::DuringPerformance => "during_performance",
+            PictureType::ScreenCapture => "screen_capture",
+            PictureType::BrightFish => "bright_fish",
+            PictureType::Illustration => "illustration",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Picture {
     pub mime_type: mime::Mime,

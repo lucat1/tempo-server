@@ -148,7 +148,7 @@ pub struct Art {
     #[serde(default)]
     pub format: ImageFormat,
     #[serde(default = "default_art_image_name")]
-    pub image_name: Option<String>,
+    pub image_name: String,
 
     #[serde(default = "default_provider_relevance")]
     pub provider_relevance: f64,
@@ -177,8 +177,8 @@ fn default_art_height() -> u32 {
     1200
 }
 
-fn default_art_image_name() -> Option<String> {
-    Some("cover".to_string())
+fn default_art_image_name() -> String {
+    "cover".to_string()
 }
 
 fn default_provider_relevance() -> f64 {

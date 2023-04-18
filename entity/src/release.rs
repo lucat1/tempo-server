@@ -18,6 +18,8 @@ pub struct Model {
     pub date: Option<NaiveDate>,
     pub original_date: Option<NaiveDate>,
     pub script: Option<String>,
+
+    pub path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

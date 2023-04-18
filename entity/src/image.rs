@@ -4,14 +4,16 @@ use serde::Serialize;
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "image")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
     // hash of path
+    #[sea_orm(primary_key, auto_increment = false, column_type = "String(Some(64))")]
     pub id: String,
+    pub role: String,
     pub format: base::ImageFormat,
+    pub description: Option<String>,
     pub width: u32,
     pub height: u32,
     pub size: u32,
-    #[sea_orm(primary_key)]
+    #[sea_orm(unique)]
     pub path: String,
 }
 
