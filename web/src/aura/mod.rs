@@ -1,5 +1,7 @@
+mod artists;
 mod documents;
 mod images;
+mod releases;
 mod tracks;
 
 use axum::{routing::get, Router};
@@ -17,6 +19,7 @@ pub fn router() -> Router<AppState> {
         .route("/tracks", get(tracks::tracks))
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
+        .route("/releases", get(releases::releases))
         .route("/images/:id", get(images::image))
         .route("/images/:id/file", get(images::file))
 }

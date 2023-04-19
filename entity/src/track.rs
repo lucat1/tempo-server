@@ -1,10 +1,7 @@
 use super::TrackFormat;
 use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct Genres(pub Vec<String>);
 
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "track")]
@@ -15,7 +12,7 @@ pub struct Model {
     pub title: String,
     pub length: u32,
     pub number: u32,
-    pub genres: Genres,
+    pub genres: crate::Genres,
     pub recording_id: Uuid,
 
     pub format: Option<TrackFormat>,

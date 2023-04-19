@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use uuid::Uuid;
 
 use base::setting::Library;
-use base::util::maybe_date;
+use base::util::{dedup, maybe_date};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Release {
@@ -280,6 +280,18 @@ impl Release {
                 .and_then(|r| r.first_release_date.clone()),
         );
         let label = self.label_info.first();
+        let genres = self
+            .media
+            .clone()
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|m| m.tracks.as_ref())
+            .flatten()
+            .filter_map(|t| t.recording.genres.as_ref())
+            .flatten()
+            .map(|g| g.name.to_owned())
+            .collect::<Vec<_>>();
+
         Ok(entity::full::FullRelease {
             release: entity::Release {
                 id: self.id,
@@ -290,6 +302,7 @@ impl Release {
                     .as_ref()
                     .and_then(|r| r.primary_type.as_ref())
                     .map(|s| s.to_lowercase()),
+                genres: entity::Genres(dedup(genres)),
                 asin: self.asin,
                 country: self.country,
                 label: label

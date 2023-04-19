@@ -10,6 +10,7 @@ pub struct Model {
     pub title: String,
     pub release_group_id: Option<Uuid>,
     pub release_type: Option<String>,
+    pub genres: crate::Genres,
     pub asin: Option<String>,
     pub country: Option<String>,
     pub label: Option<String>,

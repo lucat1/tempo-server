@@ -118,25 +118,6 @@ where
     Ok(RelatedToTracks(artists, mediums, releases, tracks))
 }
 
-fn artist_to_artist(artist: &entity::Artist) -> Artist {
-    Artist {
-        id: artist.id,
-        name: artist.name.clone(),
-        sort_name: artist.sort_name.clone(),
-    }
-}
-
-fn artist_credit_to_artist_credit(
-    artist_credit: &entity::ArtistCredit,
-    artist: &entity::Artist,
-) -> ArtistCredit {
-    ArtistCredit {
-        id: artist_credit.id.clone(),
-        join_phrase: artist_credit.join_phrase.clone(),
-        artist: artist_to_artist(artist),
-    }
-}
-
 fn related_to_track(
     track: &entity::Track,
     track_artist_credits: &Vec<entity::ArtistCredit>,
@@ -158,7 +139,7 @@ fn related_to_track(
             .filter_map(|ac| {
                 artists
                     .get(&ac.artist_id)
-                    .map(|artist| artist_credit_to_artist_credit(ac, artist))
+                    .map(|artist| super::artists::artist_credit_to_artist_credit(ac, artist))
             })
             .collect()
     };
@@ -168,7 +149,7 @@ fn related_to_track(
             .iter()
             .filter(|ar| ar.relation_type == rel_type)
             .filter_map(|ar| artists.get(&ar.artist_id))
-            .map(artist_to_artist)
+            .map(super::artists::artist_to_artist)
             .collect()
     };
 
@@ -176,7 +157,13 @@ fn related_to_track(
         id: track.id,
         title: track.title.clone(),
         artists: intersect(track_artist_credits),
-        album: release.title.clone(),
+        release: super::releases::related_to_release(
+            release,
+            release_artist_credits,
+            image,
+            artists,
+            mediums,
+        ),
         cover: super::images::image_to_image(image),
 
         track: track.number,
