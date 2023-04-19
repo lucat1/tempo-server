@@ -6,17 +6,18 @@ use base::util::mkdirp;
 use base::util::path_to_str;
 use entity::conflict::{
     ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
-    ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, MEDIUM_CONFLICT,
-    RELEASE_CONFLICT, TRACK_CONFLICT,
+    ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, IMAGE_CONFLICT_1,
+    IMAGE_CONFLICT_2, IMAGE_RELEASE_CONFLICT, MEDIUM_CONFLICT, RELEASE_CONFLICT, TRACK_CONFLICT,
 };
 use entity::full::ArtistInfo;
 use entity::full::FullReleaseActive;
 use entity::full::FullTrackActive;
 use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
-    ArtistTrackRelationEntity, MediumEntity, ReleaseEntity, TrackEntity,
+    ArtistTrackRelationEntity, Image, ImageActive, ImageEntity, ImageRelease, ImageReleaseActive,
+    ImageReleaseEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
-use eyre::{bail, eyre, Result, WrapErr};
+use eyre::{eyre, Result, WrapErr};
 use log::{info, trace};
 use rayon::prelude::*;
 use scan_dir::ScanDir;
@@ -26,7 +27,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::canonicalize;
 use std::fs::write;
-use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use strfmt::strfmt;
@@ -161,21 +161,6 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
     })
 }
 
-pub fn write_picture<P>(library: &Library, picture: &Picture, root: P) -> Result<()>
-where
-    P: AsRef<Path>,
-{
-    let cover_name = &library.art.image_name;
-    let name = match cover_name {
-        Some(n) => n.to_string(),
-        None => bail!("Picture write not required"),
-    };
-    let ext = picture.mime_type.subtype().as_str();
-    let filename = PathBuf::from_str((name + "." + ext).as_str())?;
-    let path = root.as_ref().join(filename);
-    write(path, &picture.data).map_err(|e| eyre!(e))
-}
-
 struct Job {
     file: TrackFile,
     dest: PathBuf,
@@ -206,15 +191,15 @@ pub async fn run(import: Import) -> Result<()> {
     }?;
 
     let RatedSearchResult {
-        search_result: SearchResult(full_release, full_tracks),
+        search_result: SearchResult(mut full_release, mut full_tracks),
         mapping,
         ..
     } = import
         .search_results
         .iter()
         .find(|sr| sr.search_result.0.release.id == import.selected.0)
-        .ok_or(eyre!("Invalid selected release id"))?;
-    let mut full_tracks = full_tracks.clone();
+        .ok_or(eyre!("Invalid selected release id"))?
+        .clone();
     info!(
         "Adding {} - {} to the library",
         full_release.get_joined_artists()?,
@@ -227,28 +212,42 @@ pub async fn run(import: Import) -> Result<()> {
             .covers
             .get(selected_cover)
             .ok_or(eyre!("Invalid selected cover"))?;
-        let (image, mime) = get_cover(library, &cover.1).await?;
-        picture = Some(Picture {
+        let (data, (width, height), mime) = get_cover(library, &cover.1).await?;
+        let size = data.len() as u32;
+        let pic = Picture {
             mime_type: mime,
             picture_type: PictureType::CoverFront,
-            description: "Front".to_string(),
-            data: image,
-        })
+            description: "Front cover".to_string(),
+            data,
+        };
+        let image = Image {
+            role: pic.picture_type.to_string(),
+            format: library.art.format,
+            description: None,
+            width,
+            height,
+            size,
+            // will be replaced afterwards
+            id: "".to_string(),
+            path: "".to_string(),
+        };
+        picture = Some((pic, image));
     }
 
     let release_root = library.path.join(PathBuf::from_str(
         strfmt(
             library.release_name.as_str(),
-            &tag_to_string_map(&tags_from_full_release(full_release)?),
+            &tag_to_string_map(&tags_from_full_release(&full_release)?),
         )?
         .as_str(),
     )?);
+    full_release.release.path = Some(path_to_str(&release_root)?);
     let mut tasks: Vec<Job> = mapping
         .iter()
         .enumerate()
         .map(|(from, to)| -> Result<Job> {
             let mut full_track = &mut full_tracks[*to];
-            let tags = tags_from_combination(full_release, full_track)?;
+            let tags = tags_from_combination(&full_release, full_track)?;
             let vars = tag_to_string_map(&tags);
             let track_name = strfmt(library.track_name.as_str(), &vars)?;
             let dest = release_root.join(PathBuf::from_str(
@@ -263,7 +262,7 @@ pub async fn run(import: Import) -> Result<()> {
             full_track.track.path = Some(path_to_str(&dest)?);
             Ok(Job {
                 file: import.track_files[from].clone(),
-                cover: picture.clone(),
+                cover: picture.clone().map(|(pic, _)| pic),
                 tags,
                 dest,
             })
@@ -285,11 +284,6 @@ pub async fn run(import: Import) -> Result<()> {
     for dest in folders.iter() {
         mkdirp(dest).wrap_err(eyre!("Could not create folder {:?} for release", dest))?;
     }
-    if let Some(ref picture) = picture {
-        write_picture(library, picture, &release_root)
-            .wrap_err("Could not write the picture file")?;
-    }
-
     tasks
         .par_iter_mut()
         .try_for_each(|task: &mut Job| -> Result<()> {
@@ -351,6 +345,38 @@ pub async fn run(import: Import) -> Result<()> {
         .exec(&tx)
         .await
         .ignore_none()?;
+
+    if let Some((pic, image)) = picture.as_mut() {
+        let cover_name = library.art.image_name.clone();
+        let ext = pic.mime_type.subtype().as_str();
+        let filename = PathBuf::from_str((cover_name + "." + ext).as_str())?;
+        let path = release_root.join(filename);
+
+        image.path = path_to_str(&path)?;
+        image.id = sha256::digest(image.path.to_owned());
+        write(path, &pic.data).map_err(|e| eyre!(e))?;
+        let image_release = ImageRelease {
+            image_id: image.id.to_owned(),
+            release_id: full_release.release.id,
+        };
+        println!("pre {:?}", image.id);
+        println!("copy {:?}", image_release.image_id);
+        let active_image: ImageActive = image.clone().into();
+        let active_image_release: ImageReleaseActive = image_release.into();
+
+        ImageEntity::insert(active_image)
+            .on_conflict(IMAGE_CONFLICT_1.to_owned())
+            .on_conflict(IMAGE_CONFLICT_2.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+
+        ImageReleaseEntity::insert(active_image_release)
+            .on_conflict(IMAGE_RELEASE_CONFLICT.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+    }
 
     for track in full_tracks.iter() {
         let FullTrackActive {

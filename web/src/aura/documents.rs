@@ -24,11 +24,26 @@ pub struct ArtistCredit {
 jsonapi_model!(ArtistCredit; "artist_credits"; has one artist);
 
 #[derive(Serialize, Deserialize, Default)]
+pub struct Image {
+    pub id: String,
+    pub role: String,
+    pub format: String,
+    pub description: Option<String>,
+    pub width: u32,
+    pub height: u32,
+    pub size: u32,
+}
+
+jsonapi_model!(Image; "image");
+
+#[derive(Serialize, Deserialize, Default)]
 pub struct Track {
     pub id: Uuid,
     pub title: String,
     pub artists: Vec<ArtistCredit>,
     pub album: String,
+    // TODO: either make it non-optional or make this optional
+    pub image: Image,
 
     pub track: u32,
     pub tracktotal: u32,
@@ -67,7 +82,7 @@ pub struct Track {
     pub others: Vec<Artist>,
 }
 
-jsonapi_model!(Track; "tracks"; has many artists, albumartists, engigneers, instrumentalists, performers, mixers, producers, vocalists, lyricists, writers, composers, others);
+jsonapi_model!(Track; "tracks"; has one image; has many artists, albumartists, engigneers, instrumentalists, performers, mixers, producers, vocalists, lyricists, writers, composers, others);
 
 pub fn dedup_document(doc: &mut JsonApiDocument) {
     if let JsonApiDocument::Data(d) = doc {

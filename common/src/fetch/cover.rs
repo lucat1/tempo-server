@@ -82,7 +82,7 @@ pub async fn search(library: &Library, release: &FullRelease) -> Result<Vec<Vec<
     }
 }
 
-pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, Mime)> {
+pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, (u32, u32), Mime)> {
     let start = Instant::now();
     let res = CLIENT.get(cover.url.clone()).send().await?;
     let req_time = start.elapsed();
@@ -123,5 +123,9 @@ pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, Mim
     let mut bytes: Vec<u8> = Vec::new();
     let format: ImageOutputFormat = library.art.format.clone().into();
     resized.write_to(&mut Cursor::new(&mut bytes), format)?;
-    Ok((bytes, library.art.format.mime()))
+    Ok((
+        bytes,
+        (resized.width(), resized.height()),
+        library.art.format.mime(),
+    ))
 }

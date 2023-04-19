@@ -18,6 +18,8 @@ pub struct Model {
     pub date: Option<NaiveDate>,
     pub original_date: Option<NaiveDate>,
     pub script: Option<String>,
+
+    pub path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -39,6 +41,16 @@ impl Related<super::artist_credit::Entity> for Entity {
 
     fn via() -> Option<RelationDef> {
         Some(super::artist_credit_release::Relation::Release.def().rev())
+    }
+}
+
+impl Related<super::image::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::image_release::Relation::Image.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::image_release::Relation::Release.def().rev())
     }
 }
 

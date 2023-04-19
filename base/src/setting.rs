@@ -1,4 +1,3 @@
-use super::util;
 use async_once_cell::OnceCell;
 use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
@@ -11,6 +10,9 @@ use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
+
+use super::image_format::ImageFormat;
+use super::util;
 
 lazy_static! {
     pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
@@ -117,27 +119,20 @@ impl Display for ArtProvider {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArtFormat {
-    Png,
-    #[default]
-    Jpeg,
-}
-
-impl ArtFormat {
+impl ImageFormat {
     pub fn mime(&self) -> Mime {
         match self {
-            ArtFormat::Png => IMAGE_PNG,
-            ArtFormat::Jpeg => IMAGE_JPEG,
+            ImageFormat::Png => IMAGE_PNG,
+            ImageFormat::Jpeg => IMAGE_JPEG,
         }
     }
 }
 
-impl From<ArtFormat> for ImageOutputFormat {
-    fn from(f: ArtFormat) -> Self {
+impl From<ImageFormat> for ImageOutputFormat {
+    fn from(f: ImageFormat) -> Self {
         match f {
-            ArtFormat::Png => ImageOutputFormat::Png,
-            ArtFormat::Jpeg => ImageOutputFormat::Jpeg(100),
+            ImageFormat::Png => ImageOutputFormat::Png,
+            ImageFormat::Jpeg => ImageOutputFormat::Jpeg(100),
         }
     }
 }
@@ -151,9 +146,9 @@ pub struct Art {
     #[serde(default = "default_art_height")]
     pub height: u32,
     #[serde(default)]
-    pub format: ArtFormat,
+    pub format: ImageFormat,
     #[serde(default = "default_art_image_name")]
-    pub image_name: Option<String>,
+    pub image_name: String,
 
     #[serde(default = "default_provider_relevance")]
     pub provider_relevance: f64,
@@ -182,8 +177,8 @@ fn default_art_height() -> u32 {
     1200
 }
 
-fn default_art_image_name() -> Option<String> {
-    Some("cover".to_string())
+fn default_art_image_name() -> String {
+    "cover".to_string()
 }
 
 fn default_provider_relevance() -> f64 {
@@ -204,7 +199,7 @@ impl Default for Art {
             providers: default_art_providers(),
             width: default_art_width(),
             height: default_art_height(),
-            format: ArtFormat::default(),
+            format: ImageFormat::default(),
             image_name: default_art_image_name(),
             provider_relevance: default_provider_relevance(),
             match_relevance: default_match_relevance(),

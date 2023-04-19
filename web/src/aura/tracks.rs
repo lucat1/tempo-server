@@ -12,7 +12,7 @@ use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait, ModelTrait, Tra
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
-use super::documents::{dedup_document, Artist, ArtistCredit, Track};
+use super::documents::{dedup_document, Artist, ArtistCredit, Image, Track};
 use crate::response::{Error, Response};
 use web::AppState;
 
@@ -20,7 +20,7 @@ use web::AppState;
 struct RelatedToTracks(
     pub HashMap<Uuid, entity::Artist>,
     pub HashMap<Uuid, entity::Medium>,
-    pub HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>)>,
+    pub HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>, entity::Image)>,
     pub  Vec<(
         entity::Track,
         Vec<entity::ArtistCredit>,
@@ -95,7 +95,12 @@ where
             artists.insert(artist.id, artist);
         }
         let medms = release.find_related(entity::MediumEntity).all(db).await?;
-        releases.insert(release.id, (release, release_artist_credits));
+        let images = release
+            .find_related(entity::ImageEntity)
+            .one(db)
+            .await?
+            .ok_or(eyre!("Release does not have an image"))?;
+        releases.insert(release.id, (release, release_artist_credits, images));
         for medium in medms.into_iter() {
             mediums.insert(medium.id, medium);
         }
@@ -132,18 +137,30 @@ fn artist_credit_to_artist_credit(
     }
 }
 
+fn image_to_image(image: &entity::Image) -> Image {
+    Image {
+        id: image.id.to_owned(),
+        role: image.role.to_owned(),
+        format: image.format.mime().to_string(),
+        description: image.description.to_owned(),
+        width: image.width,
+        height: image.height,
+        size: image.size,
+    }
+}
+
 fn related_to_track(
     track: &entity::Track,
     track_artist_credits: &Vec<entity::ArtistCredit>,
     artist_relations: &[entity::ArtistTrackRelation],
     artists: &HashMap<Uuid, entity::Artist>,
     mediums: &HashMap<Uuid, entity::Medium>,
-    releases: &HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>)>,
+    releases: &HashMap<Uuid, (entity::Release, Vec<entity::ArtistCredit>, entity::Image)>,
 ) -> Result<Track> {
     let medium = mediums
         .get(&track.medium_id)
         .ok_or(eyre!("Track {} doesn't belong to any medium", track.id))?;
-    let (release, release_artist_credits) = releases
+    let (release, release_artist_credits, image) = releases
         .get(&medium.release_id)
         .ok_or(eyre!("Medium {} doesn't belong to any release", medium.id))?;
 
@@ -172,6 +189,7 @@ fn related_to_track(
         title: track.title.clone(),
         artists: intersect(track_artist_credits),
         album: release.title.clone(),
+        image: image_to_image(image),
 
         track: track.number,
         tracktotal: mediums

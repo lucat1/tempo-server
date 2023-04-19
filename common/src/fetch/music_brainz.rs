@@ -305,6 +305,7 @@ impl Release {
                 },
                 original_date,
                 script: self.text_representation.and_then(|t| t.script),
+                path: None,
             },
             medium: self
                 .media
