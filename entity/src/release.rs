@@ -44,4 +44,14 @@ impl Related<super::artist_credit::Entity> for Entity {
     }
 }
 
+impl Related<super::image::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::image_release::Relation::Image.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::image_release::Relation::Release.def().rev())
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
