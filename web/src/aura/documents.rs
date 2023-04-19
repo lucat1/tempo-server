@@ -12,7 +12,7 @@ pub struct Artist {
     pub sort_name: String,
 }
 
-jsonapi_model!(Artist; "artists");
+jsonapi_model!(Artist; "artist");
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct ArtistCredit {
@@ -21,7 +21,7 @@ pub struct ArtistCredit {
     pub artist: Artist,
 }
 
-jsonapi_model!(ArtistCredit; "artist_credits"; has one artist);
+jsonapi_model!(ArtistCredit; "artist_credit"; has one artist);
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Image {
@@ -43,7 +43,7 @@ pub struct Track {
     pub artists: Vec<ArtistCredit>,
     pub album: String,
     // TODO: either make it non-optional or make this optional
-    pub image: Image,
+    pub cover: Image,
 
     pub track: u32,
     pub tracktotal: u32,
@@ -82,13 +82,26 @@ pub struct Track {
     pub others: Vec<Artist>,
 }
 
-jsonapi_model!(Track; "tracks"; has one image; has many artists, albumartists, engigneers, instrumentalists, performers, mixers, producers, vocalists, lyricists, writers, composers, others);
+jsonapi_model!(Track; "track"; has one cover; has many artists, albumartists, engigneers, instrumentalists, performers, mixers, producers, vocalists, lyricists, writers, composers, others);
 
 pub fn dedup_document(doc: &mut JsonApiDocument) {
     if let JsonApiDocument::Data(d) = doc {
         if let Some(ref mut included) = &mut d.included {
             included.sort_by_key(|e| e.id.to_owned());
             included.dedup_by_key(|e| e.id.to_owned());
+        }
+    }
+}
+
+pub fn filter_included(doc: &mut JsonApiDocument, include: Vec<String>) {
+    if let JsonApiDocument::Data(d) = doc {
+        if let Some(included) = &d.included {
+            let filtered = included
+                .into_iter()
+                .filter(|r| include.contains(&r._type))
+                .map(|r| r.to_owned())
+                .collect();
+            d.included = Some(filtered);
         }
     }
 }

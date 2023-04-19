@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use axum::body::Body;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
 use chrono::Datelike;
@@ -12,9 +12,9 @@ use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait, ModelTrait, Tra
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
-use super::documents::{dedup_document, Artist, ArtistCredit, Image, Track};
+use super::documents::{dedup_document, filter_included, Artist, ArtistCredit, Track};
 use crate::response::{Error, Response};
-use web::AppState;
+use web::{AppState, QueryParameters};
 
 #[derive(Debug)]
 struct RelatedToTracks(
@@ -137,18 +137,6 @@ fn artist_credit_to_artist_credit(
     }
 }
 
-fn image_to_image(image: &entity::Image) -> Image {
-    Image {
-        id: image.id.to_owned(),
-        role: image.role.to_owned(),
-        format: image.format.mime().to_string(),
-        description: image.description.to_owned(),
-        width: image.width,
-        height: image.height,
-        size: image.size,
-    }
-}
-
 fn related_to_track(
     track: &entity::Track,
     track_artist_credits: &Vec<entity::ArtistCredit>,
@@ -189,7 +177,7 @@ fn related_to_track(
         title: track.title.clone(),
         artists: intersect(track_artist_credits),
         album: release.title.clone(),
-        image: image_to_image(image),
+        cover: super::images::image_to_image(image),
 
         track: track.number,
         tracktotal: mediums
@@ -247,7 +235,10 @@ fn related_to_tracks(r: &RelatedToTracks) -> Result<Vec<Track>> {
     Ok(results)
 }
 
-pub async fn tracks(State(AppState(db)): State<AppState>) -> Result<Response, Error> {
+pub async fn tracks(
+    State(AppState(db)): State<AppState>,
+    Query(parameters): Query<QueryParameters>,
+) -> Result<Response, Error> {
     let tx = db.begin().await.map_err(|e| {
         Error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -279,6 +270,12 @@ pub async fn tracks(State(AppState(db)): State<AppState>) -> Result<Response, Er
 
     let mut doc = vec_to_jsonapi_document(tracks);
     dedup_document(&mut doc);
+    filter_included(
+        &mut doc,
+        parameters
+            .include
+            .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
+    );
     Ok(Response(doc))
 }
 
@@ -303,6 +300,7 @@ async fn find_track_by_id(db: &DbConn, id: Uuid) -> Result<entity::Track, Error>
 pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
+    Query(parameters): Query<QueryParameters>,
 ) -> Result<Response, Error> {
     let tx = db.begin().await.map_err(|e| {
         Error(
@@ -341,6 +339,12 @@ pub async fn track(
 
     let mut doc = track.to_jsonapi_document();
     dedup_document(&mut doc);
+    filter_included(
+        &mut doc,
+        parameters
+            .include
+            .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
+    );
     Ok(Response(doc))
 }
 

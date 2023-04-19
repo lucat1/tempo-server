@@ -10,7 +10,7 @@ use super::documents::Image;
 use crate::response::{Error, Response};
 use web::AppState;
 
-fn image_to_image(image: &entity::Image) -> Image {
+pub fn image_to_image(image: &entity::Image) -> Image {
     Image {
         id: image.id.to_owned(),
         role: image.role.to_owned(),
