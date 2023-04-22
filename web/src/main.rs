@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
         .filter_or(base::TAGGER_LOGLEVEL, "info")
         .write_style(base::TAGGER_STYLE);
     Builder::from_env(env)
-        .filter(Some("sqlx"), log::LevelFilter::Debug)
+        .filter(Some("sqlx"), log::LevelFilter::Warn)
         .init();
 
     let cli = Cli::parse();

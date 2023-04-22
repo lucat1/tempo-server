@@ -20,6 +20,7 @@ pub fn router() -> Router<AppState> {
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
         .route("/releases", get(releases::releases))
+        .route("/releases/:id", get(releases::release))
         .route("/images/:id", get(images::image))
         .route("/images/:id/file", get(images::file))
 }

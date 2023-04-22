@@ -8,7 +8,7 @@ use chrono::Datelike;
 use entity::RelationType;
 use eyre::{eyre, Result};
 use jsonapi::model::*;
-use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
@@ -266,14 +266,17 @@ pub async fn tracks(
     Ok(Response(doc))
 }
 
-async fn find_track_by_id(db: &DbConn, id: Uuid) -> Result<entity::Track, Error> {
+async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, Error>
+where
+    C: ConnectionTrait,
+{
     entity::TrackEntity::find_by_id(id)
         .one(db)
         .await
         .map_err(|e| {
             Error(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not fetch tracks".to_string(),
+                "Could not fetch track".to_string(),
                 e.into(),
             )
         })?
@@ -296,14 +299,14 @@ pub async fn track(
             e.into(),
         )
     })?;
-    let track = find_track_by_id(&db, id).await?;
+    let track = find_track_by_id(&tx, id).await?;
     let RelatedToTracks(artists, mediums, releases, tracks) =
         find_related_to_tracks(&tx, vec![track])
             .await
             .map_err(|e| {
                 Error(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Could not fetch entites related to the tracks".to_string(),
+                    "Could not fetch entites related to the track".to_string(),
                     e.into(),
                 )
             })?;
