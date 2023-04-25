@@ -128,7 +128,7 @@ pub struct RawQueryOptions {
 #[derive(Debug)]
 pub struct QueryOptions<C: Eq + Hash + TryFrom<String>> {
     pub include: Vec<String>,
-    pub filter: HashMap<String, String>,
+    pub filter: HashMap<C, String>,
     pub sort: HashMap<C, Order>,
 }
 
@@ -149,8 +149,17 @@ where
                 let raw_opts: RawQueryOptions = serde_qs::from_str(qs)
                     .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
 
+                let parse_key = |k: &str| -> Option<C> { k.to_owned().try_into().ok() };
+
                 let opts = QueryOptions {
-                    filter: raw_opts.filter.unwrap_or_default(),
+                    filter: raw_opts
+                        .filter
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|(k, v)| -> Option<(C, String)> {
+                            Some((parse_key(k.as_str())?, v))
+                        })
+                        .collect(),
                     include: raw_opts
                         .include
                         .as_ref()
@@ -162,9 +171,9 @@ where
                             s.split(",")
                                 .filter_map(|p| -> Option<(C, Order)> {
                                     if p.starts_with("-") {
-                                        Some((p[1..].to_owned().try_into().ok()?, Order::Desc))
+                                        Some((parse_key(&p[1..])?, Order::Desc))
                                     } else {
-                                        Some((p.to_owned().try_into().ok()?, Order::Asc))
+                                        Some((parse_key(p)?, Order::Asc))
                                     }
                                 })
                                 .collect()

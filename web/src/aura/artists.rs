@@ -1,7 +1,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use sea_orm::{EntityTrait, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -25,10 +25,12 @@ pub async fn artists(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<entity::ArtistColumn>,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
-    println!("{:?}", opts);
     let mut artists_query = entity::ArtistEntity::find();
     for (sort_key, sort_order) in opts.sort.into_iter() {
         artists_query = artists_query.order_by(sort_key, sort_order);
+    }
+    for (filter_key, filter_value) in opts.filter.into_iter() {
+        artists_query = artists_query.filter(ColumnTrait::eq(&filter_key, filter_value));
     }
     let artists = artists_query.all(&db).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
