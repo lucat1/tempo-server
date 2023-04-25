@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -37,3 +39,29 @@ impl Related<super::artist_track_relation::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "name" => Ok(Column::Name),
+            "sort_name" => Ok(Column::SortName),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

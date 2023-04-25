@@ -1,13 +1,13 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use sea_orm::EntityTrait;
+use sea_orm::{EntityTrait, QueryOrder};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::AppState;
 use crate::documents::ArtistAttributes;
-use crate::jsonapi::{ArtistResource, Document, DocumentData, Error, ResourceType};
+use crate::jsonapi::{ArtistResource, Document, DocumentData, Error, Query, ResourceType};
 
 pub fn entity_to_resource(entity: entity::Artist) -> ArtistResource {
     ArtistResource {
@@ -23,15 +23,18 @@ pub fn entity_to_resource(entity: entity::Artist) -> ArtistResource {
 
 pub async fn artists(
     State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::ArtistColumn>,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
-    let artists = entity::ArtistEntity::find()
-        .all(&db)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch all artists".to_string(),
-            detail: Some(e.into()),
-        })?;
+    println!("{:?}", opts);
+    let mut artists_query = entity::ArtistEntity::find();
+    for (sort_key, sort_order) in opts.sort.into_iter() {
+        artists_query = artists_query.order_by(sort_key, sort_order);
+    }
+    let artists = artists_query.all(&db).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch all artists".to_string(),
+        detail: Some(e.into()),
+    })?;
     Ok(Json(Document {
         data: DocumentData::Multi(artists.into_iter().map(entity_to_resource).collect()),
         included: Vec::new(),

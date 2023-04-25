@@ -1,8 +1,13 @@
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use axum::Json;
-use serde::Serialize;
-use std::{collections::HashMap, error::Error as StdError};
+use axum::{
+    async_trait,
+    extract::FromRequestParts,
+    http::{request::Parts, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
+use sea_orm::Order;
+use serde::{Deserialize, Serialize};
+use std::{cmp::Eq, collections::HashMap, error::Error as StdError, hash::Hash};
 use uuid::Uuid;
 
 use super::documents::{
@@ -110,5 +115,69 @@ impl IntoResponse for Error {
             detail: self.detail.map(|e| e.to_string()),
         };
         (self.status, Json(err)).into_response()
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RawQueryOptions {
+    include: Option<String>,
+    filter: Option<HashMap<String, String>>,
+    sort: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct QueryOptions<C: Eq + Hash + TryFrom<String>> {
+    pub include: Vec<String>,
+    pub filter: HashMap<String, String>,
+    pub sort: HashMap<C, Order>,
+}
+
+pub struct Query<C: Eq + Hash + TryFrom<String>>(pub QueryOptions<C>);
+
+#[async_trait]
+impl<S, C> FromRequestParts<S> for Query<C>
+where
+    S: Send + Sync,
+    C: Eq + Hash + TryFrom<String>,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
+        let query = parts.uri.query();
+        match query {
+            Some(qs) => {
+                let raw_opts: RawQueryOptions = serde_qs::from_str(qs)
+                    .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
+
+                let opts = QueryOptions {
+                    filter: raw_opts.filter.unwrap_or_default(),
+                    include: raw_opts
+                        .include
+                        .as_ref()
+                        .map(|s| s.split(",").map(|p| p.to_owned()).collect())
+                        .unwrap_or(Vec::new()),
+                    sort: raw_opts
+                        .sort
+                        .map(|s| {
+                            s.split(",")
+                                .filter_map(|p| -> Option<(C, Order)> {
+                                    if p.starts_with("-") {
+                                        Some((p[1..].to_owned().try_into().ok()?, Order::Desc))
+                                    } else {
+                                        Some((p.to_owned().try_into().ok()?, Order::Asc))
+                                    }
+                                })
+                                .collect()
+                        })
+                        .unwrap_or(HashMap::new()),
+                };
+                Ok(Query(opts))
+            }
+            None => Ok(Self(QueryOptions {
+                include: Vec::new(),
+                filter: HashMap::new(),
+                sort: HashMap::new(),
+            })),
+        }
     }
 }
