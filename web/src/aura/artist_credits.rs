@@ -1,21 +1,24 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use sea_orm::EntityTrait;
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
+};
 
 use super::AppState;
 use crate::documents::{ArtistCreditAttributes, ArtistCreditRelation};
 use crate::jsonapi::{
-    ArtistCreditResource, Document, DocumentData, Error, Related, Relation, RelationData,
+    ArtistCreditResource, Document, DocumentData, Error, Included, Related, Relation, RelationData,
     Relationship, ResourceType,
 };
 
-pub fn entity_to_resource(artist_credit: entity::ArtistCredit) -> ArtistCreditResource {
+pub fn entity_to_resource(artist_credit: &entity::ArtistCredit) -> ArtistCreditResource {
     ArtistCreditResource {
-        id: artist_credit.id,
+        id: artist_credit.id.to_owned(),
         r#type: ResourceType::ArtistCredit,
         attributes: ArtistCreditAttributes {
-            join_phrase: artist_credit.join_phrase,
+            join_phrase: artist_credit.join_phrase.to_owned(),
         },
         relationships: [(
             ArtistCreditRelation::Artist,
@@ -28,6 +31,10 @@ pub fn entity_to_resource(artist_credit: entity::ArtistCredit) -> ArtistCreditRe
         )]
         .into(),
     }
+}
+
+pub fn entity_to_included(artist_credit: &entity::ArtistCredit) -> Included {
+    Included::ArtistCredit(entity_to_resource(artist_credit))
 }
 
 pub async fn artist_credit(
@@ -48,7 +55,7 @@ pub async fn artist_credit(
             detail: None,
         })?;
     Ok(Json(Document {
-        data: DocumentData::Single(entity_to_resource(artist_credit)),
+        data: DocumentData::Single(entity_to_resource(&artist_credit)),
         included: Vec::new(),
     }))
 }

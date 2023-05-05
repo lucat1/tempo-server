@@ -16,9 +16,10 @@ use super::documents::{
     TrackRelation,
 };
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceType {
+    Image,
     Artist,
     ArtistCredit,
     Track,
@@ -85,6 +86,7 @@ pub enum Related {
     Track(RelationData<Uuid>),
     Medium(RelationData<Uuid>),
     Release(RelationData<Uuid>),
+    Image(RelationData<String>),
 }
 
 #[derive(Serialize)]
@@ -127,7 +129,7 @@ pub struct RawQueryOptions {
 
 #[derive(Debug)]
 pub struct QueryOptions<C: Eq + Hash + TryFrom<String>> {
-    pub include: Vec<String>,
+    pub include: Vec<ResourceType>,
     pub filter: HashMap<C, String>,
     pub sort: HashMap<C, Order>,
 }
@@ -152,6 +154,16 @@ where
                 let parse_key = |k: &str| -> Option<C> { k.to_owned().try_into().ok() };
 
                 let opts = QueryOptions {
+                    include: raw_opts
+                        .include
+                        .as_ref()
+                        .map(|s| -> Result<Vec<_>, serde_json::Error> {
+                            s.split(",")
+                                .map(|p| serde::from_str(p))
+                                .collect::<Result<Vec<_>, serde_json::Error>>()
+                        })
+                        .unwrap_or(Ok(Vec::new()))
+                        .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?,
                     filter: raw_opts
                         .filter
                         .unwrap_or_default()
@@ -160,11 +172,6 @@ where
                             Some((parse_key(k.as_str())?, v))
                         })
                         .collect(),
-                    include: raw_opts
-                        .include
-                        .as_ref()
-                        .map(|s| s.split(",").map(|p| p.to_owned()).collect())
-                        .unwrap_or(Vec::new()),
                     sort: raw_opts
                         .sort
                         .map(|s| {

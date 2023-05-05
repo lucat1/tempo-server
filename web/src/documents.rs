@@ -7,7 +7,13 @@ pub struct ArtistAttributes {
 }
 
 #[derive(Serialize, Hash, PartialEq, Eq)]
-pub enum ArtistRelation {}
+#[serde(rename_all = "snake_case")]
+pub enum ArtistRelation {
+    #[serde(rename = "images")]
+    Image,
+    #[serde(rename = "artist_credits")]
+    ArtistCredit,
+}
 
 #[derive(Serialize)]
 pub struct ArtistCreditAttributes {
