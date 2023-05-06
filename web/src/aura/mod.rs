@@ -1,9 +1,7 @@
-mod artist_credits;
 mod artists;
-// mod documents;
-// mod images;
-// mod releases;
-// mod tracks;
+mod images;
+mod releases;
+mod tracks;
 
 use axum::{routing::get, Router};
 use jsonapi::api::*;
@@ -17,16 +15,15 @@ use web::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/server", get(server))
+        .route("/images/:id", get(images::image))
+        .route("/images/:id/file", get(images::file))
         .route("/artists", get(artists::artists))
         .route("/artists/:id", get(artists::artist))
-        .route("/artist_credits/:id", get(artist_credits::artist_credit))
     // .route("/tracks", get(tracks::tracks))
     // .route("/tracks/:id", get(tracks::track))
     // .route("/tracks/:id/audio", get(tracks::audio))
     // .route("/releases", get(releases::releases))
     // .route("/releases/:id", get(releases::release))
-    // .route("/images/:id", get(images::image))
-    // .route("/images/:id/file", get(images::file))
 }
 
 #[derive(Serialize, Deserialize)]

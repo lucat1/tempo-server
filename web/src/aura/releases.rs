@@ -1,229 +1,142 @@
-use std::collections::VecDeque;
+use std::collections::HashMap;
 
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
 use chrono::Datelike;
-use eyre::{eyre, Result};
-use jsonapi::model::*;
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
-use uuid::Uuid;
+use itertools::Itertools;
+use sea_orm::{ConnectionTrait, DbErr, LoaderTrait};
 
-use super::documents::{dedup_document, filter_included, Release};
-use crate::response::{Error, Response};
-use web::{AppState, QueryParameters};
+use crate::documents::{
+    ArtistCreditAttributes, RecordingAttributes, ReleaseAttributes, ReleaseRelation,
+};
+use crate::jsonapi::{
+    Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
+    ReleaseResource, ResourceIdentifier, ResourceType,
+};
 
-#[derive(Debug)]
-struct RelatedToReleases(
-    pub HashMap<Uuid, entity::Artist>,
-    pub HashMap<Uuid, entity::Medium>,
-    pub Vec<(entity::Release, Vec<entity::ArtistCredit>, entity::Image)>,
-);
+#[derive(Default)]
+pub struct ReleaseRelated {
+    image: Option<entity::ImageRelease>,
+    artist_credits: Vec<entity::ArtistCredit>,
+    artists: Vec<Option<entity::Artist>>,
+    mediums: Vec<entity::Medium>,
+}
 
-async fn find_related_to_releases<C>(
+pub async fn related<C>(
     db: &C,
-    src_releases: Vec<entity::Release>,
-) -> Result<RelatedToReleases>
+    entities: &Vec<entity::Release>,
+) -> Result<Vec<ReleaseRelated>, DbErr>
 where
     C: ConnectionTrait,
 {
-    let mut artists = HashMap::new();
-    let mut mediums = HashMap::new();
-    let mut releases = Vec::new();
-
-    let mut artist_credits: VecDeque<_> = src_releases
+    let artist_credits = entities
         .load_many_to_many(
             entity::ArtistCreditEntity,
             entity::ArtistCreditReleaseEntity,
             db,
         )
-        .await?
-        .into();
-    let artsts: VecDeque<_> = artist_credits
-        .clone()
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .load_one(entity::ArtistEntity, db)
-        .await?
-        .into_iter()
-        .flatten()
-        .collect();
-    for artist in artsts {
-        artists.insert(artist.id, artist);
-    }
-    let medms = src_releases
-        .load_many(entity::MediumEntity, db)
-        .await?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
-    for medium in medms {
-        mediums.insert(medium.id, medium);
-    }
+        .await?;
+    let images = entities.load_one(entity::ImageReleaseEntity, db).await?;
+    let mediums = entities.load_many(entity::MediumEntity, db).await?;
 
-    for release in src_releases.into_iter() {
-        let image = release
-            .find_related(entity::ImageEntity)
-            .one(db)
-            .await?
-            .ok_or(eyre!(
-                "Release {} doesn't have an associated image",
-                release.id
-            ))?;
-        releases.push((
-            release,
-            artist_credits
-                .pop_front()
-                .ok_or(eyre!("Missing artist credits relations"))?,
-            image,
-        ))
-    }
+    let mut related = Vec::new();
+    for i in 0..entities.len() {
+        let artist_credits = &artist_credits[i];
+        let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
 
-    Ok(RelatedToReleases(artists, mediums, releases))
-}
-
-fn related_to_releases(r: &RelatedToReleases) -> Result<Vec<Release>> {
-    let RelatedToReleases(artists, mediums, releases) = r;
-    let mut results = vec![];
-    for (release, artist_credits, image) in releases.iter() {
-        results.push(related_to_release(
-            release,
-            artist_credits,
-            image,
+        related.push(ReleaseRelated {
+            image: images[i].to_owned(),
+            artist_credits: artist_credits.to_owned(),
             artists,
-            mediums,
-        ));
+            mediums: mediums[i].to_owned(),
+        });
     }
-    Ok(results)
+
+    Ok(related)
 }
 
-pub fn related_to_release(
-    release: &entity::Release,
-    artist_credits: &Vec<entity::ArtistCredit>,
-    image: &entity::Image,
-    artists: &HashMap<Uuid, entity::Artist>,
-    mediums: &HashMap<Uuid, entity::Medium>,
-) -> Release {
-    let artists = artist_credits
-        .iter()
-        .filter_map(|ac| {
-            artists
-                .get(&ac.artist_id)
-                .map(|artist| super::artists::artist_credit_to_artist_credit(ac, artist))
-        })
-        .collect();
-    Release {
-        id: release.id,
-        title: release.title.to_owned(),
+pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) -> ReleaseResource {
+    let ReleaseRelated {
+        image,
+        artist_credits,
         artists,
-        disctotal: mediums
-            .values()
-            .filter(|m| m.release_id == release.id)
-            .count() as u32,
-        tracktotal: mediums
-            .values()
-            .filter(|m| m.release_id == release.id)
-            .fold(0, |c, m| c + m.tracks) as u32,
-        genres: release.genres.0.to_owned(),
-        release_mbid: release.id,
-        release_group_mbid: release.release_group_id,
-        year: release.date.map(|d| d.year()),
-        day: release.date.map(|d| d.day()),
-        month: release.date.map(|d| d.month()),
-        image: super::images::image_to_image(image),
+        mediums,
+    } = related;
+    let mut relationships = HashMap::new();
+    if let Some(img) = image {
+        relationships.insert(
+            ReleaseRelation::Image,
+            Relationship {
+                data: Relation::Single(Related::Image(ResourceIdentifier {
+                    r#type: ResourceType::Image,
+                    id: img.image_id.to_owned(),
+                    meta: None,
+                })),
+            },
+        );
+    }
+    let mut related_artists = Vec::new();
+    for (i, ac) in artist_credits.into_iter().enumerate() {
+        if let Some(artist) = &artists[i] {
+            related_artists.push(Related::Artist(ResourceIdentifier {
+                r#type: ResourceType::Artist,
+                id: artist.id.to_owned(),
+                meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
+                    join_phrase: ac.join_phrase.to_owned(),
+                })),
+            }));
+        }
+    }
+    if !related_artists.is_empty() {
+        relationships.insert(
+            ReleaseRelation::Artists,
+            Relationship {
+                data: Relation::Multi(related_artists),
+            },
+        );
+    }
+    if !mediums.is_empty() {
+        relationships.insert(
+            ReleaseRelation::Mediums,
+            Relationship {
+                data: Relation::Multi(
+                    mediums
+                        .iter()
+                        .map(|m| {
+                            Related::Medium(ResourceIdentifier {
+                                r#type: ResourceType::Medium,
+                                id: m.id,
+                                meta: None,
+                            })
+                        })
+                        .collect(),
+                ),
+            },
+        );
+    }
+
+    ReleaseResource {
+        r#type: ResourceType::Release,
+        id: entity.id,
+        attributes: ReleaseAttributes {
+            title: entity.title.to_owned(),
+            disctotal: mediums.len() as u32,
+            tracktotal: mediums.iter().fold(0, |acc, m| acc + m.tracks),
+            genres: entity.genres.0.to_owned(),
+
+            year: entity.date.map(|d| d.year()),
+            month: entity.date.map(|d| d.month()),
+            day: entity.date.map(|d| d.day()),
+            original_year: entity.original_date.map(|d| d.year()),
+            original_month: entity.original_date.map(|d| d.month()),
+            original_day: entity.original_date.map(|d| d.day()),
+
+            release_type: entity.release_type.to_owned(),
+            release_mbid: entity.id,
+            release_group_mbid: entity.release_group_id,
+        },
+        relationships,
     }
 }
 
-pub async fn releases(
-    State(AppState(db)): State<AppState>,
-    Query(parameters): Query<QueryParameters>,
-) -> Result<Response, Error> {
-    let tx = db.begin().await.map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Couldn't being database transaction".to_string(),
-            e.into(),
-        )
-    })?;
-    let releases = entity::ReleaseEntity::find().all(&tx).await.map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not fetch releases".to_string(),
-            e.into(),
-        )
-    })?;
-    let r = find_related_to_releases(&tx, releases).await.map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not fetch entites related to the tracks".to_string(),
-            e.into(),
-        )
-    })?;
-    let releases = related_to_releases(&r).map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Could not aggregate relation data".to_string(),
-            e.into(),
-        )
-    })?;
-
-    let mut doc = vec_to_jsonapi_document(releases);
-    dedup_document(&mut doc);
-    filter_included(
-        &mut doc,
-        parameters
-            .include
-            .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
-    );
-    Ok(Response(doc))
-}
-
-pub async fn release(
-    State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
-    Query(parameters): Query<QueryParameters>,
-) -> Result<Response, Error> {
-    let tx = db.begin().await.map_err(|e| {
-        Error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Couldn't being database transaction".to_string(),
-            e.into(),
-        )
-    })?;
-    let release = entity::ReleaseEntity::find_by_id(id)
-        .one(&tx)
-        .await
-        .map_err(|e| {
-            Error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not fetch release".to_string(),
-                e.into(),
-            )
-        })?
-        .ok_or(Error(
-            StatusCode::NOT_FOUND,
-            "Not found".to_string(),
-            "Not found".into(),
-        ))?;
-    let RelatedToReleases(artists, mediums, releases) =
-        find_related_to_releases(&tx, vec![release])
-            .await
-            .map_err(|e| {
-                Error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Could not fetch entites related to the release".to_string(),
-                    e.into(),
-                )
-            })?;
-    let (release, artist_credits, image) = releases.first().unwrap();
-    let track = related_to_release(release, artist_credits, image, &artists, &mediums);
-    let mut doc = track.to_jsonapi_document();
-    dedup_document(&mut doc);
-    filter_included(
-        &mut doc,
-        parameters
-            .include
-            .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
-    );
-    Ok(Response(doc))
+pub fn entity_to_included(entity: &entity::Release, related: &ReleaseRelated) -> Included {
+    Included::Release(entity_to_resource(entity, related))
 }

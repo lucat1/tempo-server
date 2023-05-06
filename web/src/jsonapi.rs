@@ -10,10 +10,13 @@ use serde::{Deserialize, Serialize};
 use std::{cmp::Eq, collections::HashMap, error::Error as StdError, hash::Hash};
 use uuid::Uuid;
 
+use crate::documents::{
+    ArtistCreditAttributes, ImageAttributes, ImageRelation, RecordingAttributes,
+};
+
 use super::documents::{
-    ArtistAttributes, ArtistCreditAttributes, ArtistCreditRelation, ArtistRelation,
-    MediumAttributes, MediumRelation, ReleaseAttributes, ReleaseRelation, TrackAttributes,
-    TrackRelation,
+    ArtistAttributes, ArtistRelation, MediumAttributes, MediumRelation, ReleaseAttributes,
+    ReleaseRelation, TrackAttributes, TrackRelation,
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -21,14 +24,13 @@ use super::documents::{
 pub enum ResourceType {
     Image,
     Artist,
-    ArtistCredit,
     Track,
     Medium,
     Release,
 }
 
+pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
-pub type ArtistCreditResource = Resource<String, ArtistCreditAttributes, ArtistCreditRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
 pub type MediumResource = Resource<Uuid, MediumAttributes, MediumRelation>;
 pub type ReleaseResource = Resource<Uuid, ReleaseAttributes, ReleaseRelation>;
@@ -36,8 +38,8 @@ pub type ReleaseResource = Resource<Uuid, ReleaseAttributes, ReleaseRelation>;
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum Included {
+    Image(ImageResource),
     Artist(ArtistResource),
-    ArtistCredit(ArtistCreditResource),
     Track(TrackResource),
     Medium(MediumResource),
     Release(ReleaseResource),
@@ -81,18 +83,26 @@ pub enum Relation {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum Related {
-    Artist(RelationData<Uuid>),
-    ArtistCredit(RelationData<String>),
-    Track(RelationData<Uuid>),
-    Medium(RelationData<Uuid>),
-    Release(RelationData<Uuid>),
-    Image(RelationData<String>),
+    Artist(ResourceIdentifier<Uuid>),
+    Track(ResourceIdentifier<Uuid>),
+    Medium(ResourceIdentifier<Uuid>),
+    Release(ResourceIdentifier<Uuid>),
+    Image(ResourceIdentifier<String>),
 }
 
 #[derive(Serialize)]
-pub struct RelationData<I> {
+#[serde(untagged)]
+pub enum Meta {
+    ArtistCredit(ArtistCreditAttributes),
+    Recording(RecordingAttributes),
+}
+
+#[derive(Serialize)]
+pub struct ResourceIdentifier<I> {
     pub r#type: ResourceType,
     pub id: I,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Meta>,
 }
 
 pub struct Error {
@@ -128,19 +138,22 @@ pub struct RawQueryOptions {
 }
 
 #[derive(Debug)]
-pub struct QueryOptions<C: Eq + Hash + TryFrom<String>> {
-    pub include: Vec<ResourceType>,
+pub struct QueryOptions<C: Eq + Hash + TryFrom<String>, I: for<'a> Deserialize<'a>> {
+    pub include: Vec<I>,
     pub filter: HashMap<C, String>,
     pub sort: HashMap<C, Order>,
 }
 
-pub struct Query<C: Eq + Hash + TryFrom<String>>(pub QueryOptions<C>);
+pub struct Query<C: Eq + Hash + TryFrom<String>, I: for<'a> Deserialize<'a>>(
+    pub QueryOptions<C, I>,
+);
 
 #[async_trait]
-impl<S, C> FromRequestParts<S> for Query<C>
+impl<S, C, I> FromRequestParts<S> for Query<C, I>
 where
     S: Send + Sync,
     C: Eq + Hash + TryFrom<String>,
+    I: for<'a> Deserialize<'a>,
 {
     type Rejection = (StatusCode, String);
 
@@ -159,7 +172,7 @@ where
                         .as_ref()
                         .map(|s| -> Result<Vec<_>, serde_json::Error> {
                             s.split(",")
-                                .map(|p| serde::from_str(p))
+                                .map(|p| serde_json::from_str(&("\"".to_owned() + p + "\"")))
                                 .collect::<Result<Vec<_>, serde_json::Error>>()
                         })
                         .unwrap_or(Ok(Vec::new()))

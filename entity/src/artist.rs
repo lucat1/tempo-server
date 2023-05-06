@@ -21,7 +21,9 @@ pub enum Relation {
     #[sea_orm(has_many = "super::artist_credit::Entity")]
     ArtistCredit,
     #[sea_orm(has_many = "super::image_artist::Entity")]
-    ArtistImage,
+    Image,
+    #[sea_orm(has_many = "super::artist_track_relation::Entity")]
+    TrackRelation,
 }
 
 impl Related<super::artist_credit::Entity> for Entity {
@@ -32,7 +34,7 @@ impl Related<super::artist_credit::Entity> for Entity {
 
 impl Related<super::image_artist::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::ArtistImage.def()
+        Relation::Image.def()
     }
 }
 
@@ -48,11 +50,7 @@ impl Related<super::image::Entity> for Entity {
 
 impl Related<super::artist_track_relation::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_track_relation::Relation::Track.def()
-    }
-
-    fn via() -> Option<RelationDef> {
-        Some(super::artist_track_relation::Relation::Artist.def().rev())
+        Relation::TrackRelation.def()
     }
 }
 
