@@ -64,16 +64,6 @@ pub enum ArtistInclude {
 }
 
 #[derive(Serialize)]
-pub struct MediumAttributes {}
-
-#[derive(Serialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum MediumRelation {
-    Release,
-    Tracks,
-}
-
-#[derive(Serialize)]
 pub struct ReleaseAttributes {
     pub title: String,
     pub disctotal: u32,
@@ -104,6 +94,26 @@ pub enum ReleaseRelation {
     Mediums,
     #[serde(rename = "artists")]
     Artists,
+}
+
+#[derive(Deserialize, PartialEq, Eq)]
+pub enum ReleaseInclude {
+    #[serde(rename = "image")]
+    Image,
+    #[serde(rename = "mediums")]
+    Mediums,
+    #[serde(rename = "artists")]
+    Artists,
+}
+
+#[derive(Serialize)]
+pub struct MediumAttributes {}
+
+#[derive(Serialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MediumRelation {
+    Release,
+    Tracks,
 }
 
 #[derive(Serialize)]

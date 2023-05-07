@@ -1,11 +1,18 @@
 use std::collections::HashMap;
 
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::Json;
 use chrono::Datelike;
-use itertools::Itertools;
-use sea_orm::{ConnectionTrait, DbErr, LoaderTrait};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
+};
+use uuid::Uuid;
 
+use super::{artists, images, AppState};
 use crate::documents::{
-    ArtistCreditAttributes, RecordingAttributes, ReleaseAttributes, ReleaseRelation,
+    ArtistCreditAttributes, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
 };
 use crate::jsonapi::{
     Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
@@ -139,4 +146,141 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
 
 pub fn entity_to_included(entity: &entity::Release, related: &ReleaseRelated) -> Included {
     Included::Release(entity_to_resource(entity, related))
+}
+
+pub async fn included<C>(
+    db: &C,
+    related: Vec<ReleaseRelated>,
+    include: Vec<ReleaseInclude>,
+) -> Result<Vec<Included>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let mut included = Vec::new();
+    if include.contains(&ReleaseInclude::Image) {
+        let all_release_images = related
+            .iter()
+            .map(|rel| rel.image.clone())
+            .flatten()
+            .collect::<Vec<_>>();
+        let images = all_release_images.load_one(entity::ImageEntity, db).await?;
+        included.extend(
+            images
+                .iter()
+                .filter_map(|i| i.as_ref().map(images::entity_to_included))
+                .collect::<Vec<_>>(),
+        );
+    }
+    if include.contains(&ReleaseInclude::Artists) {
+        let artist_credits = related
+            .iter()
+            .map(|rel| rel.artist_credits.to_owned())
+            .flatten()
+            .collect::<Vec<_>>();
+        let artists = artist_credits
+            .load_one(entity::ArtistEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let artists_related = artists::related(db, &artists).await?;
+        for (i, artist) in artists.into_iter().enumerate() {
+            included.push(artists::entity_to_included(&artist, &artists_related[i]));
+        }
+    }
+    if include.contains(&ReleaseInclude::Mediums) {
+        // TODO
+    }
+    Ok(included)
+}
+
+pub async fn releases(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude>,
+) -> Result<Json<Document<ReleaseResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+
+    let mut releases_query = entity::ReleaseEntity::find();
+    for (sort_key, sort_order) in opts.sort.into_iter() {
+        releases_query = releases_query.order_by(sort_key, sort_order);
+    }
+    for (filter_key, filter_value) in opts.filter.into_iter() {
+        releases_query = releases_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    }
+    let releases = releases_query.all(&tx).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch all releases".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let related_to_releases = related(&tx, &releases).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch entites related to the releases".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let mut data = Vec::new();
+    for (i, release) in releases.iter().enumerate() {
+        data.push(entity_to_resource(release, &related_to_releases[i]));
+    }
+    let included = included(&tx, related_to_releases, opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json(Document {
+        data: DocumentData::Multi(data),
+        included,
+    }))
+}
+
+pub async fn release(
+    State(AppState(db)): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude>,
+) -> Result<Json<Document<ReleaseResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+
+    let release = entity::ReleaseEntity::find_by_id(id)
+        .one(&tx)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the requried release".to_string(),
+            detail: Some(e.into()),
+        })?
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Release not found".to_string(),
+            detail: None,
+        })?;
+    let related_to_releases = related(&tx, &vec![release.clone()])
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch entites related to the releases".to_string(),
+            detail: Some(e.into()),
+        })?;
+    let empty_relationship = ReleaseRelated::default();
+    let related = related_to_releases.first().unwrap_or(&empty_relationship);
+    let data = entity_to_resource(&release, related);
+    let included = included(&tx, related_to_releases, opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json(Document {
+        data: DocumentData::Single(data),
+        included,
+    }))
 }

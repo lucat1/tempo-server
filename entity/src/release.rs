@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
@@ -64,3 +66,39 @@ impl Related<super::image::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "title" => Ok(Column::Title),
+            "release-group-id" => Ok(Column::ReleaseGroupId),
+            "release-type" => Ok(Column::ReleaseType),
+            "genres" => Ok(Column::Genres),
+            "asin" => Ok(Column::Asin),
+            "country" => Ok(Column::Country),
+            "label" => Ok(Column::Label),
+            "catalog-no" => Ok(Column::CatalogNo),
+            "status" => Ok(Column::Status),
+            "date" => Ok(Column::Date),
+            "original-date" => Ok(Column::OriginalDate),
+            "script" => Ok(Column::Script),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

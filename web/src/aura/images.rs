@@ -9,10 +9,7 @@ use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
 use crate::documents::ImageAttributes;
-use crate::jsonapi::{
-    Document, DocumentData, Error, ImageResource, Included, Query, Related, Relation, Relationship,
-    ResourceIdentifier, ResourceType,
-};
+use crate::jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType};
 use web::AppState;
 
 pub fn entity_to_resource(image: &entity::Image) -> ImageResource {

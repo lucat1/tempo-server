@@ -19,11 +19,11 @@ pub fn router() -> Router<AppState> {
         .route("/images/:id/file", get(images::file))
         .route("/artists", get(artists::artists))
         .route("/artists/:id", get(artists::artist))
-    // .route("/tracks", get(tracks::tracks))
-    // .route("/tracks/:id", get(tracks::track))
-    // .route("/tracks/:id/audio", get(tracks::audio))
-    // .route("/releases", get(releases::releases))
-    // .route("/releases/:id", get(releases::release))
+        .route("/releases", get(releases::releases))
+        .route("/releases/:id", get(releases::release))
+        // .route("/tracks", get(tracks::tracks))
+        // .route("/tracks/:id", get(tracks::track))
+        .route("/tracks/:id/audio", get(tracks::audio))
 }
 
 #[derive(Serialize, Deserialize)]

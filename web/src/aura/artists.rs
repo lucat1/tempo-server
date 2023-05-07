@@ -4,8 +4,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, ModelTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
 use uuid::Uuid;
 
