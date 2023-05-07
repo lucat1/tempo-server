@@ -107,12 +107,26 @@ pub enum ReleaseInclude {
 }
 
 #[derive(Serialize)]
-pub struct MediumAttributes {}
+pub struct MediumAttributes {
+    pub position: u32,
+    pub tracks: u32,
+    #[serde(rename = "track-offset")]
+    pub track_offset: u32,
+    pub format: Option<String>,
+}
 
 #[derive(Serialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MediumRelation {
     Release,
+    Tracks,
+}
+
+#[derive(Deserialize, PartialEq, Eq)]
+pub enum MediumInclude {
+    #[serde(rename = "release")]
+    Release,
+    #[serde(rename = "tracks")]
     Tracks,
 }
 

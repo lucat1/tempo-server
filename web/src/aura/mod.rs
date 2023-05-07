@@ -1,5 +1,6 @@
 mod artists;
 mod images;
+mod mediums;
 mod releases;
 mod tracks;
 
@@ -21,6 +22,8 @@ pub fn router() -> Router<AppState> {
         .route("/artists/:id", get(artists::artist))
         .route("/releases", get(releases::releases))
         .route("/releases/:id", get(releases::release))
+        .route("/mediums/", get(mediums::mediums))
+        .route("/mediums/:id", get(mediums::medium))
         // .route("/tracks", get(tracks::tracks))
         // .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))

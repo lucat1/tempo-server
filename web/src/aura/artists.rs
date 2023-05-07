@@ -27,15 +27,23 @@ pub struct ArtistRelated {
     tracks: Vec<Vec<entity::ArtistCreditTrack>>,
 }
 
-pub async fn related<C>(db: &C, entities: &Vec<entity::Artist>) -> Result<Vec<ArtistRelated>, DbErr>
+pub async fn related<C>(
+    db: &C,
+    entities: &Vec<entity::Artist>,
+    light: bool,
+) -> Result<Vec<ArtistRelated>, DbErr>
 where
     C: ConnectionTrait,
 {
     let artist_credits = entities.load_many(entity::ArtistCreditEntity, db).await?;
     let images = entities.load_many(entity::ImageArtistEntity, db).await?;
-    let recordings = entities
-        .load_many(entity::ArtistTrackRelationEntity, db)
-        .await?;
+    let recordings = if !light {
+        entities
+            .load_many(entity::ArtistTrackRelationEntity, db)
+            .await?
+    } else {
+        Vec::new()
+    };
 
     let mut related = Vec::new();
     for i in 0..entities.len() {
@@ -43,16 +51,26 @@ where
         let releases = artist_credits
             .load_many(entity::ArtistCreditReleaseEntity, db)
             .await?;
-        let tracks = artist_credits
-            .load_many(entity::ArtistCreditTrackEntity, db)
-            .await?;
+        let tracks = if !light {
+            artist_credits
+                .load_many(entity::ArtistCreditTrackEntity, db)
+                .await?
+        } else {
+            Vec::new()
+        };
 
         related.push(ArtistRelated {
-            artist_credits: artist_credits.to_owned(),
+            artist_credits: if !light {
+                artist_credits.to_owned()
+            } else {
+                Vec::new()
+            },
             images: images[i].to_owned(),
             releases,
             tracks,
-            recordings: recordings[i].to_owned(),
+            recordings: recordings
+                .get(i)
+                .map_or_else(|| Vec::new(), |r| r.to_owned()),
         });
     }
 
@@ -95,7 +113,7 @@ where
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
-        let release_related = releases::related(db, &releases).await?;
+        let release_related = releases::related(db, &releases, true).await?;
         for (i, release) in releases.iter().enumerate() {
             included.push(releases::entity_to_included(release, &release_related[i]))
         }
@@ -113,7 +131,7 @@ where
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
-        let track_related = tracks::related(db, &tracks).await?;
+        let track_related = tracks::related(db, &tracks, true).await?;
         for (i, track) in tracks.iter().enumerate() {
             included.push(tracks::entity_to_included(track, &track_related[i]))
         }
@@ -247,7 +265,7 @@ pub async fn artists(
         title: "Could not fetch all artists".to_string(),
         detail: Some(e.into()),
     })?;
-    let related_to_artists = related(&tx, &artists).await.map_err(|e| Error {
+    let related_to_artists = related(&tx, &artists, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch entites related to the artists".to_string(),
         detail: Some(e.into()),
@@ -293,7 +311,7 @@ pub async fn artist(
             title: "Artist not found".to_string(),
             detail: None,
         })?;
-    let related_to_artists = related(&tx, &vec![artist.clone()])
+    let related_to_artists = related(&tx, &vec![artist.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

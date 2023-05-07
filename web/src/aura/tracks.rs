@@ -29,7 +29,11 @@ pub struct TrackRelated {
     recorders: Vec<entity::ArtistTrackRelation>,
 }
 
-pub async fn related<C>(db: &C, entities: &Vec<entity::Track>) -> Result<Vec<TrackRelated>, DbErr>
+pub async fn related<C>(
+    db: &C,
+    entities: &Vec<entity::Track>,
+    light: bool,
+) -> Result<Vec<TrackRelated>, DbErr>
 where
     C: ConnectionTrait,
 {

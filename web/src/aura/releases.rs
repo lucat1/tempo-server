@@ -10,7 +10,7 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use super::{artists, images, AppState};
+use super::{artists, images, mediums, AppState};
 use crate::documents::{
     ArtistCreditAttributes, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
 };
@@ -30,6 +30,7 @@ pub struct ReleaseRelated {
 pub async fn related<C>(
     db: &C,
     entities: &Vec<entity::Release>,
+    light: bool,
 ) -> Result<Vec<ReleaseRelated>, DbErr>
 where
     C: ConnectionTrait,
@@ -183,13 +184,21 @@ where
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
-        let artists_related = artists::related(db, &artists).await?;
+        let artists_related = artists::related(db, &artists, true).await?;
         for (i, artist) in artists.into_iter().enumerate() {
             included.push(artists::entity_to_included(&artist, &artists_related[i]));
         }
     }
     if include.contains(&ReleaseInclude::Mediums) {
-        // TODO
+        let mediums = related
+            .iter()
+            .map(|rel| rel.mediums.to_owned())
+            .flatten()
+            .collect::<Vec<_>>();
+        let mediums_related = mediums::related(db, &mediums, true).await?;
+        for (i, medium) in mediums.into_iter().enumerate() {
+            included.push(mediums::entity_to_included(&medium, &mediums_related[i]));
+        }
     }
     Ok(included)
 }
@@ -216,7 +225,7 @@ pub async fn releases(
         title: "Could not fetch all releases".to_string(),
         detail: Some(e.into()),
     })?;
-    let related_to_releases = related(&tx, &releases).await.map_err(|e| Error {
+    let related_to_releases = related(&tx, &releases, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch entites related to the releases".to_string(),
         detail: Some(e.into()),
@@ -262,7 +271,7 @@ pub async fn release(
             title: "Release not found".to_string(),
             detail: None,
         })?;
-    let related_to_releases = related(&tx, &vec![release.clone()])
+    let related_to_releases = related(&tx, &vec![release.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
