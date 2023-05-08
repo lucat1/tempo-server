@@ -18,7 +18,6 @@ use entity::{
     ImageReleaseEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
 use eyre::{eyre, Result, WrapErr};
-use log::{info, trace};
 use rayon::prelude::*;
 use scan_dir::ScanDir;
 use sea_orm::{DbErr, EntityTrait, TransactionTrait};
@@ -86,15 +85,15 @@ pub async fn all_tracks(library: &Library, path: &PathBuf) -> Result<Vec<TrackFi
         .partition(Result::is_ok);
     let tracks: Vec<_> = tracks.into_iter().map(Result::unwrap).collect();
     let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
-    info!(
-        "Found {} tracks, {} files were ignored due to errors",
-        tracks.len(),
-        errors.len()
-    );
+    tracing::info! {
+        tracks=%tracks.len(),
+        errors=%errors.len(),
+        "Found tracks, with files ignored due to errors"
+    };
     if !errors.is_empty() {
         errors
             .iter()
-            .for_each(|e| trace!("Error while importing file:{}", e));
+            .for_each(|error| tracing::trace! {%error, "Error while importing file"});
     }
     Ok(tracks)
 }
@@ -107,7 +106,7 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
         Ok(&settings.libraries[lib])
     }?;
 
-    info!("Importing {:?} for library {:?}", path, library.name);
+    tracing::info! {?path, library = library.name, "Importing folder for the given library"};
     let tracks = all_tracks(library, path).await?;
     if tracks.is_empty() {
         return Err(eyre!("No tracks to import were found"));
@@ -115,11 +114,7 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
 
     let source_release: internal::Release = tracks.clone().into();
     let source_tracks: Vec<internal::Track> = tracks.iter().map(|t| t.clone().into()).collect();
-    info!(
-        "Searching for {} - {}",
-        source_release.artists.join(", "),
-        source_release.title
-    );
+    tracing::info! {artists = source_release.artists.join(", "), title = source_release.title, "Searching for"};
     let compressed_search_results = fetch::search(library, &source_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
@@ -200,11 +195,11 @@ pub async fn run(import: Import) -> Result<()> {
         .find(|sr| sr.search_result.0.release.id == import.selected.0)
         .ok_or(eyre!("Invalid selected release id"))?
         .clone();
-    info!(
-        "Adding {} - {} to the library",
-        full_release.get_joined_artists()?,
-        full_release.release.title
-    );
+    tracing::info! {
+        joined_artists=full_release.get_joined_artists()?,
+        title=full_release.release.title,
+        "Adding release to the library",
+    };
 
     let mut picture = None;
     if let Some(selected_cover) = import.selected.1 {

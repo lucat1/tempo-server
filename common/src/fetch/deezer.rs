@@ -1,5 +1,4 @@
 use eyre::{bail, Result};
-use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::time::Instant;
 use strum::IntoEnumIterator;
@@ -66,7 +65,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
         .send()
         .await?;
     let req_time = start.elapsed();
-    trace!("Deezer HTTP request took {:?}", req_time);
+    tracing::trace! {?req_time, "Time taken by the Deezer HTTP request"};
     if !res.status().is_success() {
         bail!(
             "Itunes request returned non-success error code: {} {}",

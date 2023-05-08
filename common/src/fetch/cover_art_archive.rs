@@ -1,6 +1,5 @@
 use eyre::{bail, Result};
 use itertools::Itertools;
-use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
@@ -84,7 +83,7 @@ pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<
         .send()
         .await?;
     let req_time = start.elapsed();
-    trace!("CoverArtArchive HTTP request took {:?}", req_time);
+    tracing::trace! {?req_time, "Time taken by the CoverArtArchive HTTP request"};
     if !res.status().is_success() {
         bail!(
             "CoverArtArchive request returned non-success error code: {} {}",
@@ -94,7 +93,10 @@ pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<
     }
     let json = res.json::<CoverArtArchive>().await?;
     let json_time = start.elapsed();
-    trace!("CoverArtArchive JSON parse took {:?}", json_time - req_time);
+    tracing::trace! {
+        parse_time = ?(json_time - req_time),
+        "Time taken by the CoverArtArchive JSON parse"
+    };
     // TODO: make the "," configurable
     Ok(json.into(
         release.title.clone(),

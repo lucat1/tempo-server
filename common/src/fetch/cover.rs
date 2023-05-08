@@ -4,7 +4,6 @@ use eyre::{bail, eyre, Result};
 use image::imageops::{resize, FilterType};
 use image::DynamicImage;
 use image::{io::Reader as ImageReader, ImageOutputFormat};
-use log::{trace, warn};
 use mime::Mime;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
@@ -69,7 +68,9 @@ pub async fn search(library: &Library, release: &FullRelease) -> Result<Vec<Vec<
         };
         match res {
             Ok(r) => v.push(r),
-            Err(e) => warn!("Error while fetching image from {:?}: {}", provider, e),
+            Err(error) => {
+                tracing::warn! {%provider, %error, "Error while fetching image from provider"}
+            }
         }
     }
     if v.is_empty() {
@@ -86,7 +87,7 @@ pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, (u3
     let start = Instant::now();
     let res = CLIENT.get(cover.url.clone()).send().await?;
     let req_time = start.elapsed();
-    trace!("Fetch request for cover art took {:?}", req_time);
+    tracing::trace! {?req_time, "Fetch request for cover art took"};
     if !res.status().is_success() {
         bail!(
             "Fetch request for cover art returned non-success error code: {} {}",
@@ -99,7 +100,7 @@ pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, (u3
     let img = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
         .decode()?;
-    trace!("Parse of cover art took {:?}", bytes_time - req_time);
+    tracing::trace! {prase_time = ?(bytes_time - req_time), "Parse of cover art took"};
     let resized = if library.art.width < img.width() || library.art.height < img.height() {
         let converted = resize(
             &img,
@@ -108,14 +109,14 @@ pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, (u3
             FilterType::Gaussian,
         );
         let convert_time = start.elapsed();
-        trace!(
-            "Conversion of cover art took {:?} (from {}x{} to {}x{})",
-            convert_time - bytes_time - req_time,
-            img.width(),
-            img.height(),
-            converted.width(),
-            converted.height()
-        );
+        tracing::trace! {
+            convert_time = ?(convert_time - bytes_time - req_time),
+            src_width = img.width(),
+            src_height = img.height(),
+            dst_width = converted.width(),
+            dst_height = converted.height(),
+            "Done scaling/converting image",
+        };
         DynamicImage::ImageRgba8(converted)
     } else {
         img

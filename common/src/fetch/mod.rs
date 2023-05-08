@@ -12,7 +12,6 @@ use crate::internal::{Release, UNKNOWN_ARTIST};
 use const_format::formatcp;
 use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
-use log::trace;
 use reqwest::header::USER_AGENT;
 use serde::Serialize;
 use std::time::Instant;
@@ -69,7 +68,7 @@ pub async fn search(library: &Library, release: &Release) -> Result<Vec<SearchRe
         .send()
         .await?;
     let req_time = start.elapsed();
-    trace!("MusicBrainz HTTP request took {:?}", req_time);
+    tracing::trace! {?req_time, "Completed the MusicBrainz HTTP request"};
     if !res.status().is_success() {
         bail!(
             "Musicbrainz request returned non-success error code: {} {}",
@@ -87,7 +86,7 @@ pub async fn search(library: &Library, release: &Release) -> Result<Vec<SearchRe
             .map_err(|e| eyre!("Error {} at path {}", e, e.path().to_string()))
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
-    trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
+    tracing::trace! {prase_time = ?(json_time - req_time), "Completed the MusicBrainz JSON parse"};
     json.releases
         .into_iter()
         .map(|r| release_to_result(library, r))
@@ -120,7 +119,7 @@ pub async fn get(library: &Library, id: &str) -> Result<SearchResult> {
         .send()
         .await?;
     let req_time = start.elapsed();
-    trace!("MusicBrainz HTTP request took {:?}", req_time);
+    tracing::trace! {?req_time, "Completed the MusicBrainz HTTP request"};
     if !res.status().is_success() {
         bail!(
             "Musicbrainz request returned non-success error code: {} {}",
@@ -138,6 +137,6 @@ pub async fn get(library: &Library, id: &str) -> Result<SearchResult> {
             .map_err(|e| eyre!("Error {} at path {}", e, e.path().to_string()))
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
-    trace!("MusicBrainz JSON parse took {:?}", json_time - req_time);
+    tracing::trace! {parse_time = ?(json_time - req_time), "Completed the MusicBrainz JSON parse"};
     release_to_result(library, json)
 }

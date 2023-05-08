@@ -1,7 +1,6 @@
 use chrono::NaiveDate;
 use entity::full::{FullRelease, FullTrack};
 use itertools::Itertools;
-use log::warn;
 use serde::Serialize;
 use tag::TagKey;
 
@@ -91,13 +90,12 @@ fn artists_from_tag(tracks: &[TrackFile], tag: TagKey) -> Vec<String> {
 fn first_tag(tracks: &[TrackFile], tag: TagKey) -> Option<String> {
     let options = dedup(tracks.iter().flat_map(|t| t.get_tag(tag)).collect());
     if options.len() > 1 {
-        warn!(
-            "Multiple ({}) unique tag values for {:?} in the given tracks ({})",
-            options.len(),
-            tag,
-            // TODO
-            options.join(", ")
-        );
+        tracing::warn! {
+            n_of_tags = options.len(),
+            %tag,
+            values = options.join(", "),
+            "Multiple unique tag values for the required tag in the given tracks",
+        };
     }
     options.first().map(|f| f.to_string())
 }

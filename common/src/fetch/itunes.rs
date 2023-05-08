@@ -1,5 +1,4 @@
 use eyre::{bail, Result};
-use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -58,7 +57,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
         .send()
         .await?;
     let req_time = start.elapsed();
-    trace!("Itunes HTTP request took {:?}", req_time);
+    tracing::trace! {?req_time,"Completed the Itunes HTTP request"};
     if !res.status().is_success() {
         bail!(
             "Itunes request returned non-success error code: {} {}",

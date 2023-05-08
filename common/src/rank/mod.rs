@@ -8,7 +8,6 @@ use crate::fetch::SearchResult;
 use crate::internal::{Release, Track};
 use crate::track::TrackFile;
 
-use log::debug;
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
@@ -32,7 +31,7 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating 
     if matrix_vec.is_empty() {
         return Rating(0, vec![]);
     }
-    debug!("kuhn_munkers matrix is {}x{}", rows, columns);
+    tracing::debug! {%rows, %columns, "The kuhn_munkers matrix has size"};
     if rows > columns {
         let max = match matrix_vec.iter().max() {
             Some(v) => *v,
@@ -46,9 +45,11 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating 
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
     let (val, map) = kuhn_munkres_min(&matrix);
     let value = val + release.diff(&candidate_release);
-    debug!(
-        "value for {:?} - {:?}: {:?}",
-        candidate_release.artists, candidate_release.title, value
-    );
+    tracing::debug! {
+        artists = ?candidate_release.artists,
+        title = %candidate_release.title,
+        %value,
+        "Rating value for"
+    };
     Rating(value, map)
 }

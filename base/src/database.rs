@@ -2,7 +2,6 @@ use super::setting::get_settings;
 use async_once_cell::OnceCell;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use log::trace;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +16,7 @@ pub fn get_database() -> Result<&'static DatabaseConnection> {
 
 pub async fn open_database() -> Result<DatabaseConnection> {
     let url = &get_settings()?.db;
-    trace!("Connecting to {}", url);
+    tracing::trace! {%url, "Connecting to database"};
     let mut opt = ConnectOptions::new(url.to_owned());
     opt.max_connections(100)
         .min_connections(5)
@@ -25,7 +24,7 @@ pub async fn open_database() -> Result<DatabaseConnection> {
         .acquire_timeout(Duration::from_secs(8))
         .idle_timeout(Duration::from_secs(8))
         .max_lifetime(Duration::from_secs(8))
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info);
+        .sqlx_logging(true);
+    // .sqlx_logging_level(log::LevelFilter::Info);
     Database::connect(opt).await.map_err(|e| eyre!(e))
 }

@@ -24,7 +24,6 @@ pub use picture::{Picture, PictureType};
 use entity::TrackFormat;
 use std::fmt::{Debug, Formatter, Result as FormatResult};
 
-use log::debug;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -84,11 +83,11 @@ pub trait Tag: TagClone {
     fn get_tag(&self, key: TagKey) -> Vec<String> {
         let keystrs = self.key_to_str(key);
         if keystrs.is_empty() {
-            debug!(
-                "The {:?} key is not supported in the output format {:?}",
-                key,
-                self.format()
-            );
+            tracing::debug! {
+                ?key,
+                format = ?self.format(),
+                "The given key is not supported in the media output format",
+            };
             return vec![];
         }
         keystrs

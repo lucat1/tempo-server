@@ -407,7 +407,6 @@ dependencies = [
  "eyre",
  "image",
  "lazy_static",
- "log",
  "mime",
  "scan_dir",
  "sea-orm",
@@ -415,6 +414,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml 0.7.2",
+ "tracing",
 ]
 
 [[package]]
@@ -729,7 +729,6 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "levenshtein",
- "log",
  "mime",
  "pathfinding",
  "rayon",
@@ -749,6 +748,7 @@ dependencies = [
  "tag",
  "tokio",
  "toml 0.7.2",
+ "tracing",
  "uuid",
 ]
 
@@ -3489,10 +3489,10 @@ dependencies = [
  "id3",
  "infer",
  "itertools 0.10.5",
- "log",
  "metaflac",
  "mime",
  "mp4ameta",
+ "tracing",
 ]
 
 [[package]]

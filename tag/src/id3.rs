@@ -10,7 +10,6 @@ use id3::frame::PictureType as ID3PictureType;
 use id3::frame::{ExtendedText, Picture as ID3Picture};
 use id3::{Content, Frame, TagLike, Version};
 use itertools::Itertools;
-use log::debug;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -369,11 +368,11 @@ impl Tag {
     fn original_get_tag(&self, key: TagKey) -> Vec<String> {
         let keystrs = self.key_to_str(key);
         if keystrs.is_empty() {
-            debug!(
-                "The {:?} key is not supported in the output format {:?}",
-                key,
-                self.format()
-            );
+            tracing::debug! {
+                ?key,
+                format = ?self.format(),
+                "The given key is not supported in the media output format",
+            };
             return vec![];
         }
         keystrs

@@ -3,7 +3,6 @@ use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
-use log::{info, trace};
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::fs;
@@ -237,7 +236,7 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
             .ok_or(eyre!("Could not locate program directories"))?;
         dirs.config_dir().join(PathBuf::from("config.toml"))
     });
-    info!("Loading config file: {:?}", path);
+    tracing::info! {?path, "Loading config file"};
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
     if set.libraries.is_empty() {
@@ -262,7 +261,7 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     if set.downloads == PathBuf::default() {
         set.downloads = get_downloads()?;
     }
-    trace!("Loaded settings: {:?}", set);
+    tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
 }
 

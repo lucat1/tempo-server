@@ -46,7 +46,7 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
         }
     }
     let raw_files = read_dir(&path).map_err(|error| {
-        tracing::warn! {%error, "Could not red directory: {:?}", path};
+        tracing::warn! {%error, ?path, "Could not red directory"};
         StatusCode::BAD_REQUEST
     })?;
     let files: Vec<Entry> = raw_files
