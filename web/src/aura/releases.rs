@@ -71,7 +71,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             Relationship {
                 data: Relation::Multi(
                     artist_credits
-                        .into_iter()
+                        .iter()
                         .map(|ac| {
                             Related::Artist(ResourceIdentifier {
                                 r#type: ResourceType::Artist,
@@ -158,8 +158,7 @@ where
     if include.contains(&ReleaseInclude::Image) {
         let all_release_images = related
             .iter()
-            .map(|rel| rel.image.clone())
-            .flatten()
+            .flat_map(|rel| rel.image.clone())
             .collect::<Vec<_>>();
         let images = all_release_images.load_one(entity::ImageEntity, db).await?;
         included.extend(
@@ -172,8 +171,7 @@ where
     if include.contains(&ReleaseInclude::Artists) {
         let artist_credits = related
             .iter()
-            .map(|rel| rel.artist_credits.to_owned())
-            .flatten()
+            .flat_map(|rel| rel.artist_credits.to_owned())
             .collect::<Vec<_>>();
         let artists = artist_credits
             .load_one(entity::ArtistEntity, db)
@@ -189,8 +187,7 @@ where
     if include.contains(&ReleaseInclude::Mediums) {
         let mediums = related
             .iter()
-            .map(|rel| rel.mediums.to_owned())
-            .flatten()
+            .flat_map(|rel| rel.mediums.to_owned())
             .collect::<Vec<_>>();
         let mediums_related = mediums::related(db, &mediums, true).await?;
         for (i, medium) in mediums.into_iter().enumerate() {

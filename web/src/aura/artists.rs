@@ -91,8 +91,7 @@ where
     if include.contains(&ArtistInclude::Images) {
         let all_artist_images = related
             .iter()
-            .map(|rel| rel.images.clone())
-            .flatten()
+            .flat_map(|rel| rel.images.clone())
             .collect::<Vec<_>>();
         let images = all_artist_images.load_one(entity::ImageEntity, db).await?;
         included.extend(
@@ -105,8 +104,7 @@ where
     if include.contains(&ArtistInclude::Releases) {
         let release_relations = related
             .iter()
-            .map(|rel| rel.releases.to_owned())
-            .flatten()
+            .flat_map(|rel| rel.releases.to_owned())
             .flatten()
             .collect::<Vec<_>>();
         let releases = release_relations
@@ -123,8 +121,7 @@ where
     if include.contains(&ArtistInclude::Tracks) {
         let track_relations = related
             .into_iter()
-            .map(|rel| rel.tracks)
-            .flatten()
+            .flat_map(|rel| rel.tracks)
             .flatten()
             .collect::<Vec<_>>();
         let tracks = track_relations
@@ -193,7 +190,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
     }
     let mut related_releases = Vec::new();
     let mut related_tracks = Vec::new();
-    for (i, ac) in artist_credits.into_iter().enumerate() {
+    for (i, ac) in artist_credits.iter().enumerate() {
         related_releases.extend(releases[i].iter().map(|r| {
             Related::Release(ResourceIdentifier {
                 r#type: ResourceType::Release,

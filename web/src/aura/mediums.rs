@@ -68,7 +68,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
             Relationship {
                 data: Relation::Multi(
                     tracks
-                        .into_iter()
+                        .iter()
                         .map(|t| {
                             Related::Track(ResourceIdentifier {
                                 r#type: ResourceType::Track,
@@ -111,8 +111,7 @@ where
     if include.contains(&MediumInclude::Release) {
         let releases = related
             .iter()
-            .map(|rel| rel.release.clone())
-            .flatten()
+            .flat_map(|rel| rel.release.clone())
             .collect::<Vec<_>>();
         let releases_related = releases::related(db, &releases, true).await?;
         for (i, release) in releases.into_iter().enumerate() {
@@ -122,8 +121,7 @@ where
     if include.contains(&MediumInclude::Tracks) {
         let tracks = related
             .iter()
-            .map(|rel| rel.tracks.clone())
-            .flatten()
+            .flat_map(|rel| rel.tracks.clone())
             .collect::<Vec<_>>();
         let tracks_related = tracks::related(db, &tracks, true).await?;
         for (i, track) in tracks.into_iter().enumerate() {

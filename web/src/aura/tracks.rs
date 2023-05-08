@@ -81,7 +81,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             Relationship {
                 data: Relation::Multi(
                     artist_credits
-                        .into_iter()
+                        .iter()
                         .map(|ac| {
                             Related::Artist(ResourceIdentifier {
                                 r#type: ResourceType::Artist,
@@ -174,8 +174,7 @@ where
     if include.contains(&TrackInclude::Artists) {
         let artist_credits = related
             .iter()
-            .map(|rel| rel.artist_credits.clone())
-            .flatten()
+            .flat_map(|rel| rel.artist_credits.clone())
             .collect::<Vec<_>>();
         let artists = artist_credits
             .load_one(entity::ArtistEntity, db)
@@ -201,8 +200,7 @@ where
     if include.contains(&TrackInclude::Recorders) {
         let recorders = related
             .iter()
-            .map(|rel| rel.recorders.clone())
-            .flatten()
+            .flat_map(|rel| rel.recorders.clone())
             .collect::<Vec<_>>();
         let artists = recorders
             .load_one(entity::ArtistEntity, db)

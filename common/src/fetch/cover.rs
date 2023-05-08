@@ -121,7 +121,7 @@ pub async fn get_cover(library: &Library, cover: &Cover) -> Result<(Vec<u8>, (u3
         img
     };
     let mut bytes: Vec<u8> = Vec::new();
-    let format: ImageOutputFormat = library.art.format.clone().into();
+    let format: ImageOutputFormat = library.art.format.into();
     resized.write_to(&mut Cursor::new(&mut bytes), format)?;
     Ok((
         bytes,

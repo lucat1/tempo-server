@@ -16,12 +16,13 @@ use crate::documents::{
 
 use super::documents::{
     ArtistAttributes, ArtistRelation, MediumAttributes, MediumRelation, ReleaseAttributes,
-    ReleaseRelation, TrackAttributes, TrackRelation,
+    ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
 };
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceType {
+    Server,
     Image,
     Artist,
     Track,
@@ -29,6 +30,7 @@ pub enum ResourceType {
     Release,
 }
 
+pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
@@ -171,7 +173,7 @@ where
                         .include
                         .as_ref()
                         .map(|s| -> Result<Vec<_>, serde_json::Error> {
-                            s.split(",")
+                            s.split(',')
                                 .map(|p| serde_json::from_str(&("\"".to_owned() + p + "\"")))
                                 .collect::<Result<Vec<_>, serde_json::Error>>()
                         })
@@ -188,10 +190,10 @@ where
                     sort: raw_opts
                         .sort
                         .map(|s| {
-                            s.split(",")
+                            s.split(',')
                                 .filter_map(|p| -> Option<(C, Order)> {
-                                    if p.starts_with("-") {
-                                        Some((parse_key(&p[1..])?, Order::Desc))
+                                    if let Some(stripped_key) = s.strip_prefix('-') {
+                                        Some((parse_key(stripped_key)?, Order::Desc))
                                     } else {
                                         Some((parse_key(p)?, Order::Asc))
                                     }

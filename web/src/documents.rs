@@ -4,6 +4,21 @@ use uuid::Uuid;
 use entity::RelationType;
 
 #[derive(Serialize)]
+pub struct ServerAttributes {
+    #[serde(rename = "aura-version")]
+    pub aura_version: String,
+    pub server: String,
+    #[serde(rename = "server-version")]
+    pub server_version: String,
+    #[serde(rename = "auth-required")]
+    pub auth_required: bool,
+    pub features: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct ServerRelation {}
+
+#[derive(Serialize)]
 pub struct ArtistCreditAttributes {
     pub join_phrase: Option<String>,
 }

@@ -2,7 +2,6 @@ mod aura;
 pub mod documents;
 mod internal;
 pub mod jsonapi;
-pub mod response;
 
 use axum::Router;
 use clap::Parser;
