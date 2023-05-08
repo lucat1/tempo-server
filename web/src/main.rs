@@ -5,12 +5,19 @@ pub mod jsonapi;
 
 use axum::Router;
 use clap::Parser;
-use env_logger::{Builder, Env};
 use eyre::{eyre, Result, WrapErr};
-use log::info;
 use sea_orm_migration::MigratorTrait;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+    prelude::*,
+};
 
 use base::database::{get_database, open_database, DATABASE};
 use base::setting::{load, SETTINGS};
@@ -31,12 +38,11 @@ struct Cli {
 async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
-    let env = Env::default()
-        .filter_or(base::TAGGER_LOGLEVEL, "info")
-        .write_style(base::TAGGER_STYLE);
-    Builder::from_env(env)
-        .filter(Some("sqlx"), log::LevelFilter::Warn)
-        .init();
+
+    let subscriber = tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::from_env(base::TAGGER_LOGLEVEL).add_directive(LevelFilter::DEBUG.into()));
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let cli = Cli::parse();
 
@@ -50,16 +56,25 @@ async fn main() -> Result<()> {
     migration::Migrator::up(get_database()?, None).await?;
 
     let conn = get_database()?.clone();
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(Any)
+        .allow_headers(Any);
+
+    let tracing = TraceLayer::new_for_http();
+
     let app = Router::new()
         .nest("/aura", aura::router())
         .nest("/internal", internal::router())
+        .layer(cors)
+        .layer(tracing)
         .with_state(web::AppState(conn));
 
     let addr: SocketAddr = cli
         .listen_address
         .parse()
         .wrap_err(eyre!("Invalid listen address"))?;
-    info!("Listening on {}", addr);
+    tracing::info! {%addr, "Listening"};
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

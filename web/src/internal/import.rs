@@ -4,7 +4,6 @@ use axum::Json;
 use base::setting::get_settings;
 use eyre::Result;
 use lazy_static::lazy_static;
-use log::trace;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
@@ -45,8 +44,8 @@ pub struct ImportError {
 
 pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> {
     let path = get_settings()
-        .map_err(|e| {
-            trace!("Could not get settings: {}", e);
+        .map_err(|error| {
+            tracing::warn! { %error, "Could not get settings" };
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .downloads
@@ -55,9 +54,9 @@ pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> 
         id: Uuid::new_v4(),
         path: body.path.clone(),
 
-        import: import::begin(body.library, &path).await.map_err(|e| {
+        import: import::begin(body.library, &path).await.map_err(|error| {
             // TODO: better errors with json output
-            trace!("Could not begin import: {}", e);
+            tracing::warn! { %error, "Could not begin import" };
             StatusCode::BAD_REQUEST
         })?,
     };

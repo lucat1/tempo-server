@@ -4,7 +4,6 @@ use axum::Json;
 use base::setting::get_settings;
 use eyre::Result;
 use fs_extra::dir::get_size;
-use log::trace;
 use serde::{Deserialize, Serialize};
 use std::{fs::read_dir, path::PathBuf};
 
@@ -34,8 +33,8 @@ pub enum EntryType {
 
 pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
     let root_path = get_settings()
-        .map_err(|e| {
-            trace!("Could not get settings: {}", e);
+        .map_err(|error| {
+            tracing::warn! {%error, "Could not get settings"};
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .downloads
@@ -46,8 +45,8 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
             path = path.join(subpath);
         }
     }
-    let raw_files = read_dir(&path).map_err(|e| {
-        trace!("Could not red directory: {:?}: {}", path, e);
+    let raw_files = read_dir(&path).map_err(|error| {
+        tracing::warn! {%error, "Could not red directory: {:?}", path};
         StatusCode::BAD_REQUEST
     })?;
     let files: Vec<Entry> = raw_files

@@ -9,6 +9,5 @@ pub const GITHUB: &str = "github.com/lucat1/tagger";
 
 // logging constants
 pub const TAGGER_LOGLEVEL: &str = "TAGGER_LOGLEVEL";
-pub const TAGGER_STYLE: &str = "TAGGER_STYLE";
 
 pub use image_format::ImageFormat;
