@@ -134,7 +134,7 @@ pub enum MediumInclude {
 pub struct TrackAttributes {
     pub title: String,
     pub track: u32,
-    pub disc: u32,
+    pub disc: Option<u32>,
     pub genres: Vec<String>,
     pub bpm: Option<u32>,
 
@@ -145,7 +145,7 @@ pub struct TrackAttributes {
     pub comments: Option<String>,
 
     pub mimetype: String,
-    pub duration: Option<f32>,
+    pub duration: u32,
     pub framerate: Option<u32>,
     pub framecount: Option<u32>,
     pub channels: Option<u32>,
@@ -159,5 +159,15 @@ pub struct TrackAttributes {
 pub enum TrackRelation {
     Artists,
     Medium,
+    Recorders,
+}
+
+#[derive(Deserialize, PartialEq, Eq)]
+pub enum TrackInclude {
+    #[serde(rename = "artists")]
+    Artists,
+    #[serde(rename = "medium")]
+    Medium,
+    #[serde(rename = "recorders")]
     Recorders,
 }

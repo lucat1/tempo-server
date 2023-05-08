@@ -10,22 +10,20 @@ use sea_orm::{
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use super::images;
-use super::releases;
-use super::AppState;
+use super::{artists, mediums, releases, AppState};
 use crate::documents::{
     ArtistCreditAttributes, ArtistInclude, ArtistRelation, RecordingAttributes, TrackAttributes,
-    TrackRelation,
+    TrackInclude, TrackRelation,
 };
 use crate::jsonapi::{
     ArtistResource, Document, DocumentData, Error, Included, Meta, Query, Related, Relation,
     Relationship, ResourceIdentifier, ResourceType, TrackResource,
 };
 
+#[derive(Default)]
 pub struct TrackRelated {
     artist_credits: Vec<entity::ArtistCredit>,
-    artists: Vec<Option<entity::Artist>>,
-    medium: entity::Medium,
+    medium: Option<entity::Medium>,
     recorders: Vec<entity::ArtistTrackRelation>,
 }
 
@@ -52,15 +50,9 @@ where
     let mut related = Vec::new();
     for (i, medium) in mediums.into_iter().enumerate() {
         let artist_credits = &artist_credits[i];
-        let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
-
-        let medium = medium.clone().ok_or(DbErr::RecordNotFound(
-            "Track doesn't have an associated medium".to_string(),
-        ))?;
 
         related.push(TrackRelated {
             artist_credits: artist_credits.to_owned(),
-            artists,
             medium,
             recorders: recorders[i].to_owned(),
         });
@@ -72,28 +64,28 @@ where
 pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> TrackResource {
     let TrackRelated {
         artist_credits,
-        artists,
         medium,
         recorders,
     } = related;
     let mut relationships = HashMap::new();
-    let mut related_artists = Vec::new();
-    for (i, ac) in artist_credits.into_iter().enumerate() {
-        if let Some(artist) = &artists[i] {
-            related_artists.push(Related::Artist(ResourceIdentifier {
-                r#type: ResourceType::Artist,
-                id: artist.id.to_owned(),
-                meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
-                    join_phrase: ac.join_phrase.to_owned(),
-                })),
-            }));
-        }
-    }
-    if !related_artists.is_empty() {
+    if !artist_credits.is_empty() {
         relationships.insert(
             TrackRelation::Artists,
             Relationship {
-                data: Relation::Multi(related_artists),
+                data: Relation::Multi(
+                    artist_credits
+                        .into_iter()
+                        .map(|ac| {
+                            Related::Artist(ResourceIdentifier {
+                                r#type: ResourceType::Artist,
+                                id: ac.artist_id.to_owned(),
+                                meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
+                                    join_phrase: ac.join_phrase.to_owned(),
+                                })),
+                            })
+                        })
+                        .collect(),
+                ),
             },
         );
     }
@@ -119,16 +111,18 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             },
         );
     }
-    relationships.insert(
-        TrackRelation::Medium,
-        Relationship {
-            data: Relation::Single(Related::Medium(ResourceIdentifier {
-                r#type: ResourceType::Medium,
-                id: medium.id,
-                meta: None,
-            })),
-        },
-    );
+    if let Some(med) = medium {
+        relationships.insert(
+            TrackRelation::Medium,
+            Relationship {
+                data: Relation::Single(Related::Medium(ResourceIdentifier {
+                    r#type: ResourceType::Medium,
+                    id: med.id,
+                    meta: None,
+                })),
+            },
+        );
+    }
 
     TrackResource {
         r#type: ResourceType::Track,
@@ -136,7 +130,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
         attributes: TrackAttributes {
             title: entity.title.to_owned(),
             track: entity.number,
-            disc: medium.position,
+            disc: medium.as_ref().map(|m| m.position),
             genres: entity.genres.0.to_owned(),
             bpm: None,
 
@@ -145,7 +139,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             comments: None,
 
             mimetype: entity.format.unwrap().mime().to_string(),
-            duration: None,
+            duration: entity.length,
             framerate: None,
             framecount: None,
             channels: None,
@@ -161,50 +155,62 @@ pub fn entity_to_included(entity: &entity::Track, related: &TrackRelated) -> Inc
     Included::Track(entity_to_resource(entity, related))
 }
 
-// pub async fn tracks(
-//     State(AppState(db)): State<AppState>,
-//     Query(parameters): Query<QueryParameters>,
-// ) -> Result<Response, Error> {
-//     let tx = db.begin().await.map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Couldn't begin database transaction".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//     let tracks = entity::TrackEntity::find().all(&tx).await.map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Could not fetch tracks".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//     let r = find_related_to_tracks(&tx, tracks).await.map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Could not fetch entites related to the tracks".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//     let tracks = related_to_tracks(&r).map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Could not aggregate relation data".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//
-//     let mut doc = vec_to_jsonapi_document(tracks);
-//     dedup_document(&mut doc);
-//     filter_included(
-//         &mut doc,
-//         parameters
-//             .include
-//             .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
-//     );
-//     Ok(Response(doc))
-// }
-//
+pub async fn included<C>(
+    db: &C,
+    related: Vec<TrackRelated>,
+    include: Vec<TrackInclude>,
+) -> Result<Vec<Included>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let mut included = Vec::new();
+    if include.contains(&TrackInclude::Artists) {
+        let artist_credits = related
+            .iter()
+            .map(|rel| rel.artist_credits.clone())
+            .flatten()
+            .collect::<Vec<_>>();
+        let artists = artist_credits
+            .load_one(entity::ArtistEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
+        let artists_related = artists::related(db, &artists, true).await?;
+        for (i, artist) in artists.into_iter().enumerate() {
+            included.push(artists::entity_to_included(&artist, &artists_related[i]));
+        }
+    }
+    if include.contains(&TrackInclude::Medium) {
+        let mediums = related
+            .iter()
+            .filter_map(|rel| rel.medium.clone())
+            .collect::<Vec<_>>();
+        let mediums_related = mediums::related(db, &mediums, true).await?;
+        for (i, medium) in mediums.into_iter().enumerate() {
+            included.push(mediums::entity_to_included(&medium, &mediums_related[i]));
+        }
+    }
+    if include.contains(&TrackInclude::Recorders) {
+        let recorders = related
+            .iter()
+            .map(|rel| rel.recorders.clone())
+            .flatten()
+            .collect::<Vec<_>>();
+        let artists = recorders
+            .load_one(entity::ArtistEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
+        let artists_related = artists::related(db, &artists, true).await?;
+        for (i, artist) in artists.into_iter().enumerate() {
+            included.push(artists::entity_to_included(&artist, &artists_related[i]));
+        }
+    }
+    Ok(included)
+}
+
 async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, Error>
 where
     C: ConnectionTrait,
@@ -223,57 +229,85 @@ where
             detail: Some("Not found".into()),
         })
 }
-//
-// pub async fn track(
-//     State(AppState(db)): State<AppState>,
-//     Path(id): Path<Uuid>,
-//     Query(parameters): Query<QueryParameters>,
-// ) -> Result<Response, Error> {
-//     let tx = db.begin().await.map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Couldn't begin database transaction".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//     let track = find_track_by_id(&tx, id).await?;
-//     let RelatedToTracks(artists, mediums, releases, tracks) =
-//         find_related_to_tracks(&tx, vec![track])
-//             .await
-//             .map_err(|e| {
-//                 Error(
-//                     StatusCode::INTERNAL_SERVER_ERROR,
-//                     "Could not fetch entites related to the track".to_string(),
-//                     e.into(),
-//                 )
-//             })?;
-//     let (track, track_artist_credits, artist_relations) = tracks.first().unwrap();
-//     let track = related_to_track(
-//         track,
-//         track_artist_credits,
-//         artist_relations,
-//         &artists,
-//         &mediums,
-//         &releases,
-//     )
-//     .map_err(|e| {
-//         Error(
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             "Could not aggregate relation data".to_string(),
-//             e.into(),
-//         )
-//     })?;
-//
-//     let mut doc = track.to_jsonapi_document();
-//     dedup_document(&mut doc);
-//     filter_included(
-//         &mut doc,
-//         parameters
-//             .include
-//             .map_or(Vec::new(), |s| s.split(",").map(|s| s.to_owned()).collect()),
-//     );
-//     Ok(Response(doc))
-// }
+
+pub async fn tracks(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::TrackColumn, TrackInclude>,
+) -> Result<Json<Document<TrackResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+
+    let mut tracks_query = entity::TrackEntity::find();
+    for (sort_key, sort_order) in opts.sort.into_iter() {
+        tracks_query = tracks_query.order_by(sort_key, sort_order);
+    }
+    for (filter_key, filter_value) in opts.filter.into_iter() {
+        tracks_query = tracks_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    }
+    let tracks = tracks_query.all(&tx).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch all tracks".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let related_to_tracks = related(&tx, &tracks, false).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch entites related to the tracks".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let mut data = Vec::new();
+    for (i, track) in tracks.iter().enumerate() {
+        data.push(entity_to_resource(track, &related_to_tracks[i]));
+    }
+    let included = included(&tx, related_to_tracks, opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json(Document {
+        data: DocumentData::Multi(data),
+        included,
+    }))
+}
+
+pub async fn track(
+    State(AppState(db)): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(opts): Query<entity::TrackColumn, TrackInclude>,
+) -> Result<Json<Document<TrackResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+
+    let track = find_track_by_id(&tx, id).await?;
+    let related_to_tracks = related(&tx, &vec![track.clone()], false)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch entites related to the track".to_string(),
+            detail: Some(e.into()),
+        })?;
+    let empty_relationship = TrackRelated::default();
+    let related = related_to_tracks.first().unwrap_or(&empty_relationship);
+    let data = entity_to_resource(&track, related);
+    let included = included(&tx, related_to_tracks, opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json(Document {
+        data: DocumentData::Single(data),
+        included,
+    }))
+}
 
 pub async fn audio(
     State(AppState(db)): State<AppState>,

@@ -24,8 +24,8 @@ pub fn router() -> Router<AppState> {
         .route("/releases/:id", get(releases::release))
         .route("/mediums/", get(mediums::mediums))
         .route("/mediums/:id", get(mediums::medium))
-        // .route("/tracks", get(tracks::tracks))
-        // .route("/tracks/:id", get(tracks::track))
+        .route("/tracks", get(tracks::tracks))
+        .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
 }
 

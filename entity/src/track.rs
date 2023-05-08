@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use super::TrackFormat;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
@@ -103,3 +105,33 @@ impl Linked for TrackToPerformer {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "title" => Ok(Column::Title),
+            "duration" => Ok(Column::Length),
+            "number" => Ok(Column::Number),
+            "genres" => Ok(Column::Genres),
+            "recording_mbid" => Ok(Column::RecordingId),
+            "mimetype" => Ok(Column::Format),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

@@ -3,21 +3,17 @@ use std::collections::HashMap;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::Datelike;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
     TransactionTrait,
 };
 use uuid::Uuid;
 
-use super::{artists, images, releases, tracks, AppState};
-use crate::documents::{
-    ArtistCreditAttributes, MediumAttributes, MediumInclude, MediumRelation, ReleaseInclude,
-    ReleaseRelation,
-};
+use super::{releases, tracks, AppState};
+use crate::documents::{MediumAttributes, MediumInclude, MediumRelation};
 use crate::jsonapi::{
-    Document, DocumentData, Error, Included, MediumResource, Meta, Query, Related, Relation,
-    Relationship, ReleaseResource, ResourceIdentifier, ResourceType,
+    Document, DocumentData, Error, Included, MediumResource, Query, Related, Relation,
+    Relationship, ResourceIdentifier, ResourceType,
 };
 
 #[derive(Default)]
@@ -75,7 +71,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
                         .into_iter()
                         .map(|t| {
                             Related::Track(ResourceIdentifier {
-                                r#type: ResourceType::Release,
+                                r#type: ResourceType::Track,
                                 id: t.id,
                                 meta: None,
                             })
@@ -147,28 +143,28 @@ pub async fn mediums(
         detail: Some(e.into()),
     })?;
 
-    let mut releases_query = entity::MediumEntity::find();
+    let mut mediums_query = entity::MediumEntity::find();
     for (sort_key, sort_order) in opts.sort.into_iter() {
-        releases_query = releases_query.order_by(sort_key, sort_order);
+        mediums_query = mediums_query.order_by(sort_key, sort_order);
     }
     for (filter_key, filter_value) in opts.filter.into_iter() {
-        releases_query = releases_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+        mediums_query = mediums_query.filter(ColumnTrait::eq(&filter_key, filter_value));
     }
-    let releases = releases_query.all(&tx).await.map_err(|e| Error {
+    let mediums = mediums_query.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch all releases".to_string(),
         detail: Some(e.into()),
     })?;
-    let related_to_releases = related(&tx, &releases, false).await.map_err(|e| Error {
+    let related_to_mediums = related(&tx, &mediums, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch entites related to the releases".to_string(),
         detail: Some(e.into()),
     })?;
     let mut data = Vec::new();
-    for (i, release) in releases.iter().enumerate() {
-        data.push(entity_to_resource(release, &related_to_releases[i]));
+    for (i, medium) in mediums.iter().enumerate() {
+        data.push(entity_to_resource(medium, &related_to_mediums[i]));
     }
-    let included = included(&tx, related_to_releases, opts.include)
+    let included = included(&tx, related_to_mediums, opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -192,12 +188,12 @@ pub async fn medium(
         detail: Some(e.into()),
     })?;
 
-    let release = entity::MediumEntity::find_by_id(id)
+    let medium = entity::MediumEntity::find_by_id(id)
         .one(&tx)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried release".to_string(),
+            title: "Could not fetch the requried medium".to_string(),
             detail: Some(e.into()),
         })?
         .ok_or(Error {
@@ -205,17 +201,17 @@ pub async fn medium(
             title: "Medium not found".to_string(),
             detail: None,
         })?;
-    let related_to_releases = related(&tx, &vec![release.clone()], false)
+    let related_to_mediums = related(&tx, &vec![medium.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the releases".to_string(),
+            title: "Could not fetch entites related to the mediums".to_string(),
             detail: Some(e.into()),
         })?;
     let empty_relationship = MediumRelated::default();
-    let related = related_to_releases.first().unwrap_or(&empty_relationship);
-    let data = entity_to_resource(&release, related);
-    let included = included(&tx, related_to_releases, opts.include)
+    let related = related_to_mediums.first().unwrap_or(&empty_relationship);
+    let data = entity_to_resource(&medium, related);
+    let included = included(&tx, related_to_mediums, opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
