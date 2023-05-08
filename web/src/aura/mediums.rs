@@ -25,7 +25,7 @@ pub struct MediumRelated {
 pub async fn related<C>(
     db: &C,
     entities: &Vec<entity::Medium>,
-    light: bool,
+    _light: bool,
 ) -> Result<Vec<MediumRelated>, DbErr>
 where
     C: ConnectionTrait,

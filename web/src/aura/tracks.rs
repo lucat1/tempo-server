@@ -4,20 +4,19 @@ use axum::extract::{Path, State};
 use axum::http::{Request, StatusCode};
 use axum::{body::Body, response::IntoResponse, Json};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, ModelTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use super::{artists, mediums, releases, AppState};
+use super::{artists, mediums, AppState};
 use crate::documents::{
-    ArtistCreditAttributes, ArtistInclude, ArtistRelation, RecordingAttributes, TrackAttributes,
-    TrackInclude, TrackRelation,
+    ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
 };
 use crate::jsonapi::{
-    ArtistResource, Document, DocumentData, Error, Included, Meta, Query, Related, Relation,
-    Relationship, ResourceIdentifier, ResourceType, TrackResource,
+    Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
+    ResourceIdentifier, ResourceType, TrackResource,
 };
 
 #[derive(Default)]
@@ -43,9 +42,13 @@ where
         )
         .await?;
     let mediums = entities.load_one(entity::MediumEntity, db).await?;
-    let recorders = entities
-        .load_many(entity::ArtistTrackRelationEntity, db)
-        .await?;
+    let recorders = if !light {
+        entities
+            .load_many(entity::ArtistTrackRelationEntity, db)
+            .await?
+    } else {
+        Vec::new()
+    };
 
     let mut related = Vec::new();
     for (i, medium) in mediums.into_iter().enumerate() {
@@ -54,7 +57,11 @@ where
         related.push(TrackRelated {
             artist_credits: artist_credits.to_owned(),
             medium,
-            recorders: recorders[i].to_owned(),
+            recorders: if light {
+                Vec::new()
+            } else {
+                recorders[i].to_owned()
+            },
         });
     }
 

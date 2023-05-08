@@ -68,9 +68,11 @@ where
             images: images[i].to_owned(),
             releases,
             tracks,
-            recordings: recordings
-                .get(i)
-                .map_or_else(|| Vec::new(), |r| r.to_owned()),
+            recordings: if light {
+                Vec::new()
+            } else {
+                recordings[i].to_owned()
+            },
         });
     }
 

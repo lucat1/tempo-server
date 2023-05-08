@@ -23,14 +23,13 @@ use crate::jsonapi::{
 pub struct ReleaseRelated {
     image: Option<entity::ImageRelease>,
     artist_credits: Vec<entity::ArtistCredit>,
-    artists: Vec<Option<entity::Artist>>,
     mediums: Vec<entity::Medium>,
 }
 
 pub async fn related<C>(
     db: &C,
     entities: &Vec<entity::Release>,
-    light: bool,
+    _light: bool,
 ) -> Result<Vec<ReleaseRelated>, DbErr>
 where
     C: ConnectionTrait,
@@ -48,12 +47,10 @@ where
     let mut related = Vec::new();
     for i in 0..entities.len() {
         let artist_credits = &artist_credits[i];
-        let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
 
         related.push(ReleaseRelated {
             image: images[i].to_owned(),
             artist_credits: artist_credits.to_owned(),
-            artists,
             mediums: mediums[i].to_owned(),
         });
     }
@@ -65,39 +62,27 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
     let ReleaseRelated {
         image,
         artist_credits,
-        artists,
         mediums,
     } = related;
     let mut relationships = HashMap::new();
-    if let Some(img) = image {
-        relationships.insert(
-            ReleaseRelation::Image,
-            Relationship {
-                data: Relation::Single(Related::Image(ResourceIdentifier {
-                    r#type: ResourceType::Image,
-                    id: img.image_id.to_owned(),
-                    meta: None,
-                })),
-            },
-        );
-    }
-    let mut related_artists = Vec::new();
-    for (i, ac) in artist_credits.into_iter().enumerate() {
-        if let Some(artist) = &artists[i] {
-            related_artists.push(Related::Artist(ResourceIdentifier {
-                r#type: ResourceType::Artist,
-                id: artist.id.to_owned(),
-                meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
-                    join_phrase: ac.join_phrase.to_owned(),
-                })),
-            }));
-        }
-    }
-    if !related_artists.is_empty() {
+    if !artist_credits.is_empty() {
         relationships.insert(
             ReleaseRelation::Artists,
             Relationship {
-                data: Relation::Multi(related_artists),
+                data: Relation::Multi(
+                    artist_credits
+                        .into_iter()
+                        .map(|ac| {
+                            Related::Artist(ResourceIdentifier {
+                                r#type: ResourceType::Artist,
+                                id: ac.artist_id.to_owned(),
+                                meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
+                                    join_phrase: ac.join_phrase.to_owned(),
+                                })),
+                            })
+                        })
+                        .collect(),
+                ),
             },
         );
     }
@@ -117,6 +102,18 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
                         })
                         .collect(),
                 ),
+            },
+        );
+    }
+    if let Some(img) = image {
+        relationships.insert(
+            ReleaseRelation::Image,
+            Relationship {
+                data: Relation::Single(Related::Image(ResourceIdentifier {
+                    r#type: ResourceType::Medium,
+                    id: img.image_id.to_owned(),
+                    meta: None,
+                })),
             },
         );
     }
