@@ -19,11 +19,28 @@ pub enum Relation {
         to = "super::artist::Column::Id"
     )]
     Artist,
+
+    #[sea_orm(has_many = "super::artist_credit_release::Entity")]
+    ArtistCreditRelease,
+    #[sea_orm(has_many = "super::artist_credit_track::Entity")]
+    ArtistCreditTrack,
 }
 
 impl Related<super::artist::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Artist.def()
+    }
+}
+
+impl Related<super::artist_credit_release::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ArtistCreditRelease.def()
+    }
+}
+
+impl Related<super::artist_credit_track::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ArtistCreditTrack.def()
     }
 }
 

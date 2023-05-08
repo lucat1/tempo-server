@@ -27,4 +27,16 @@ pub enum Relation {
     Release,
 }
 
+impl Related<super::artist_credit::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ArtistCredit.def()
+    }
+}
+
+impl Related<super::release::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Release.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}

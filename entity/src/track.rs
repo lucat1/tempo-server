@@ -1,10 +1,9 @@
+use std::hash::Hash;
+
 use super::TrackFormat;
 use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct Genres(pub Vec<String>);
 
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "track")]
@@ -15,7 +14,7 @@ pub struct Model {
     pub title: String,
     pub length: u32,
     pub number: u32,
-    pub genres: Genres,
+    pub genres: crate::Genres,
     pub recording_id: Uuid,
 
     pub format: Option<TrackFormat>,
@@ -106,3 +105,33 @@ impl Linked for TrackToPerformer {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "title" => Ok(Column::Title),
+            "duration" => Ok(Column::Length),
+            "number" => Ok(Column::Number),
+            "genres" => Ok(Column::Genres),
+            "recording_mbid" => Ok(Column::RecordingId),
+            "mimetype" => Ok(Column::Format),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

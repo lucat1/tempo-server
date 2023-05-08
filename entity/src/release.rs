@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
@@ -10,6 +12,7 @@ pub struct Model {
     pub title: String,
     pub release_group_id: Option<Uuid>,
     pub release_type: Option<String>,
+    pub genres: crate::Genres,
     pub asin: Option<String>,
     pub country: Option<String>,
     pub label: Option<String>,
@@ -26,11 +29,19 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::medium::Entity")]
     Medium,
+    #[sea_orm(has_one = "super::image_release::Entity")]
+    Image,
 }
 
 impl Related<super::medium::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Medium.def()
+    }
+}
+
+impl Related<super::image_release::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Image.def()
     }
 }
 
@@ -55,3 +66,39 @@ impl Related<super::image::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "title" => Ok(Column::Title),
+            "release-group-id" => Ok(Column::ReleaseGroupId),
+            "release-type" => Ok(Column::ReleaseType),
+            "genres" => Ok(Column::Genres),
+            "asin" => Ok(Column::Asin),
+            "country" => Ok(Column::Country),
+            "label" => Ok(Column::Label),
+            "catalog-no" => Ok(Column::CatalogNo),
+            "status" => Ok(Column::Status),
+            "date" => Ok(Column::Date),
+            "original-date" => Ok(Column::OriginalDate),
+            "script" => Ok(Column::Script),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

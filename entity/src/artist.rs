@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -18,6 +20,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::artist_credit::Entity")]
     ArtistCredit,
+    #[sea_orm(has_many = "super::image_artist::Entity")]
+    Image,
+    #[sea_orm(has_many = "super::artist_track_relation::Entity")]
+    TrackRelation,
 }
 
 impl Related<super::artist_credit::Entity> for Entity {
@@ -26,14 +32,52 @@ impl Related<super::artist_credit::Entity> for Entity {
     }
 }
 
-impl Related<super::artist_track_relation::Entity> for Entity {
+impl Related<super::image_artist::Entity> for Entity {
     fn to() -> RelationDef {
-        super::artist_track_relation::Relation::Track.def()
+        Relation::Image.def()
+    }
+}
+
+impl Related<super::image::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::image_artist::Relation::Image.def()
     }
 
     fn via() -> Option<RelationDef> {
-        Some(super::artist_track_relation::Relation::Artist.def().rev())
+        Some(super::image_artist::Relation::Artist.def().rev())
+    }
+}
+
+impl Related<super::artist_track_relation::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TrackRelation.def()
     }
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "name" => Ok(Column::Name),
+            "sort_name" => Ok(Column::SortName),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

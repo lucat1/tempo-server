@@ -1,5 +1,7 @@
-mod documents;
+mod artists;
 mod images;
+mod mediums;
+mod releases;
 mod tracks;
 
 use axum::{routing::get, Router};
@@ -14,11 +16,17 @@ use web::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/server", get(server))
+        .route("/images/:id", get(images::image))
+        .route("/images/:id/file", get(images::file))
+        .route("/artists", get(artists::artists))
+        .route("/artists/:id", get(artists::artist))
+        .route("/releases", get(releases::releases))
+        .route("/releases/:id", get(releases::release))
+        .route("/mediums/", get(mediums::mediums))
+        .route("/mediums/:id", get(mediums::medium))
         .route("/tracks", get(tracks::tracks))
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
-        .route("/images/:id", get(images::image))
-        .route("/images/:id/file", get(images::file))
 }
 
 #[derive(Serialize, Deserialize)]
