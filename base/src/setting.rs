@@ -5,6 +5,7 @@ use image::ImageOutputFormat;
 use lazy_static::lazy_static;
 use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -28,6 +29,9 @@ pub struct Settings {
     pub libraries: Vec<Library>,
     #[serde(default)]
     pub downloads: PathBuf,
+
+    #[serde(default)]
+    pub tasks: Tasks,
 }
 
 fn default_library_name() -> String {
@@ -265,12 +269,25 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     Ok(set)
 }
 
-pub fn get_settings() -> Result<&'static Settings> {
-    SETTINGS.get().ok_or(eyre!("Could not get settings"))
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Tasks {
+    #[serde(default = "num_cpus::get")]
+    pub workers: usize,
+
+    #[serde(default = "default_recurring")]
+    pub recurring: HashMap<TaskType, String>,
 }
 
-pub fn print() -> Result<()> {
-    let settings = get_settings()?;
-    print!("{}", toml::to_string(settings)?);
-    Ok(())
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskType {
+    ArtistDescription,
+}
+
+fn default_recurring() -> HashMap<TaskType, String> {
+    [(TaskType::ArtistDescription, "1 * * * * *".to_string())].into()
+}
+
+pub fn get_settings() -> Result<&'static Settings> {
+    SETTINGS.get().ok_or(eyre!("Could not get settings"))
 }
