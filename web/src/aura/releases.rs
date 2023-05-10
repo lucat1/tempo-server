@@ -12,10 +12,10 @@ use uuid::Uuid;
 
 use super::{artists, images, mediums, AppState};
 use crate::documents::{
-    ArtistCreditAttributes, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
+    ArtistCreditAttributes, MediumInclude, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
 };
 use crate::jsonapi::{
-    Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
+    dedup, Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
     ReleaseResource, ResourceIdentifier, ResourceType,
 };
 
@@ -110,7 +110,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             ReleaseRelation::Image,
             Relationship {
                 data: Relation::Single(Related::Image(ResourceIdentifier {
-                    r#type: ResourceType::Medium,
+                    r#type: ResourceType::Image,
                     id: img.image_id.to_owned(),
                     meta: None,
                 })),
@@ -144,6 +144,17 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
 
 pub fn entity_to_included(entity: &entity::Release, related: &ReleaseRelated) -> Included {
     Included::Release(entity_to_resource(entity, related))
+}
+
+fn map_to_mediums_include(include: &[ReleaseInclude]) -> Vec<MediumInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            ReleaseInclude::MediumsTracks => Some(MediumInclude::Tracks),
+            ReleaseInclude::MediumsTracksArtists => Some(MediumInclude::TracksArtists),
+            _ => None,
+        })
+        .collect()
 }
 
 pub async fn included<C>(
@@ -193,6 +204,9 @@ where
         for (i, medium) in mediums.into_iter().enumerate() {
             included.push(mediums::entity_to_included(&medium, &mediums_related[i]));
         }
+        included.extend(
+            mediums::included(db, mediums_related, map_to_mediums_include(&include)).await?,
+        );
     }
     Ok(included)
 }
@@ -237,7 +251,7 @@ pub async fn releases(
         })?;
     Ok(Json(Document {
         data: DocumentData::Multi(data),
-        included,
+        included: dedup(included),
     }))
 }
 
@@ -284,6 +298,6 @@ pub async fn release(
         })?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
-        included,
+        included: dedup(included),
     }))
 }

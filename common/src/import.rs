@@ -354,8 +354,6 @@ pub async fn run(import: Import) -> Result<()> {
             image_id: image.id.to_owned(),
             release_id: full_release.release.id,
         };
-        println!("pre {:?}", image.id);
-        println!("copy {:?}", image_release.image_id);
         let active_image: ImageActive = image.clone().into();
         let active_image_release: ImageReleaseActive = image_release.into();
 

@@ -10,9 +10,9 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::{releases, tracks, AppState};
-use crate::documents::{MediumAttributes, MediumInclude, MediumRelation};
+use crate::documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude};
 use crate::jsonapi::{
-    Document, DocumentData, Error, Included, MediumResource, Query, Related, Relation,
+    dedup, Document, DocumentData, Error, Included, MediumResource, Query, Related, Relation,
     Relationship, ResourceIdentifier, ResourceType,
 };
 
@@ -99,6 +99,16 @@ pub fn entity_to_included(entity: &entity::Medium, related: &MediumRelated) -> I
     Included::Medium(entity_to_resource(entity, related))
 }
 
+fn map_to_tracks_include(include: &[MediumInclude]) -> Vec<TrackInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            MediumInclude::TracksArtists => Some(TrackInclude::Artists),
+            _ => None,
+        })
+        .collect()
+}
+
 pub async fn included<C>(
     db: &C,
     related: Vec<MediumRelated>,
@@ -127,6 +137,8 @@ where
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
         }
+        included
+            .extend(tracks::included(db, tracks_related, map_to_tracks_include(&include)).await?);
     }
     Ok(included)
 }
@@ -171,7 +183,7 @@ pub async fn mediums(
         })?;
     Ok(Json(Document {
         data: DocumentData::Multi(data),
-        included,
+        included: dedup(included),
     }))
 }
 
@@ -218,6 +230,6 @@ pub async fn medium(
         })?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
-        included,
+        included: dedup(included),
     }))
 }

@@ -15,7 +15,7 @@ use crate::documents::{
     ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
 };
 use crate::jsonapi::{
-    Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
+    dedup, Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
     ResourceIdentifier, ResourceType, TrackResource,
 };
 
@@ -275,7 +275,7 @@ pub async fn tracks(
         })?;
     Ok(Json(Document {
         data: DocumentData::Multi(data),
-        included,
+        included: dedup(included),
     }))
 }
 
@@ -310,7 +310,7 @@ pub async fn track(
         })?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
-        included,
+        included: dedup(included),
     }))
 }
 

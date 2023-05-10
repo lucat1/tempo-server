@@ -33,6 +33,7 @@ pub struct RecordingAttributes {
 pub struct ImageAttributes {
     pub role: String,
     pub format: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub width: u32,
     pub height: u32,
@@ -72,10 +73,12 @@ pub enum ArtistRelation {
 pub enum ArtistInclude {
     #[serde(rename = "images")]
     Images,
-    #[serde(rename = "releases")]
-    Releases,
     #[serde(rename = "tracks")]
     Tracks,
+    #[serde(rename = "releases")]
+    Releases,
+    #[serde(rename = "releases.artists")]
+    ReleasesArtists,
 }
 
 #[derive(Serialize)]
@@ -85,18 +88,26 @@ pub struct ReleaseAttributes {
     pub tracktotal: u32,
     pub genres: Vec<String>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub month: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub day: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub original_year: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub original_month: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub original_day: Option<u32>,
 
     #[serde(rename = "release-type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub release_type: Option<String>,
     #[serde(rename = "release-mbid")]
     pub release_mbid: Uuid,
     #[serde(rename = "release-group-mbid")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub release_group_mbid: Option<Uuid>,
 }
 
@@ -115,10 +126,14 @@ pub enum ReleaseRelation {
 pub enum ReleaseInclude {
     #[serde(rename = "image")]
     Image,
-    #[serde(rename = "mediums")]
-    Mediums,
     #[serde(rename = "artists")]
     Artists,
+    #[serde(rename = "mediums")]
+    Mediums,
+    #[serde(rename = "mediums.tracks")]
+    MediumsTracks,
+    #[serde(rename = "mediums.tracks.artists")]
+    MediumsTracksArtists,
 }
 
 #[derive(Serialize)]
@@ -127,6 +142,7 @@ pub struct MediumAttributes {
     pub tracks: u32,
     #[serde(rename = "track-offset")]
     pub track_offset: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
 }
 
@@ -143,29 +159,40 @@ pub enum MediumInclude {
     Release,
     #[serde(rename = "tracks")]
     Tracks,
+    #[serde(rename = "tracks.artists")]
+    TracksArtists,
 }
 
 #[derive(Serialize)]
 pub struct TrackAttributes {
     pub title: String,
     pub track: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub disc: Option<u32>,
     pub genres: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bpm: Option<u32>,
 
     #[serde(rename = "recording-mbid")]
     pub recording_mbid: Uuid,
     #[serde(rename = "track-mbid")]
     pub track_mbid: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub comments: Option<String>,
 
     pub mimetype: String,
     pub duration: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub framerate: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub framecount: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub channels: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bitdepth: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u32>,
 }
 

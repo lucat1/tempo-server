@@ -212,3 +212,31 @@ where
         }
     }
 }
+
+#[derive(PartialEq)]
+enum Identifier {
+    Image(String),
+    Artist(Uuid),
+    Track(Uuid),
+    Medium(Uuid),
+    Release(Uuid),
+}
+
+pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
+    included.sort_unstable_by(|_a, _b| match (_a, _b) {
+        (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
+        (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
+        (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
+        (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
+        (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
+        (_, _) => std::cmp::Ordering::Less,
+    });
+    included.dedup_by_key(|e| match e {
+        Included::Image(e) => Identifier::Image(e.id.to_owned()),
+        Included::Artist(e) => Identifier::Artist(e.id),
+        Included::Track(e) => Identifier::Track(e.id),
+        Included::Medium(e) => Identifier::Medium(e.id),
+        Included::Release(e) => Identifier::Release(e.id),
+    });
+    included
+}

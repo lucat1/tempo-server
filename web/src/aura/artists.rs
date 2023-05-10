@@ -12,9 +12,10 @@ use uuid::Uuid;
 use super::{images, releases, tracks, AppState};
 use crate::documents::{
     ArtistAttributes, ArtistCreditAttributes, ArtistInclude, ArtistRelation, RecordingAttributes,
+    ReleaseInclude,
 };
 use crate::jsonapi::{
-    ArtistResource, Document, DocumentData, Error, Included, Meta, Query, Related, Relation,
+    dedup, ArtistResource, Document, DocumentData, Error, Included, Meta, Query, Related, Relation,
     Relationship, ResourceIdentifier, ResourceType,
 };
 
@@ -79,6 +80,16 @@ where
     Ok(related)
 }
 
+fn map_to_releases_include(include: &[ArtistInclude]) -> Vec<ReleaseInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            ArtistInclude::ReleasesArtists => Some(ReleaseInclude::Artists),
+            _ => None,
+        })
+        .collect()
+}
+
 pub async fn included<C>(
     db: &C,
     related: Vec<ArtistRelated>,
@@ -101,27 +112,10 @@ where
                 .collect::<Vec<_>>(),
         );
     }
-    if include.contains(&ArtistInclude::Releases) {
-        let release_relations = related
-            .iter()
-            .flat_map(|rel| rel.releases.to_owned())
-            .flatten()
-            .collect::<Vec<_>>();
-        let releases = release_relations
-            .load_one(entity::ReleaseEntity, db)
-            .await?
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
-        let release_related = releases::related(db, &releases, true).await?;
-        for (i, release) in releases.iter().enumerate() {
-            included.push(releases::entity_to_included(release, &release_related[i]))
-        }
-    }
     if include.contains(&ArtistInclude::Tracks) {
         let track_relations = related
-            .into_iter()
-            .flat_map(|rel| rel.tracks)
+            .iter()
+            .flat_map(|rel| rel.tracks.to_owned())
             .flatten()
             .collect::<Vec<_>>();
         let tracks = track_relations
@@ -134,6 +128,26 @@ where
         for (i, track) in tracks.iter().enumerate() {
             included.push(tracks::entity_to_included(track, &track_related[i]))
         }
+    }
+    if include.contains(&ArtistInclude::Releases) {
+        let release_relations = related
+            .into_iter()
+            .flat_map(|rel| rel.releases)
+            .flatten()
+            .collect::<Vec<_>>();
+        let releases = release_relations
+            .load_one(entity::ReleaseEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let releases_related = releases::related(db, &releases, true).await?;
+        for (i, release) in releases.iter().enumerate() {
+            included.push(releases::entity_to_included(release, &releases_related[i]))
+        }
+        included.extend(
+            releases::included(db, releases_related, map_to_releases_include(&include)).await?,
+        );
     }
     Ok(included)
 }
@@ -282,7 +296,7 @@ pub async fn artists(
         })?;
     Ok(Json(Document {
         data: DocumentData::Multi(data),
-        included,
+        included: dedup(included),
     }))
 }
 
@@ -329,6 +343,6 @@ pub async fn artist(
         })?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
-        included,
+        included: dedup(included),
     }))
 }
