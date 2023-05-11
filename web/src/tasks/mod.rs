@@ -1,9 +1,10 @@
 pub mod artist_description;
 
-use base::setting::get_settings;
+use base::{database::get_database, setting::get_settings};
 use deadqueue::unlimited::Queue;
 use eyre::Result;
 use lazy_static::lazy_static;
+use sea_orm::DbConn;
 use std::sync::Arc;
 
 lazy_static! {
@@ -24,11 +25,12 @@ pub fn queue_loop() -> Result<()> {
     tracing::info!(%workers,"Starting worker pool for background tasks");
     for worker in 0..workers {
         let queue = QUEUE.clone();
+        let db = get_database()?;
         tokio::spawn(async move {
             loop {
                 let task = queue.pop().await;
                 tracing::trace!(%worker, ?task, "Executing task");
-                match run_task(task.clone()).await {
+                match run_task(db, task.clone()).await {
                     Ok(_) => tracing::info!(%worker, ?task, "Task completed"),
                     Err(error) => tracing::warn!(%worker, ?task, %error, "Task failed with error"),
                 }
@@ -38,9 +40,9 @@ pub fn queue_loop() -> Result<()> {
     Ok(())
 }
 
-async fn run_task(task: Task) -> Result<()> {
+async fn run_task(db: &DbConn, task: Task) -> Result<()> {
     match task {
-        Task::ArtistDescription(data) => artist_description::run(data),
+        Task::ArtistDescription(data) => artist_description::run(db, data),
     }
     .await
 }

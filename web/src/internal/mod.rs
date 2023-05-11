@@ -1,6 +1,7 @@
 mod import;
 mod library;
 mod list;
+mod tasks;
 
 use axum::{
     routing::{delete, get, patch, post, put},
@@ -18,4 +19,5 @@ pub fn router() -> Router<AppState> {
         .route("/import/:job", patch(import::edit))
         .route("/import/:job", post(import::run))
         .route("/import/:job", delete(import::delete))
+        .route("/tasks/trigger/:type", post(tasks::trigger))
 }

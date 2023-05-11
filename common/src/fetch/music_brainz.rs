@@ -163,6 +163,8 @@ impl From<Artist> for entity::Artist {
             id: artist.id,
             name: artist.name,
             sort_name: artist.sort_name,
+
+            description: None,
         }
     }
 }

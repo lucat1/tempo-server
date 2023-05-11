@@ -2,6 +2,7 @@ use sea_orm_migration::prelude::*;
 
 mod m20220101_000001_init;
 mod m20230416_000001_image;
+mod m20230511_000001_artist_description;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20220101_000001_init::Migration),
             Box::new(m20230416_000001_image::Migration),
+            Box::new(m20230511_000001_artist_description::Migration),
         ]
     }
 }

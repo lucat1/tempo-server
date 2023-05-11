@@ -14,6 +14,8 @@ pub struct Model {
     pub id: Uuid,
     pub name: String,
     pub sort_name: String,
+
+    pub description: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

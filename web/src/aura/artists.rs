@@ -247,6 +247,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
         attributes: ArtistAttributes {
             name: entity.name.to_owned(),
             sort_name: entity.sort_name.to_owned(),
+            description: entity.description.to_owned(),
         },
         relationships,
     }
