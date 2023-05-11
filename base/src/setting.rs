@@ -285,7 +285,7 @@ pub enum TaskType {
 }
 
 fn default_recurring() -> HashMap<TaskType, String> {
-    [(TaskType::ArtistDescription, "1 * * * * *".to_string())].into()
+    [(TaskType::ArtistDescription, "0 0 4 * * * *".to_string())].into()
 }
 
 pub fn get_settings() -> Result<&'static Settings> {
