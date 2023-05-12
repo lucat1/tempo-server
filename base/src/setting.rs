@@ -32,6 +32,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub tasks: Tasks,
+
+    #[serde(default)]
+    pub keys: Keys,
 }
 
 fn default_library_name() -> String {
@@ -281,11 +284,24 @@ pub struct Tasks {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskType {
+    ArtistRelations,
     ArtistDescription,
+    // ArtistImagesLastfm,
 }
 
 fn default_recurring() -> HashMap<TaskType, String> {
-    [(TaskType::ArtistDescription, "0 0 4 * * * *".to_string())].into()
+    [
+        (TaskType::ArtistRelations, "0 0 3 * * * *".to_string()),
+        (TaskType::ArtistDescription, "0 0 4 * * * *".to_string()),
+        // (TaskType::ArtistImagesLastfm, "0 0 4 * * * *".to_string()),
+    ]
+    .into()
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Keys {
+    pub lastfm_apikey: String,
+    pub lastfm_shared_secret: String,
 }
 
 pub fn get_settings() -> Result<&'static Settings> {

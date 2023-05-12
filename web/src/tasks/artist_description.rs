@@ -5,6 +5,8 @@ use sea_orm::{ActiveModelTrait, ActiveValue, DbConn, EntityTrait, IntoActiveMode
 use serde::Deserialize;
 use uuid::Uuid;
 
+pub type Data = Uuid;
+
 pub async fn all_data(db: &DbConn) -> Result<Vec<Data>> {
     Ok(entity::ArtistEntity::find()
         .all(db)
@@ -13,8 +15,6 @@ pub async fn all_data(db: &DbConn) -> Result<Vec<Data>> {
         .map(|a| a.id as Data)
         .collect())
 }
-
-pub type Data = Uuid;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,7 +47,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
     let document: Document = res
         .json()
         .await
-        .wrap_err(eyre!("Could not read parse wikipedia extract content"))?;
+        .wrap_err(eyre!("Could not parse wikipedia extract content"))?;
     match document.wikipedia_extract {
         Some(extract) => {
             let mut entity = entity::ArtistEntity::find_by_id(data)

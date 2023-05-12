@@ -26,6 +26,18 @@ pub async fn schedule(scheduler: &mut JobScheduler, period: String, task: TaskTy
 pub async fn trigger_task(task: &TaskType) -> Result<()> {
     let db = get_database()?;
     match task {
+        TaskType::ArtistRelations => {
+            let data_result = tasks::artist_relations::all_data(db).await;
+            match data_result {
+                Ok(data) => {
+                    for id in data.into_iter() {
+                        get_queue().push(Task::ArtistRelations(id));
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
+        }
         TaskType::ArtistDescription => {
             let data_result = tasks::artist_description::all_data(db).await;
             match data_result {
@@ -37,7 +49,18 @@ pub async fn trigger_task(task: &TaskType) -> Result<()> {
                 }
                 Err(e) => Err(e),
             }
-        }
+        } // TaskType::ArtistImagesLastfm => {
+          //     let data_result = tasks::artist_images_lastfm::all_data(db).await;
+          //     match data_result {
+          //         Ok(data) => {
+          //             for id in data.into_iter() {
+          //                 get_queue().push(Task::ArtistImagesLastfm(id));
+          //             }
+          //             Ok(())
+          //         }
+          //         Err(e) => Err(e),
+          //     }
+          // }
     }
 }
 

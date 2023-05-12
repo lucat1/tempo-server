@@ -1,5 +1,8 @@
+#![feature(type_alias_impl_trait)]
+
 mod aura;
 pub mod documents;
+pub mod fetch;
 mod internal;
 pub mod jsonapi;
 mod scheduling;
