@@ -6,7 +6,7 @@ use reqwest::{header::USER_AGENT, Error, Request, Response};
 use std::num::NonZeroU32;
 
 pub static MB_BASE_URL: &str = "https://musicbrainz.org/ws/2/";
-static MB_CALLS_PER_SECOND: NonZeroU32 = nonzero!(50u32);
+static MB_CALLS_PER_SECOND: NonZeroU32 = nonzero!(1u32);
 static MB_USER_AGENT: &str = formatcp!("{}/{} ({})", base::CLI_NAME, base::VERSION, base::GITHUB);
 
 lazy_static! {

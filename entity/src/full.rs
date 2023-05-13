@@ -174,7 +174,7 @@ impl ArtistInfo for FullTrack {
 }
 
 impl FullTrack {
-    pub fn get_related(&self, relation_type: RelationType) -> Result<Vec<&Artist>> {
+    pub fn get_related(&self, relation_type: ArtistTrackRelationType) -> Result<Vec<&Artist>> {
         self.artist_track_relation
             .iter()
             .filter(|atr| atr.relation_type == relation_type)

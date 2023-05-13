@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use entity::RelationType;
+use entity::ArtistTrackRelationType;
 
 #[derive(Serialize)]
 pub struct ServerAttributes {
@@ -25,7 +25,7 @@ pub struct ArtistCreditAttributes {
 
 #[derive(Serialize)]
 pub struct RecordingAttributes {
-    pub role: RelationType,
+    pub role: ArtistTrackRelationType,
     pub detail: String,
 }
 

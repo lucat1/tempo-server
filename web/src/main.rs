@@ -47,9 +47,12 @@ async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
 
-    let subscriber = tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::from_env(base::TAGGER_LOGLEVEL).add_directive(LevelFilter::DEBUG.into()));
+    let subscriber = tracing_subscriber::registry().with(fmt::layer()).with(
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::TRACE.into())
+            .with_env_var(base::TAGGER_LOGLEVEL)
+            .from_env_lossy(),
+    );
     tracing::subscriber::set_global_default(subscriber)?;
 
     let cli = Cli::parse();

@@ -28,7 +28,7 @@ struct WikipediExtract {
 }
 
 pub async fn run(db: &DbConn, data: Data) -> Result<()> {
-    tracing::debug!(%data, "Fetching the description for artist");
+    tracing::trace!(%data, "Fetching the description for artist");
     let res = CLIENT
         .get(format!(
             "https://musicbrainz.org/artist/{}/wikipedia-extract",
@@ -65,7 +65,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
             Ok(())
         }
         None => {
-            tracing::debug!(id=%data, "Wikipedia/MusicBrainz doesn't provide a description for the artist");
+            tracing::trace!(id=%data, "Wikipedia/MusicBrainz doesn't provide a description for the artist");
             Ok(())
         }
     }

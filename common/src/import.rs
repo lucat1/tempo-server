@@ -14,13 +14,13 @@ use entity::full::FullReleaseActive;
 use entity::full::FullTrackActive;
 use entity::{
     ArtistCreditEntity, ArtistCreditReleaseEntity, ArtistCreditTrackEntity, ArtistEntity,
-    ArtistTrackRelationEntity, Image, ImageActive, ImageEntity, ImageRelease, ImageReleaseActive,
-    ImageReleaseEntity, MediumEntity, ReleaseEntity, TrackEntity,
+    ArtistTrackRelationEntity, IgnoreNone, Image, ImageActive, ImageEntity, ImageRelease,
+    ImageReleaseActive, ImageReleaseEntity, MediumEntity, ReleaseEntity, TrackEntity,
 };
 use eyre::{eyre, Result, WrapErr};
 use rayon::prelude::*;
 use scan_dir::ScanDir;
-use sea_orm::{DbErr, EntityTrait, TransactionTrait};
+use sea_orm::{EntityTrait, TransactionTrait};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -161,20 +161,6 @@ struct Job {
     dest: PathBuf,
     tags: HashMap<TagKey, Vec<String>>,
     cover: Option<Picture>,
-}
-
-trait IgnoreNone {
-    fn ignore_none(self) -> Result<(), DbErr>;
-}
-
-impl<T> IgnoreNone for Result<T, DbErr> {
-    fn ignore_none(self) -> Result<(), DbErr> {
-        match self {
-            Err(DbErr::RecordNotInserted) => Ok(()),
-            Err(v) => Err(v),
-            Ok(_) => Ok(()),
-        }
-    }
 }
 
 pub async fn run(import: Import) -> Result<()> {

@@ -27,7 +27,7 @@ mime = "0.3.16"
 serde = "1.0.152"
 serde_derive = "1.0.152"
 toml = "0.7.1"
-sea-orm = { version = "0.11", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time" ] }
+sea-orm = { version = "0.11", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time", "debug-print" ] }
 sea-orm-migration = "0.11"
 scan_dir = "0.3.3"
 reqwest = { version = "0.11", features = ["json", "rustls-tls", "gzip"], default-features = false }

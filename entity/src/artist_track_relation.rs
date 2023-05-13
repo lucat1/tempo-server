@@ -6,26 +6,37 @@ use uuid::Uuid;
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum RelationType {
     #[sea_orm(string_value = "a")]
+    #[serde(rename = "engineer")]
     Engineer,
     #[sea_orm(string_value = "b")]
+    #[serde(rename = "instrument")]
     Instrument,
     #[sea_orm(string_value = "c")]
+    #[serde(rename = "performer")]
     Performer,
     #[sea_orm(string_value = "d")]
+    #[serde(rename = "mix")]
     Mix,
     #[sea_orm(string_value = "e")]
+    #[serde(rename = "producer")]
     Producer,
     #[sea_orm(string_value = "f")]
+    #[serde(rename = "vocal")]
     Vocal,
     #[sea_orm(string_value = "g")]
+    #[serde(rename = "lyricist")]
     Lyricist,
     #[sea_orm(string_value = "h")]
+    #[serde(rename = "writer")]
     Writer,
     #[sea_orm(string_value = "i")]
+    #[serde(rename = "composer")]
     Composer,
     #[sea_orm(string_value = "j")]
+    #[serde(rename = "performance")]
     Performance,
     #[sea_orm(string_value = "k")]
+    #[serde(rename = "other")]
     Other,
 }
 
@@ -52,7 +63,7 @@ pub struct Entity;
 
 impl EntityName for Entity {
     fn table_name(&self) -> &str {
-        "arist_track_relation"
+        "artists_track_relation"
     }
 }
 

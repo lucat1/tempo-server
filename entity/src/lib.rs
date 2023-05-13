@@ -1,13 +1,14 @@
-mod artist;
 mod genres;
 mod medium;
 mod release;
 mod track;
 mod track_format;
 
+mod artist;
 mod artist_credit;
 mod artist_credit_release;
 mod artist_credit_track;
+mod artist_relation;
 mod artist_track_relation;
 
 mod image;
@@ -18,6 +19,7 @@ pub mod conflict;
 pub mod full;
 
 use eyre::Result;
+use sea_orm::DbErr;
 use uuid::Uuid;
 
 pub use artist::ActiveModel as ArtistActive;
@@ -28,11 +30,16 @@ pub use artist_credit::ActiveModel as ArtistCreditActive;
 pub use artist_credit::Column as ArtistCreditColumn;
 pub use artist_credit::Entity as ArtistCreditEntity;
 pub use artist_credit::Model as ArtistCredit;
+pub use artist_relation::ActiveModel as ArtistRelationActive;
+pub use artist_relation::Column as ArtistRelationColumn;
+pub use artist_relation::Entity as ArtistRelationEntity;
+pub use artist_relation::Model as ArtistRelation;
+pub use artist_relation::RelationType as ArtistRelationRelationType;
 pub use artist_track_relation::ActiveModel as ArtistTrackRelationActive;
 pub use artist_track_relation::Column as ArtistTrackRelationColumn;
 pub use artist_track_relation::Entity as ArtistTrackRelationEntity;
 pub use artist_track_relation::Model as ArtistTrackRelation;
-pub use artist_track_relation::RelationType;
+pub use artist_track_relation::RelationType as ArtistTrackRelationType;
 pub use genres::Genres;
 pub use medium::ActiveModel as MediumActive;
 pub use medium::Column as MediumColumn;
@@ -72,3 +79,17 @@ pub use image_release::ActiveModel as ImageReleaseActive;
 pub use image_release::Column as ImageReleaseColumn;
 pub use image_release::Entity as ImageReleaseEntity;
 pub use image_release::Model as ImageRelease;
+
+pub trait IgnoreNone {
+    fn ignore_none(self) -> Result<(), DbErr>;
+}
+
+impl<T> IgnoreNone for Result<T, DbErr> {
+    fn ignore_none(self) -> Result<(), DbErr> {
+        match self {
+            Err(DbErr::RecordNotInserted) => Ok(()),
+            Err(v) => Err(v),
+            Ok(_) => Ok(()),
+        }
+    }
+}
