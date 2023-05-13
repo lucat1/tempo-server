@@ -21,6 +21,7 @@ use crate::jsonapi::{
 
 #[derive(Default)]
 pub struct ArtistRelated {
+    relations: Vec<entity::ArtistUrl>,
     images: Vec<entity::ImageArtist>,
     recordings: Vec<entity::ArtistTrackRelation>,
     artist_credits: Vec<entity::ArtistCredit>,
@@ -36,6 +37,7 @@ pub async fn related<C>(
 where
     C: ConnectionTrait,
 {
+    let artist_relations = entities.load_many(entity::ArtistUrlEntity, db).await?;
     let artist_credits = entities.load_many(entity::ArtistCreditEntity, db).await?;
     let images = entities.load_many(entity::ImageArtistEntity, db).await?;
     let recordings = if !light {
@@ -61,6 +63,7 @@ where
         };
 
         related.push(ArtistRelated {
+            relations: artist_relations[i].to_owned(),
             artist_credits: if !light {
                 artist_credits.to_owned()
             } else {
@@ -154,6 +157,7 @@ where
 
 pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> ArtistResource {
     let ArtistRelated {
+        relations,
         images,
         recordings,
         artist_credits,
@@ -248,6 +252,10 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
             name: entity.name.to_owned(),
             sort_name: entity.sort_name.to_owned(),
             description: entity.description.to_owned(),
+            urls: relations
+                .iter()
+                .map(|rel| (rel.r#type, rel.url.to_owned()))
+                .collect(),
         },
         relationships,
     }

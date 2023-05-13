@@ -67,23 +67,20 @@ struct RelationUrl {
     pub resource: Url,
 }
 
-fn parse(
-    url: Url,
-    t: MusicBrainzRelationType,
-) -> Option<(String, entity::ArtistRelationRelationType)> {
+fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::ArtistUrlType)> {
     match t {
-        MusicBrainzRelationType::Biography => Some(entity::ArtistRelationRelationType::Biography),
-        MusicBrainzRelationType::Discogs => Some(entity::ArtistRelationRelationType::Discogs),
-        MusicBrainzRelationType::LastFM => Some(entity::ArtistRelationRelationType::LastFM),
-        MusicBrainzRelationType::AllMusic => Some(entity::ArtistRelationRelationType::AllMusic),
-        MusicBrainzRelationType::Youtube => Some(entity::ArtistRelationRelationType::Youtube),
-        MusicBrainzRelationType::Homepage => Some(entity::ArtistRelationRelationType::Homepage),
-        MusicBrainzRelationType::Wikidata => Some(entity::ArtistRelationRelationType::Wikidata),
-        MusicBrainzRelationType::SongKick => Some(entity::ArtistRelationRelationType::SongKick),
-        MusicBrainzRelationType::SoundCloud=> Some(entity::ArtistRelationRelationType::SoundCloud),
+        MusicBrainzRelationType::Biography => Some(entity::ArtistUrlType::Biography),
+        MusicBrainzRelationType::Discogs => Some(entity::ArtistUrlType::Discogs),
+        MusicBrainzRelationType::LastFM => Some(entity::ArtistUrlType::LastFM),
+        MusicBrainzRelationType::AllMusic => Some(entity::ArtistUrlType::AllMusic),
+        MusicBrainzRelationType::Youtube => Some(entity::ArtistUrlType::Youtube),
+        MusicBrainzRelationType::Homepage => Some(entity::ArtistUrlType::Homepage),
+        MusicBrainzRelationType::Wikidata => Some(entity::ArtistUrlType::Wikidata),
+        MusicBrainzRelationType::SongKick => Some(entity::ArtistUrlType::SongKick),
+        MusicBrainzRelationType::SoundCloud=> Some(entity::ArtistUrlType::SoundCloud),
         MusicBrainzRelationType::FreeStreaming => match url.domain() {
-            Some("spotify.com") | Some("open.spotify.com") => Some(entity::ArtistRelationRelationType::Spotify),
-            Some("deezer.com") | Some("www.deezer.com") => Some(entity::ArtistRelationRelationType::Deezer),
+            Some("spotify.com") | Some("open.spotify.com") => Some(entity::ArtistUrlType::Spotify),
+            Some("deezer.com") | Some("www.deezer.com") => Some(entity::ArtistUrlType::Deezer),
             Some(domain) => {
                 tracing::trace!(%domain,"Ignoring free streaming service relation");
                 None
@@ -91,7 +88,7 @@ fn parse(
             None => None,
         },
         MusicBrainzRelationType::Streaming => match url.domain() {
-            Some("tidal.com") => Some(entity::ArtistRelationRelationType::Tidal),
+            Some("tidal.com") => Some(entity::ArtistUrlType::Tidal),
             Some(domain) => {
                 tracing::trace!(%domain,"Ignoring streaming service relation");
                 None
@@ -99,9 +96,9 @@ fn parse(
             None => None,
         },
         MusicBrainzRelationType::SocialNetwork => match url.domain() {
-            Some("twitter.com") | Some("www.twitter.com") => Some(entity::ArtistRelationRelationType::Twitter),
-            Some("facebook.com") | Some("www.facebook.com") => Some(entity::ArtistRelationRelationType::Facebook),
-            Some("instagram.com") | Some("www.instagram.com") => Some(entity::ArtistRelationRelationType::Instagram),
+            Some("twitter.com") | Some("www.twitter.com") => Some(entity::ArtistUrlType::Twitter),
+            Some("facebook.com") | Some("www.facebook.com") => Some(entity::ArtistUrlType::Facebook),
+            Some("instagram.com") | Some("www.instagram.com") => Some(entity::ArtistUrlType::Instagram),
             Some(domain) => {
                 tracing::trace!(%domain,"Ignoring social network service relation");
                 None
@@ -147,7 +144,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
         .relations
         .into_iter()
         .filter_map(|r| r.url.and_then(|url| parse(url.resource, r.r#type)))
-        .map(|(url, t)| entity::ArtistRelation {
+        .map(|(url, t)| entity::ArtistUrl {
             artist_id: data,
             r#type: t,
             url,
@@ -157,7 +154,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
         .map(|r| r.into_active_model())
         .collect::<Vec<_>>();
     if !relations.is_empty() {
-        entity::ArtistRelationEntity::insert_many(relations)
+        entity::ArtistUrlEntity::insert_many(relations)
             .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
             .exec(db)
             .await

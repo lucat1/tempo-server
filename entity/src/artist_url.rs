@@ -3,12 +3,12 @@ use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "artists_relation")]
+#[sea_orm(table_name = "artists_url")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub artist_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub r#type: RelationType,
+    pub r#type: UrlType,
     pub url: String,
 }
 
@@ -16,15 +16,15 @@ pub struct Model {
     Serialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, PartialOrd, Ord, Hash,
 )]
 #[sea_orm(rs_type = "String", db_type = "String(None)")]
-pub enum RelationType {
+pub enum UrlType {
     #[sea_orm(string_value = "biography")]
     #[serde(rename = "biography")]
     Biography,
     #[sea_orm(string_value = "homepage")]
-    #[serde(rename = "official homepage")]
+    #[serde(rename = "homepage")]
     Homepage,
     #[sea_orm(string_value = "lastfm")]
-    #[serde(rename = "last.fm")]
+    #[serde(rename = "lastfm")]
     LastFM,
     #[sea_orm(string_value = "discogs")]
     #[serde(rename = "discogs")]

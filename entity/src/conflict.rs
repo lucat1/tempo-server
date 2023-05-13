@@ -88,7 +88,7 @@ lazy_static! {
     .update_column(ArtistTrackRelationColumn::RelationValue)
     .to_owned();
     pub static ref ARTIST_RELATION_CONFLICT: OnConflict =
-        OnConflict::columns([ArtistRelationColumn::ArtistId, ArtistRelationColumn::Type,])
-            .update_column(ArtistRelationColumn::Url)
+        OnConflict::columns([ArtistUrlColumn::ArtistId, ArtistUrlColumn::Type,])
+            .update_column(ArtistUrlColumn::Url)
             .to_owned();
 }

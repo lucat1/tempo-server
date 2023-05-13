@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use entity::ArtistTrackRelationType;
+use entity::{ArtistTrackRelationType, ArtistUrlType};
 
 #[derive(Serialize)]
 pub struct ServerAttributes {
@@ -57,6 +59,7 @@ pub struct ArtistAttributes {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    pub urls: HashMap<ArtistUrlType, String>,
 }
 
 #[derive(Serialize, Hash, PartialEq, Eq)]

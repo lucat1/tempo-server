@@ -27,11 +27,11 @@ pub async fn trigger_task(task: &TaskType) -> Result<()> {
     let db = get_database()?;
     match task {
         TaskType::ArtistRelations => {
-            let data_result = tasks::artist_relations::all_data(db).await;
+            let data_result = tasks::artist_url::all_data(db).await;
             match data_result {
                 Ok(data) => {
                     for id in data.into_iter() {
-                        get_queue().push(Task::ArtistRelations(id));
+                        get_queue().push(Task::ArtistUrl(id));
                     }
                     Ok(())
                 }
