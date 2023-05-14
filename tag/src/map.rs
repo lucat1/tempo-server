@@ -166,6 +166,16 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     Ok(map)
 }
 
+pub fn tags_from_artist(artist: &Artist) -> Result<TagMap> {
+    let Artist {
+        name, sort_name, ..
+    } = &artist;
+    let mut map = HashMap::new();
+    map.insert(TagKey::Artist, vec![name.to_owned()]);
+    map.insert(TagKey::ArtistSortOrder, vec![sort_name.to_owned()]);
+    Ok(map)
+}
+
 pub fn tags_from_combination(full_release: &FullRelease, full_track: &FullTrack) -> Result<TagMap> {
     let mut map = tags_from_full_release(full_release)?;
     map.extend(tags_from_full_track(full_track)?);

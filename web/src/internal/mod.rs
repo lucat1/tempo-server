@@ -1,5 +1,4 @@
 mod import;
-mod library;
 mod list;
 mod tasks;
 
@@ -13,7 +12,6 @@ use web::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/list", get(list::list))
-        .route("/library", get(library::list))
         .route("/import", put(import::begin))
         .route("/import/:job", get(import::get))
         .route("/import/:job", patch(import::edit))

@@ -19,7 +19,6 @@ lazy_static! {
 #[derive(Deserialize)]
 pub struct ImportBegin {
     path: PathBuf,
-    library: usize,
 }
 
 #[derive(Serialize, Clone)]
@@ -54,7 +53,7 @@ pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> 
         id: Uuid::new_v4(),
         path: body.path.clone(),
 
-        import: import::begin(body.library, &path).await.map_err(|error| {
+        import: import::begin(&path).await.map_err(|error| {
             // TODO: better errors with json output
             tracing::warn! { %error, "Could not begin import" };
             StatusCode::BAD_REQUEST

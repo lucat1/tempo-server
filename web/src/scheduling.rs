@@ -26,7 +26,7 @@ pub async fn schedule(scheduler: &mut JobScheduler, period: String, task: TaskTy
 pub async fn trigger_task(task: &TaskType) -> Result<()> {
     let db = get_database()?;
     match task {
-        TaskType::ArtistRelations => {
+        TaskType::ArtistUrl => {
             let data_result = tasks::artist_url::all_data(db).await;
             match data_result {
                 Ok(data) => {
@@ -49,18 +49,19 @@ pub async fn trigger_task(task: &TaskType) -> Result<()> {
                 }
                 Err(e) => Err(e),
             }
-        } // TaskType::ArtistImagesLastfm => {
-          //     let data_result = tasks::artist_images_lastfm::all_data(db).await;
-          //     match data_result {
-          //         Ok(data) => {
-          //             for id in data.into_iter() {
-          //                 get_queue().push(Task::ArtistImagesLastfm(id));
-          //             }
-          //             Ok(())
-          //         }
-          //         Err(e) => Err(e),
-          //     }
-          // }
+        }
+        TaskType::LastfmArtistImage => {
+            let data_result = tasks::lastfm_artist_image::all_data(db).await;
+            match data_result {
+                Ok(data) => {
+                    for id in data.into_iter() {
+                        get_queue().push(Task::LastfmArtistImage(id));
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
+        }
     }
 }
 

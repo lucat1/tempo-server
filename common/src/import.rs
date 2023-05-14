@@ -54,8 +54,6 @@ pub struct RatedSearchResult {
 
 #[derive(Serialize, Clone)]
 pub struct Import {
-    library: usize,
-
     #[serde(skip_serializing)]
     track_files: Vec<TrackFile>,
 
@@ -98,16 +96,12 @@ pub async fn all_tracks(library: &Library, path: &PathBuf) -> Result<Vec<TrackFi
     Ok(tracks)
 }
 
-pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
+pub async fn begin(path: &PathBuf) -> Result<Import> {
     let settings = get_settings()?;
-    let library = if settings.libraries.len() <= lib {
-        Err(eyre!("Invalid library id"))
-    } else {
-        Ok(&settings.libraries[lib])
-    }?;
+    let library = &settings.library;
 
     tracing::info! {?path, library = library.name, "Importing folder for the given library"};
-    let tracks = all_tracks(library, path).await?;
+    let tracks = all_tracks(&library, path).await?;
     if tracks.is_empty() {
         return Err(eyre!("No tracks to import were found"));
     }
@@ -115,12 +109,12 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
     let source_release: internal::Release = tracks.clone().into();
     let source_tracks: Vec<internal::Track> = tracks.iter().map(|t| t.clone().into()).collect();
     tracing::info! {artists = source_release.artists.join(", "), title = source_release.title, "Searching for"};
-    let compressed_search_results = fetch::search(library, &source_release)
+    let compressed_search_results = fetch::search(&library, &source_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     let mut search_results: Vec<fetch::SearchResult> = vec![];
     for result in compressed_search_results.into_iter() {
-        search_results.push(fetch::get(library, result.0.release.id.to_string().as_str()).await?);
+        search_results.push(fetch::get(&library, result.0.release.id.to_string().as_str()).await?);
     }
     let mut rated_search_results = search_results
         .into_iter()
@@ -138,8 +132,8 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
         .first()
         .map(|r| r.search_result.clone())
         .ok_or(eyre!("No results found"))?;
-    let covers_by_provider = fetch::cover::search(library, &full_release).await?;
-    let covers = rank::rank_covers(library, covers_by_provider, &full_release);
+    let covers_by_provider = fetch::cover::search(&library, &full_release).await?;
+    let covers = rank::rank_covers(&library, covers_by_provider, &full_release);
     let selected = (
         full_release.release.id,
         if !covers.is_empty() { Some(0) } else { None },
@@ -149,7 +143,6 @@ pub async fn begin(lib: usize, path: &PathBuf) -> Result<Import> {
         release: source_release,
         tracks: source_tracks,
 
-        library: lib,
         search_results: rated_search_results,
         covers,
         selected,
@@ -165,11 +158,7 @@ struct Job {
 
 pub async fn run(import: Import) -> Result<()> {
     let settings = get_settings()?;
-    let library = if settings.libraries.len() <= import.library {
-        Err(eyre!("Invalid library id"))
-    } else {
-        Ok(&settings.libraries[import.library])
-    }?;
+    let library = &settings.library;
 
     let RatedSearchResult {
         search_result: SearchResult(mut full_release, mut full_tracks),

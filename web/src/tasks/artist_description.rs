@@ -1,9 +1,10 @@
-use common::fetch::{CLIENT, MB_USER_AGENT};
 use eyre::{bail, eyre, Result, WrapErr};
-use reqwest::header::USER_AGENT;
+use reqwest::{Method, Request};
 use sea_orm::{ActiveModelTrait, ActiveValue, DbConn, EntityTrait, IntoActiveModel};
 use serde::Deserialize;
 use uuid::Uuid;
+
+use crate::fetch::musicbrainz::send_request;
 
 pub type Data = Uuid;
 
@@ -29,25 +30,32 @@ struct WikipediExtract {
 
 pub async fn run(db: &DbConn, data: Data) -> Result<()> {
     tracing::trace!(%data, "Fetching the description for artist");
-    let res = CLIENT
-        .get(format!(
-            "https://musicbrainz.org/artist/{}/wikipedia-extract",
-            data
-        ))
-        .header(USER_AGENT, MB_USER_AGENT)
-        .send()
-        .await?;
+    let req = Request::new(
+        Method::GET,
+        format!("https://musicbrainz.org/artist/{}/wikipedia-extract", data).parse()?,
+    );
+    let res = send_request(req).await?;
     if !res.status().is_success() {
         bail!(
-            "Musicbrainz request returned non-success error code: {} {}",
+            "MusicBrainz request returned non-success error code: {} {}",
             res.status(),
             res.text().await?
         );
     }
-    let document: Document = res
-        .json()
+    let text = res
+        .text()
         .await
-        .wrap_err(eyre!("Could not parse wikipedia extract content"))?;
+        .wrap_err(eyre!("Could not read response as text"))?;
+
+    let document: Document =
+        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(text.as_str()))
+            .map_err(|e| {
+                eyre!(
+                    "Could not parse wikipedia extract content: {} at path {}",
+                    e,
+                    e.path().to_string()
+                )
+            })?;
     match document.wikipedia_extract {
         Some(extract) => {
             let mut entity = entity::ArtistEntity::find_by_id(data)

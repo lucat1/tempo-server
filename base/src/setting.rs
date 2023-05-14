@@ -26,7 +26,7 @@ pub struct Settings {
     #[serde(default)]
     pub db: String,
     #[serde(default)]
-    pub libraries: Vec<Library>,
+    pub library: Library,
     #[serde(default)]
     pub downloads: PathBuf,
 
@@ -41,6 +41,10 @@ fn default_library_name() -> String {
     "Main library".to_string()
 }
 
+fn default_artist_name() -> String {
+    "{artist}".to_string()
+}
+
 fn default_release_name() -> String {
     "{album_artist}/{album} ({release_year}) ({release_type})".to_string()
 }
@@ -53,8 +57,10 @@ fn default_track_name() -> String {
 pub struct Library {
     #[serde(default = "default_library_name")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default = "get_library")]
     pub path: PathBuf,
+    #[serde(default = "default_artist_name")]
+    pub artist_name: String,
     #[serde(default = "default_release_name")]
     pub release_name: String,
     #[serde(default = "default_track_name")]
@@ -215,15 +221,10 @@ impl Default for Art {
     }
 }
 
-fn get_library() -> Result<PathBuf> {
+fn get_library() -> PathBuf {
     UserDirs::new()
-        .ok_or(eyre!("Could not locate user directories"))
-        .and_then(|dirs| {
-            dirs.audio_dir()
-                .map(|audio| audio.to_path_buf())
-                .ok_or(eyre!("Could not locate current user's Audio directory"))
-        })
-        .or_else(|_| PathBuf::from_str("/music").map_err(|e| eyre!(e)))
+        .and_then(|dirs| dirs.audio_dir().map(|audio| audio.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from_str("/music").unwrap())
 }
 
 fn get_downloads() -> Result<PathBuf> {
@@ -246,23 +247,10 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     tracing::info! {?path, "Loading config file"};
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
-    if set.libraries.is_empty() {
-        set.libraries.push(Library {
-            name: default_library_name(),
-            path: get_library()?,
-            release_name: default_release_name(),
-            track_name: default_track_name(),
-            ..Default::default()
-        });
-    }
     if set.db == String::default() {
-        let lib = set
-            .libraries
-            .first()
-            .ok_or(eyre!("No libraries have been defined"))?;
         set.db = format!(
             "sqlite://{}?mode=rwc",
-            util::path_to_str(&lib.path.join(DEFAULT_DB_FILE))?
+            util::path_to_str(&set.library.path.join(DEFAULT_DB_FILE))?
         );
     }
     if set.downloads == PathBuf::default() {
@@ -284,14 +272,14 @@ pub struct Tasks {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskType {
-    ArtistRelations,
+    ArtistUrl,
     ArtistDescription,
-    // ArtistImagesLastfm,
+    LastfmArtistImage,
 }
 
 fn default_recurring() -> HashMap<TaskType, String> {
     [
-        (TaskType::ArtistRelations, "0 0 3 * * * *".to_string()),
+        (TaskType::ArtistUrl, "0 0 3 * * * *".to_string()),
         (TaskType::ArtistDescription, "0 0 4 * * * *".to_string()),
         // (TaskType::ArtistImagesLastfm, "0 0 4 * * * *".to_string()),
     ]

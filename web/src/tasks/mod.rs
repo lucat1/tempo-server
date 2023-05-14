@@ -1,5 +1,6 @@
 pub mod artist_description;
 pub mod artist_url;
+pub mod lastfm_artist_image;
 
 use base::{database::get_database, setting::get_settings};
 use deadqueue::unlimited::Queue;
@@ -20,7 +21,7 @@ pub fn get_queue() -> Arc<Queue<Task>> {
 pub enum Task {
     ArtistDescription(artist_description::Data),
     ArtistUrl(artist_url::Data),
-    // ArtistImagesLastfm(artist_images_lastfm::Data),
+    LastfmArtistImage(lastfm_artist_image::Data),
 }
 
 pub fn queue_loop() -> Result<()> {
@@ -47,6 +48,6 @@ async fn run_task(db: &DbConn, task: Task) -> Result<()> {
     match task {
         Task::ArtistDescription(data) => artist_description::run(db, data).await,
         Task::ArtistUrl(data) => artist_url::run(db, data).await,
-        // Task::ArtistImagesLastfm(data) => artist_images_lastfm::run(db, data).await,
+        Task::LastfmArtistImage(data) => lastfm_artist_image::run(db, data).await,
     }
 }

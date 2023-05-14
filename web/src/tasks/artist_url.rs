@@ -113,7 +113,7 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
 }
 
 pub async fn run(db: &DbConn, data: Data) -> Result<()> {
-    tracing::trace!(%data, "Fetching artist relations");
+    tracing::trace!(%data, "Fetching artist urls");
     let req = Request::new(
         Method::GET,
         format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_URL, data,).parse()?,
@@ -140,7 +140,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
                     e.path().to_string()
                 )
             })?;
-    let relations = document
+    let urls = document
         .relations
         .into_iter()
         .filter_map(|r| r.url.and_then(|url| parse(url.resource, r.r#type)))
@@ -153,8 +153,8 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
         .unique_by(|relation| (relation.r#type, relation.artist_id))
         .map(|r| r.into_active_model())
         .collect::<Vec<_>>();
-    if !relations.is_empty() {
-        entity::ArtistUrlEntity::insert_many(relations)
+    if !urls.is_empty() {
+        entity::ArtistUrlEntity::insert_many(urls)
             .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
             .exec(db)
             .await
