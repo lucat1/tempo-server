@@ -71,3 +71,5 @@ governor = "0.5.1"
 nonzero_ext = "0.3.0"
 url = { version = "2.3.1", features = ["serde"] }
 serde-enum-str = "0.3.2"
+infer = "0.13.0"
+sha256 = "1.1.3"

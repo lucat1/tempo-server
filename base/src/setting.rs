@@ -3,7 +3,7 @@ use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
-use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
+use mime::{Mime, IMAGE_GIF, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -136,6 +136,15 @@ impl ImageFormat {
         match self {
             ImageFormat::Png => IMAGE_PNG,
             ImageFormat::Jpeg => IMAGE_JPEG,
+            ImageFormat::Gif => IMAGE_GIF,
+        }
+    }
+    pub fn from_mime(m: Mime) -> Option<Self> {
+        match (m.type_(), m.subtype()) {
+            (mime::IMAGE, mime::PNG) => Some(ImageFormat::Png),
+            (mime::IMAGE, mime::JPEG) => Some(ImageFormat::Jpeg),
+            (mime::IMAGE, mime::GIF) => Some(ImageFormat::Gif),
+            (_, _) => None,
         }
     }
 }
@@ -145,6 +154,17 @@ impl From<ImageFormat> for ImageOutputFormat {
         match f {
             ImageFormat::Png => ImageOutputFormat::Png,
             ImageFormat::Jpeg => ImageOutputFormat::Jpeg(100),
+            ImageFormat::Gif => ImageOutputFormat::Gif,
+        }
+    }
+}
+
+impl From<ImageFormat> for image::ImageFormat {
+    fn from(f: ImageFormat) -> Self {
+        match f {
+            ImageFormat::Png => image::ImageFormat::Png,
+            ImageFormat::Jpeg => image::ImageFormat::Jpeg,
+            ImageFormat::Gif => image::ImageFormat::Gif,
         }
     }
 }
