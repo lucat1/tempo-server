@@ -81,21 +81,21 @@ fn img_url(url: &url::Url) -> Result<UrlData> {
     ))
 }
 
-fn extract_description(html: &String) -> Option<String> {
-    let html = Html::parse_document(html.as_str());
+fn extract_description(html: &str) -> Option<String> {
+    let html = Html::parse_document(html);
     html.select(&IMAGE_DESCRIPTION_SELECTOR)
         .next()
         .map(|p| p.text().collect())
 }
 
-fn get_urls(url: &mut url::Url, html: &String, artist_id: Uuid) -> Result<Vec<UrlData>> {
-    let html = Html::parse_document(html.as_str());
+fn get_urls(url: &mut url::Url, html: &str, artist_id: Uuid) -> Result<Vec<UrlData>> {
+    let html = Html::parse_document(html);
     let mut urls = Vec::new();
     for anchor in html.select(&IMAGE_SELECTOR) {
         if let Some(abs_path) = anchor.value().attr("href") {
             url.set_path(abs_path);
             tracing::trace! {image_url = %url, artist = %artist_id, "Found artist image"};
-            urls.push(img_url(&url)?);
+            urls.push(img_url(url)?);
         }
     }
     Ok(urls)
@@ -130,7 +130,7 @@ async fn download(
 
     if !image_path.exists() {
         let text = get_html(image_page).await?;
-        let description = extract_description(&text);
+        let description = extract_description(text.as_str());
 
         let bytes = get(image_url.to_owned()).await?.bytes().await?;
         let format = infer::get(&bytes)
@@ -171,7 +171,7 @@ pub async fn run(db: &DbConn, Data(artist_id, url): Data) -> Result<()> {
     let text = get_html(url.to_owned()).await?;
 
     // TODO: paginate over lastfm, setting limit
-    let urls = get_urls(&mut url, &text, artist_id)?;
+    let urls = get_urls(&mut url, text.as_str(), artist_id)?;
     for url_data in urls.into_iter() {
         let new_image = download(db, artist_id, url_data).await?;
         if let Some(image) = new_image {
