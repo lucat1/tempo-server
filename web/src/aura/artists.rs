@@ -4,8 +4,8 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
+    QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -15,8 +15,8 @@ use crate::documents::{
     ReleaseInclude,
 };
 use crate::jsonapi::{
-    dedup, ArtistResource, Document, DocumentData, Error, Included, Meta, Query, Related, Relation,
-    Relationship, ResourceIdentifier, ResourceType,
+    dedup, links_from_resource, make_cursor, ArtistResource, Document, DocumentData, Error,
+    Included, Meta, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
 };
 
 #[derive(Default)]
@@ -96,7 +96,7 @@ fn map_to_releases_include(include: &[ArtistInclude]) -> Vec<ReleaseInclude> {
 pub async fn included<C>(
     db: &C,
     related: Vec<ArtistRelated>,
-    include: Vec<ArtistInclude>,
+    include: &[ArtistInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
@@ -149,7 +149,7 @@ where
             included.push(releases::entity_to_included(release, &releases_related[i]))
         }
         included.extend(
-            releases::included(db, releases_related, map_to_releases_include(&include)).await?,
+            releases::included(db, releases_related, map_to_releases_include(include)).await?,
         );
     }
     Ok(included)
@@ -267,8 +267,9 @@ pub fn entity_to_included(entity: &entity::Artist, related: &ArtistRelated) -> I
 
 pub async fn artists(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ArtistColumn, ArtistInclude>,
+    Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
+    tracing::info!(?opts, "Fetching users");
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -276,17 +277,20 @@ pub async fn artists(
     })?;
 
     let mut artists_query = entity::ArtistEntity::find();
-    for (sort_key, sort_order) in opts.sort.into_iter() {
-        artists_query = artists_query.order_by(sort_key, sort_order);
+    for (sort_key, sort_order) in opts.sort.iter() {
+        artists_query = artists_query.order_by(sort_key.to_owned(), sort_order.to_owned());
     }
-    for (filter_key, filter_value) in opts.filter.into_iter() {
-        artists_query = artists_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    for (filter_key, filter_value) in opts.filter.iter() {
+        artists_query = artists_query.filter(ColumnTrait::eq(filter_key, filter_value));
     }
-    let artists = artists_query.all(&tx).await.map_err(|e| Error {
+    let mut _artists_cursor = artists_query.cursor_by(entity::ArtistColumn::Id);
+    let artists_cursor = make_cursor(&mut _artists_cursor, &opts.page);
+    let artists = artists_cursor.all(&db).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all artists".to_string(),
+        title: "Could not fetch artists page".to_string(),
         detail: Some(e.into()),
     })?;
+
     let related_to_artists = related(&tx, &artists, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch entites related to the artists".to_string(),
@@ -296,7 +300,7 @@ pub async fn artists(
     for (i, artist) in artists.iter().enumerate() {
         data.push(entity_to_resource(artist, &related_to_artists[i]));
     }
-    let included = included(&tx, related_to_artists, opts.include)
+    let included = included(&tx, related_to_artists, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -304,6 +308,7 @@ pub async fn artists(
             detail: Some(e.into()),
         })?;
     Ok(Json(Document {
+        links: links_from_resource(&data, &opts),
         data: DocumentData::Multi(data),
         included: dedup(included),
     }))
@@ -312,7 +317,7 @@ pub async fn artists(
 pub async fn artist(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::ArtistColumn, ArtistInclude>,
+    Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -343,7 +348,7 @@ pub async fn artist(
     let empty_relationship = ArtistRelated::default();
     let related = related_to_artists.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&artist, related);
-    let included = included(&tx, related_to_artists, opts.include)
+    let included = included(&tx, related_to_artists, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -353,5 +358,6 @@ pub async fn artist(
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }

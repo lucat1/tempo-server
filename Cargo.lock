@@ -1801,6 +1801,7 @@ checksum = "1885e79c1fc4b10f0e172c475f458b7f7b93061064d98c3293e98c5ba0c8b399"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
+ "serde",
 ]
 
 [[package]]
@@ -3377,6 +3378,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_valid"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb47afb10c357401383513681f2e5fd81dd03d2fe7bbd75cb3cb030a6ed666b7"
+dependencies = [
+ "indexmap",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "paste",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_valid_derive",
+ "serde_valid_literal",
+ "thiserror",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "serde_valid_derive"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276abce17aad1cde372d9eaa81a23f08c0ce77d20b967491c833dc3a8c640272"
+dependencies = [
+ "paste",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn",
+]
+
+[[package]]
+name = "serde_valid_literal"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad11428981e57daa867e8577ffa3612dc79bcefc88904a52b814579f1e812efd"
+dependencies = [
+ "paste",
+ "regex",
+]
+
+[[package]]
 name = "servo_arc"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4421,6 +4466,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_qs",
+ "serde_valid",
  "sha256",
  "strfmt",
  "strum",

@@ -75,7 +75,7 @@ pub enum ArtistRelation {
     Tracks,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum ArtistInclude {
     #[serde(rename = "images")]
     Images,
@@ -128,7 +128,7 @@ pub enum ReleaseRelation {
     Artists,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum ReleaseInclude {
     #[serde(rename = "image")]
     Image,
@@ -159,7 +159,7 @@ pub enum MediumRelation {
     Tracks,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum MediumInclude {
     #[serde(rename = "release")]
     Release,
@@ -210,7 +210,7 @@ pub enum TrackRelation {
     Recorders,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum TrackInclude {
     #[serde(rename = "artists")]
     Artists,

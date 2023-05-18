@@ -237,7 +237,7 @@ where
 
 pub async fn tracks(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::TrackColumn, TrackInclude>,
+    Query(opts): Query<entity::TrackColumn, TrackInclude, uuid::Uuid>,
 ) -> Result<Json<Document<TrackResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -276,13 +276,14 @@ pub async fn tracks(
     Ok(Json(Document {
         data: DocumentData::Multi(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }
 
 pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::TrackColumn, TrackInclude>,
+    Query(opts): Query<entity::TrackColumn, TrackInclude, uuid::Uuid>,
 ) -> Result<Json<Document<TrackResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -311,6 +312,7 @@ pub async fn track(
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }
 

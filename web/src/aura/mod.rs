@@ -49,5 +49,6 @@ async fn server() -> Json<Document<ServerResource>> {
             relationships: HashMap::new(),
         }),
         included: Vec::new(),
+        links: HashMap::new(),
     })
 }

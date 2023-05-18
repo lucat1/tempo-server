@@ -213,7 +213,7 @@ where
 
 pub async fn releases(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude>,
+    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -252,13 +252,14 @@ pub async fn releases(
     Ok(Json(Document {
         data: DocumentData::Multi(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }
 
 pub async fn release(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude>,
+    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -299,5 +300,6 @@ pub async fn release(
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }

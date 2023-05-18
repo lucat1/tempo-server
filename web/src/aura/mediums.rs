@@ -145,7 +145,7 @@ where
 
 pub async fn mediums(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude>,
+    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -184,13 +184,14 @@ pub async fn mediums(
     Ok(Json(Document {
         data: DocumentData::Multi(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }
 
 pub async fn medium(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude>,
+    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -231,5 +232,6 @@ pub async fn medium(
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }

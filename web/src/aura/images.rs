@@ -52,6 +52,7 @@ pub async fn image(
     Ok(Json(Document {
         data: DocumentData::Single(entity_to_resource(&image)),
         included: Vec::new(),
+        links: HashMap::new(),
     }))
 }
 
