@@ -1,11 +1,15 @@
 use axum::{
     async_trait,
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
+    http::{request::Parts, StatusCode, Uri},
     response::{IntoResponse, Response},
     Json,
 };
-use sea_orm::{sea_query::IntoValueTuple, Cursor, Order, SelectorTrait};
+use itertools::Itertools;
+use sea_orm::{
+    sea_query::{IntoIden, IntoValueTuple},
+    ColumnTrait, Cursor, Order, SelectorTrait,
+};
 use serde::{Deserialize, Serialize};
 use serde_valid::Validate;
 use std::{cmp::Eq, collections::HashMap, default::Default, error::Error as StdError, hash::Hash};
@@ -150,7 +154,7 @@ fn default_page_size() -> u32 {
     DEFAULT_PAGE_SIZE
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, Hash, Validate)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash, Validate)]
 pub struct Page<Id: Default> {
     #[serde(default = "default_page_size")]
     #[validate(maximum = 20)]
@@ -166,7 +170,7 @@ fn default_page<Id: Default>() -> Page<Id> {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct RawQueryOptions<Id: Default> {
     include: Option<String>,
     filter: Option<HashMap<String, String>>,
@@ -174,9 +178,9 @@ pub struct RawQueryOptions<Id: Default> {
     page: Option<Page<Id>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryOptions<
-    C: Eq + Hash + TryFrom<String>,
+    C: Eq + Hash,
     I: for<'a> Deserialize<'a>,
     Id: for<'a> Deserialize<'a> + Default,
 > {
@@ -186,17 +190,15 @@ pub struct QueryOptions<
     pub page: Page<Id>,
 }
 
-pub struct Query<
-    C: Eq + Hash + TryFrom<String>,
-    I: for<'a> Deserialize<'a>,
-    Id: for<'a> Deserialize<'a> + Default,
->(pub QueryOptions<C, I, Id>);
+pub struct Query<C: Eq + Hash, I: for<'a> Deserialize<'a>, Id: for<'a> Deserialize<'a> + Default>(
+    pub QueryOptions<C, I, Id>,
+);
 
 #[async_trait]
 impl<S, C, I, Id> FromRequestParts<S> for Query<C, I, Id>
 where
     S: Send + Sync,
-    C: Eq + Hash + TryFrom<String>,
+    C: Eq + Hash + ColumnTrait,
     I: for<'a> Deserialize<'a>,
     Id: for<'a> Deserialize<'a> + Default,
 {
@@ -209,7 +211,7 @@ where
                 let raw_opts: RawQueryOptions<Id> = serde_qs::from_str(qs)
                     .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
 
-                let parse_key = |k: &str| -> Option<C> { k.to_owned().try_into().ok() };
+                let parse_key = |k: &str| -> Option<C> { C::from_str(k).ok() };
 
                 let opts = QueryOptions {
                     include: raw_opts
@@ -261,6 +263,56 @@ where
     }
 }
 
+impl<C, I, Id> From<QueryOptions<C, I, Id>> for RawQueryOptions<Id>
+where
+    C: Eq + Hash + ColumnTrait,
+    I: for<'a> Deserialize<'a> + Serialize,
+    Id: for<'a> Deserialize<'a> + Default,
+{
+    fn from(value: QueryOptions<C, I, Id>) -> Self {
+        RawQueryOptions {
+            include: if value.include.len() > 0 {
+                Some(
+                    value
+                        .include
+                        .iter()
+                        .filter_map(|i| {
+                            serde_json::to_string(i)
+                                .ok()
+                                .map(|s| s[1..s.len() - 1].to_string())
+                        })
+                        .join(","),
+                )
+            } else {
+                None
+            },
+            filter: Some(
+                value
+                    .filter
+                    .into_iter()
+                    .map(|(k, v)| (k.into_iden().to_string(), v.to_owned()))
+                    .collect(),
+            ),
+            sort: Some(
+                value
+                    .sort
+                    .into_iter()
+                    .map(|(k, v)| {
+                        match v {
+                            Order::Asc => "",
+                            Order::Desc => "-",
+                            Order::Field(_) => unreachable!(),
+                        }
+                        .to_owned()
+                            + k.into_iden().to_string().as_str()
+                    })
+                    .collect(),
+            ),
+            page: Some(value.page),
+        }
+    }
+}
+
 #[derive(PartialEq)]
 enum Identifier {
     Image(String),
@@ -308,28 +360,52 @@ where
     cursor
 }
 
-pub fn links_from_resource<I, T, R, C, Inc, Id>(
+pub fn links_from_resource<I, T, R, C, Inc>(
     data: &[Resource<I, T, R>],
-    _opts: &QueryOptions<C, Inc, Id>,
+    opts: QueryOptions<C, Inc, I>,
+    uri: &Uri,
 ) -> HashMap<LinkKey, String>
 where
-    I: ToString,
-    C: Eq + Hash + TryFrom<String>,
-    Inc: for<'a> Deserialize<'a>,
-    Id: for<'a> Deserialize<'a> + Default,
+    I: for<'a> Deserialize<'a> + Serialize + Default + ToString + Clone,
+    C: Eq + Hash + ColumnTrait,
+    Inc: for<'a> Deserialize<'a> + Serialize + Clone,
 {
+    // TODO: a good way to find out if there is a page before
+    // or if the next page is empty.
+
     let mut res = HashMap::new();
     if let Some(first) = data.first() {
         res.insert(LinkKey::First, first.id.to_string());
+        if data.len() == opts.page.size as usize {
+            let opts_clone = opts.clone();
+            let prev_opts: RawQueryOptions<I> = QueryOptions {
+                page: Page {
+                    before: Some(first.id.clone()),
+                    ..opts_clone.page
+                },
+                ..opts_clone
+            }
+            .into();
+            if let Some(qs) = serde_qs::to_string(&prev_opts).ok() {
+                res.insert(LinkKey::Prev, uri.path().to_owned() + "?" + qs.as_str());
+            }
+        }
     }
     if let Some(last) = data.last() {
         res.insert(LinkKey::Last, last.id.to_string());
+        if data.len() == opts.page.size as usize {
+            let next_opts: RawQueryOptions<I> = QueryOptions {
+                page: Page {
+                    after: Some(last.id.clone()),
+                    ..opts.page
+                },
+                ..opts
+            }
+            .into();
+            if let Some(qs) = serde_qs::to_string(&next_opts).ok() {
+                res.insert(LinkKey::Next, uri.path().to_owned() + "?" + qs.as_str());
+            }
+        }
     }
-
-    // TODO: a good way to find out if there is a page before?
-    // TODO: serialize next, previous from current url
-    // if data.len() == page.size as usize {
-    //     res.insert(LinkKey::Next);
-    // }
     res
 }

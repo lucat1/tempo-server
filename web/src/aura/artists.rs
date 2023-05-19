@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{Path, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use sea_orm::{
@@ -265,9 +265,11 @@ pub fn entity_to_included(entity: &entity::Artist, related: &ArtistRelated) -> I
     Included::Artist(entity_to_resource(entity, related))
 }
 
+#[axum_macros::debug_handler]
 pub async fn artists(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
+    OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
     tracing::info!(?opts, "Fetching users");
     let tx = db.begin().await.map_err(|e| Error {
@@ -308,7 +310,7 @@ pub async fn artists(
             detail: Some(e.into()),
         })?;
     Ok(Json(Document {
-        links: links_from_resource(&data, &opts),
+        links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
     }))
