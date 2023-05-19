@@ -271,7 +271,7 @@ where
 {
     fn from(value: QueryOptions<C, I, Id>) -> Self {
         RawQueryOptions {
-            include: if value.include.len() > 0 {
+            include: if !value.include.is_empty() {
                 Some(
                     value
                         .include
@@ -290,7 +290,7 @@ where
                 value
                     .filter
                     .into_iter()
-                    .map(|(k, v)| (k.into_iden().to_string(), v.to_owned()))
+                    .map(|(k, v)| (k.into_iden().to_string(), v))
                     .collect(),
             ),
             sort: Some(
@@ -386,7 +386,7 @@ where
                 ..opts_clone
             }
             .into();
-            if let Some(qs) = serde_qs::to_string(&prev_opts).ok() {
+            if let Ok(qs) = serde_qs::to_string(&prev_opts) {
                 res.insert(LinkKey::Prev, uri.path().to_owned() + "?" + qs.as_str());
             }
         }
@@ -402,7 +402,7 @@ where
                 ..opts
             }
             .into();
-            if let Some(qs) = serde_qs::to_string(&next_opts).ok() {
+            if let Ok(qs) = serde_qs::to_string(&next_opts) {
                 res.insert(LinkKey::Next, uri.path().to_owned() + "?" + qs.as_str());
             }
         }
