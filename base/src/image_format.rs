@@ -11,4 +11,6 @@ pub enum ImageFormat {
     Jpeg,
     #[sea_orm(num_value = 1)]
     Png,
+    #[sea_orm(num_value = 2)]
+    Gif,
 }

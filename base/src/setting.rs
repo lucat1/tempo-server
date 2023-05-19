@@ -3,8 +3,9 @@ use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
-use mime::{Mime, IMAGE_JPEG, IMAGE_PNG};
+use mime::{Mime, IMAGE_GIF, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -25,13 +26,23 @@ pub struct Settings {
     #[serde(default)]
     pub db: String,
     #[serde(default)]
-    pub libraries: Vec<Library>,
+    pub library: Library,
     #[serde(default)]
     pub downloads: PathBuf,
+
+    #[serde(default)]
+    pub tasks: Tasks,
+
+    #[serde(default)]
+    pub keys: Keys,
 }
 
 fn default_library_name() -> String {
     "Main library".to_string()
+}
+
+fn default_artist_name() -> String {
+    "{artist}".to_string()
 }
 
 fn default_release_name() -> String {
@@ -46,8 +57,10 @@ fn default_track_name() -> String {
 pub struct Library {
     #[serde(default = "default_library_name")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default = "get_library")]
     pub path: PathBuf,
+    #[serde(default = "default_artist_name")]
+    pub artist_name: String,
     #[serde(default = "default_release_name")]
     pub release_name: String,
     #[serde(default = "default_track_name")]
@@ -123,6 +136,15 @@ impl ImageFormat {
         match self {
             ImageFormat::Png => IMAGE_PNG,
             ImageFormat::Jpeg => IMAGE_JPEG,
+            ImageFormat::Gif => IMAGE_GIF,
+        }
+    }
+    pub fn from_mime(m: Mime) -> Option<Self> {
+        match (m.type_(), m.subtype()) {
+            (mime::IMAGE, mime::PNG) => Some(ImageFormat::Png),
+            (mime::IMAGE, mime::JPEG) => Some(ImageFormat::Jpeg),
+            (mime::IMAGE, mime::GIF) => Some(ImageFormat::Gif),
+            (_, _) => None,
         }
     }
 }
@@ -132,6 +154,17 @@ impl From<ImageFormat> for ImageOutputFormat {
         match f {
             ImageFormat::Png => ImageOutputFormat::Png,
             ImageFormat::Jpeg => ImageOutputFormat::Jpeg(100),
+            ImageFormat::Gif => ImageOutputFormat::Gif,
+        }
+    }
+}
+
+impl From<ImageFormat> for image::ImageFormat {
+    fn from(f: ImageFormat) -> Self {
+        match f {
+            ImageFormat::Png => image::ImageFormat::Png,
+            ImageFormat::Jpeg => image::ImageFormat::Jpeg,
+            ImageFormat::Gif => image::ImageFormat::Gif,
         }
     }
 }
@@ -208,15 +241,10 @@ impl Default for Art {
     }
 }
 
-fn get_library() -> Result<PathBuf> {
+fn get_library() -> PathBuf {
     UserDirs::new()
-        .ok_or(eyre!("Could not locate user directories"))
-        .and_then(|dirs| {
-            dirs.audio_dir()
-                .map(|audio| audio.to_path_buf())
-                .ok_or(eyre!("Could not locate current user's Audio directory"))
-        })
-        .or_else(|_| PathBuf::from_str("/music").map_err(|e| eyre!(e)))
+        .and_then(|dirs| dirs.audio_dir().map(|audio| audio.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from_str("/music").unwrap())
 }
 
 fn get_downloads() -> Result<PathBuf> {
@@ -239,23 +267,10 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     tracing::info! {?path, "Loading config file"};
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
-    if set.libraries.is_empty() {
-        set.libraries.push(Library {
-            name: default_library_name(),
-            path: get_library()?,
-            release_name: default_release_name(),
-            track_name: default_track_name(),
-            ..Default::default()
-        });
-    }
     if set.db == String::default() {
-        let lib = set
-            .libraries
-            .first()
-            .ok_or(eyre!("No libraries have been defined"))?;
         set.db = format!(
             "sqlite://{}?mode=rwc",
-            util::path_to_str(&lib.path.join(DEFAULT_DB_FILE))?
+            util::path_to_str(&set.library.path.join(DEFAULT_DB_FILE))?
         );
     }
     if set.downloads == PathBuf::default() {
@@ -265,12 +280,38 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     Ok(set)
 }
 
-pub fn get_settings() -> Result<&'static Settings> {
-    SETTINGS.get().ok_or(eyre!("Could not get settings"))
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Tasks {
+    #[serde(default = "num_cpus::get")]
+    pub workers: usize,
+
+    #[serde(default = "default_recurring")]
+    pub recurring: HashMap<TaskType, String>,
 }
 
-pub fn print() -> Result<()> {
-    let settings = get_settings()?;
-    print!("{}", toml::to_string(settings)?);
-    Ok(())
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskType {
+    ArtistUrl,
+    ArtistDescription,
+    LastfmArtistImage,
+}
+
+fn default_recurring() -> HashMap<TaskType, String> {
+    [
+        (TaskType::ArtistUrl, "0 0 3 * * * *".to_string()),
+        (TaskType::ArtistDescription, "0 0 4 * * * *".to_string()),
+        // (TaskType::ArtistImagesLastfm, "0 0 4 * * * *".to_string()),
+    ]
+    .into()
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Keys {
+    pub lastfm_apikey: String,
+    pub lastfm_shared_secret: String,
+}
+
+pub fn get_settings() -> Result<&'static Settings> {
+    SETTINGS.get().ok_or(eyre!("Could not get settings"))
 }

@@ -1,23 +1,30 @@
 use axum::{
     async_trait,
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
+    http::{request::Parts, StatusCode, Uri},
     response::{IntoResponse, Response},
     Json,
 };
-use sea_orm::Order;
-use serde::{Deserialize, Serialize};
-use std::{cmp::Eq, collections::HashMap, error::Error as StdError, hash::Hash};
-use uuid::Uuid;
-
-use crate::documents::{
-    ArtistCreditAttributes, ImageAttributes, ImageRelation, RecordingAttributes,
+use itertools::Itertools;
+use sea_orm::{
+    sea_query::{IntoIden, IntoValueTuple},
+    ColumnTrait, Cursor, Order, SelectorTrait,
 };
+use serde::{Deserialize, Serialize};
+use serde_valid::Validate;
+use std::{cmp::Eq, collections::HashMap, default::Default, error::Error as StdError, hash::Hash};
+use uuid::Uuid;
 
 use super::documents::{
     ArtistAttributes, ArtistRelation, MediumAttributes, MediumRelation, ReleaseAttributes,
     ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
 };
+use crate::documents::{
+    ArtistCreditAttributes, ImageAttributes, ImageRelation, RecordingAttributes,
+};
+
+pub static DEFAULT_PAGE_SIZE: u32 = 10;
+pub static MAX_PAGE_SIZE: u32 = 20;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -47,11 +54,22 @@ pub enum Included {
     Release(ReleaseResource),
 }
 
+#[derive(Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkKey {
+    Prev,
+    Next,
+    First,
+    Last,
+}
+
 #[derive(Serialize)]
 pub struct Document<R> {
     pub data: DocumentData<R>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub included: Vec<Included>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub links: HashMap<LinkKey, String>,
 }
 
 #[derive(Serialize)]
@@ -132,30 +150,57 @@ impl IntoResponse for Error {
     }
 }
 
-#[derive(Deserialize)]
-pub struct RawQueryOptions {
+fn default_page_size() -> u32 {
+    DEFAULT_PAGE_SIZE
+}
+
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash, Validate)]
+pub struct Page<Id: Default> {
+    #[serde(default = "default_page_size")]
+    #[validate(maximum = 20)]
+    pub size: u32,
+    pub before: Option<Id>,
+    pub after: Option<Id>,
+}
+
+fn default_page<Id: Default>() -> Page<Id> {
+    Page {
+        size: default_page_size(),
+        ..Default::default()
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct RawQueryOptions<Id: Default> {
     include: Option<String>,
     filter: Option<HashMap<String, String>>,
     sort: Option<String>,
+    page: Option<Page<Id>>,
 }
 
-#[derive(Debug)]
-pub struct QueryOptions<C: Eq + Hash + TryFrom<String>, I: for<'a> Deserialize<'a>> {
+#[derive(Debug, Clone)]
+pub struct QueryOptions<
+    C: Eq + Hash,
+    I: for<'a> Deserialize<'a>,
+    Id: for<'a> Deserialize<'a> + Default,
+> {
     pub include: Vec<I>,
     pub filter: HashMap<C, String>,
     pub sort: HashMap<C, Order>,
+    pub page: Page<Id>,
 }
 
-pub struct Query<C: Eq + Hash + TryFrom<String>, I: for<'a> Deserialize<'a>>(
-    pub QueryOptions<C, I>,
+pub struct Query<C: Eq + Hash, I: for<'a> Deserialize<'a>, Id: for<'a> Deserialize<'a> + Default>(
+    pub QueryOptions<C, I, Id>,
 );
 
 #[async_trait]
-impl<S, C, I> FromRequestParts<S> for Query<C, I>
+impl<S, C, I, Id> FromRequestParts<S> for Query<C, I, Id>
 where
     S: Send + Sync,
-    C: Eq + Hash + TryFrom<String>,
+    C: Eq + Hash + ColumnTrait,
     I: for<'a> Deserialize<'a>,
+    Id: for<'a> Deserialize<'a> + Default,
 {
     type Rejection = (StatusCode, String);
 
@@ -163,10 +208,10 @@ where
         let query = parts.uri.query();
         match query {
             Some(qs) => {
-                let raw_opts: RawQueryOptions = serde_qs::from_str(qs)
+                let raw_opts: RawQueryOptions<Id> = serde_qs::from_str(qs)
                     .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
 
-                let parse_key = |k: &str| -> Option<C> { k.to_owned().try_into().ok() };
+                let parse_key = |k: &str| -> Option<C> { C::from_str(k).ok() };
 
                 let opts = QueryOptions {
                     include: raw_opts
@@ -201,6 +246,7 @@ where
                                 .collect()
                         })
                         .unwrap_or(HashMap::new()),
+                    page: raw_opts.page.unwrap_or_else(default_page),
                 };
                 Ok(Query(opts))
             }
@@ -208,7 +254,61 @@ where
                 include: Vec::new(),
                 filter: HashMap::new(),
                 sort: HashMap::new(),
+                page: Page {
+                    size: DEFAULT_PAGE_SIZE,
+                    ..Page::default()
+                },
             })),
+        }
+    }
+}
+
+impl<C, I, Id> From<QueryOptions<C, I, Id>> for RawQueryOptions<Id>
+where
+    C: Eq + Hash + ColumnTrait,
+    I: for<'a> Deserialize<'a> + Serialize,
+    Id: for<'a> Deserialize<'a> + Default,
+{
+    fn from(value: QueryOptions<C, I, Id>) -> Self {
+        RawQueryOptions {
+            include: if !value.include.is_empty() {
+                Some(
+                    value
+                        .include
+                        .iter()
+                        .filter_map(|i| {
+                            serde_json::to_string(i)
+                                .ok()
+                                .map(|s| s[1..s.len() - 1].to_string())
+                        })
+                        .join(","),
+                )
+            } else {
+                None
+            },
+            filter: Some(
+                value
+                    .filter
+                    .into_iter()
+                    .map(|(k, v)| (k.into_iden().to_string(), v))
+                    .collect(),
+            ),
+            sort: Some(
+                value
+                    .sort
+                    .into_iter()
+                    .map(|(k, v)| {
+                        match v {
+                            Order::Asc => "",
+                            Order::Desc => "-",
+                            Order::Field(_) => unreachable!(),
+                        }
+                        .to_owned()
+                            + k.into_iden().to_string().as_str()
+                    })
+                    .collect(),
+            ),
+            page: Some(value.page),
         }
     }
 }
@@ -239,4 +339,75 @@ pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
         Included::Release(e) => Identifier::Release(e.id),
     });
     included
+}
+
+pub fn make_cursor<'a, S, Id>(mut cursor: &'a mut Cursor<S>, page: &Page<Id>) -> &'a mut Cursor<S>
+where
+    S: SelectorTrait,
+    Id: Default + IntoValueTuple + Copy,
+{
+    if let Some(before) = page.before {
+        cursor = cursor.before(before);
+    }
+    if let Some(after) = page.after {
+        cursor = cursor.after(after);
+    }
+    cursor = match (page.after, page.before) {
+        (None, Some(_)) => cursor.last(page.size.into()),
+        // Also matches (Some(_), None), which means "everything all after `after`"
+        (_, _) => cursor.first(page.size.into()),
+    };
+    cursor
+}
+
+pub fn links_from_resource<I, T, R, C, Inc>(
+    data: &[Resource<I, T, R>],
+    opts: QueryOptions<C, Inc, I>,
+    uri: &Uri,
+) -> HashMap<LinkKey, String>
+where
+    I: for<'a> Deserialize<'a> + Serialize + Default + ToString + Clone,
+    C: Eq + Hash + ColumnTrait,
+    Inc: for<'a> Deserialize<'a> + Serialize + Clone,
+{
+    // TODO: a good way to find out if there is a page before
+    // or if the next page is empty.
+
+    let mut res = HashMap::new();
+    if let Some(first) = data.first() {
+        res.insert(LinkKey::First, first.id.to_string());
+        if data.len() == opts.page.size as usize {
+            let opts_clone = opts.clone();
+            let prev_opts: RawQueryOptions<I> = QueryOptions {
+                page: Page {
+                    before: Some(first.id.clone()),
+                    after: None,
+                    ..opts_clone.page
+                },
+                ..opts_clone
+            }
+            .into();
+            if let Ok(qs) = serde_qs::to_string(&prev_opts) {
+                res.insert(LinkKey::Prev, uri.path().to_owned() + "?" + qs.as_str());
+            }
+        }
+    }
+    if let Some(last) = data.last() {
+        res.insert(LinkKey::Last, last.id.to_string());
+        if data.len() == opts.page.size as usize {
+            let next_opts: RawQueryOptions<I> = QueryOptions {
+                page: Page {
+                    before: None,
+                    after: Some(last.id.clone()),
+                    ..opts.page
+                },
+                ..opts
+            }
+            .into();
+            if let Ok(qs) = serde_qs::to_string(&next_opts) {
+                res.insert(LinkKey::Next, uri.path().to_owned() + "?" + qs.as_str());
+            }
+        }
+    }
+    res
 }

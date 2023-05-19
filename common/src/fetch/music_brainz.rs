@@ -163,6 +163,8 @@ impl From<Artist> for entity::Artist {
             id: artist.id,
             name: artist.name,
             sort_name: artist.sort_name,
+
+            description: None,
         }
     }
 }
@@ -192,8 +194,8 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
             .relations
             .iter()
             .filter_map(|rel| {
-                if <String as Into<entity::RelationType>>::into(rel.type_field.clone())
-                    == entity::RelationType::Performance
+                if <String as Into<entity::ArtistTrackRelationType>>::into(rel.type_field.clone())
+                    == entity::ArtistTrackRelationType::Performance
                 {
                     rel.work.clone()
                 } else {

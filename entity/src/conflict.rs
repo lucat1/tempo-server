@@ -30,7 +30,11 @@ lazy_static! {
         ])
         .to_owned();
     pub static ref IMAGE_RELEASE_CONFLICT: OnConflict =
-        OnConflict::columns([ImageReleaseColumn::ImageId, ImageReleaseColumn::ReleaseId,])
+        OnConflict::columns([ImageReleaseColumn::ImageId, ImageReleaseColumn::ReleaseId])
+            .do_nothing()
+            .to_owned();
+    pub static ref IMAGE_ARTIST_CONFLICT: OnConflict =
+        OnConflict::columns([ImageArtistColumn::ImageId, ImageArtistColumn::ArtistId])
             .do_nothing()
             .to_owned();
     pub static ref RELEASE_CONFLICT: OnConflict = OnConflict::column(ReleaseColumn::Id)
@@ -87,4 +91,8 @@ lazy_static! {
     ])
     .update_column(ArtistTrackRelationColumn::RelationValue)
     .to_owned();
+    pub static ref ARTIST_RELATION_CONFLICT: OnConflict =
+        OnConflict::columns([ArtistUrlColumn::ArtistId, ArtistUrlColumn::Type,])
+            .update_column(ArtistUrlColumn::Url)
+            .to_owned();
 }

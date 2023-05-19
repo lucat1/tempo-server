@@ -1,19 +1,19 @@
 use std::collections::HashMap;
 
-use axum::extract::{Path, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
+    QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
 use super::{releases, tracks, AppState};
 use crate::documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude};
 use crate::jsonapi::{
-    dedup, Document, DocumentData, Error, Included, MediumResource, Query, Related, Relation,
-    Relationship, ResourceIdentifier, ResourceType,
+    dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
+    MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
 };
 
 #[derive(Default)]
@@ -112,7 +112,7 @@ fn map_to_tracks_include(include: &[MediumInclude]) -> Vec<TrackInclude> {
 pub async fn included<C>(
     db: &C,
     related: Vec<MediumRelated>,
-    include: Vec<MediumInclude>,
+    include: &[MediumInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
@@ -137,15 +137,16 @@ where
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
         }
-        included
-            .extend(tracks::included(db, tracks_related, map_to_tracks_include(&include)).await?);
+        let tracks_included = map_to_tracks_include(include);
+        included.extend(tracks::included(db, tracks_related, &tracks_included).await?);
     }
     Ok(included)
 }
 
 pub async fn mediums(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude>,
+    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
+    OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -154,13 +155,15 @@ pub async fn mediums(
     })?;
 
     let mut mediums_query = entity::MediumEntity::find();
-    for (sort_key, sort_order) in opts.sort.into_iter() {
-        mediums_query = mediums_query.order_by(sort_key, sort_order);
+    for (sort_key, sort_order) in opts.sort.iter() {
+        mediums_query = mediums_query.order_by(sort_key.to_owned(), sort_order.to_owned());
     }
-    for (filter_key, filter_value) in opts.filter.into_iter() {
-        mediums_query = mediums_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    for (filter_key, filter_value) in opts.filter.iter() {
+        mediums_query = mediums_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
-    let mediums = mediums_query.all(&tx).await.map_err(|e| Error {
+    let mut _mediums_cursor = mediums_query.cursor_by(entity::MediumColumn::Id);
+    let mediums_cursor = make_cursor(&mut _mediums_cursor, &opts.page);
+    let mediums = mediums_cursor.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch all releases".to_string(),
         detail: Some(e.into()),
@@ -174,7 +177,7 @@ pub async fn mediums(
     for (i, medium) in mediums.iter().enumerate() {
         data.push(entity_to_resource(medium, &related_to_mediums[i]));
     }
-    let included = included(&tx, related_to_mediums, opts.include)
+    let included = included(&tx, related_to_mediums, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -182,6 +185,7 @@ pub async fn mediums(
             detail: Some(e.into()),
         })?;
     Ok(Json(Document {
+        links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
     }))
@@ -190,7 +194,7 @@ pub async fn mediums(
 pub async fn medium(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude>,
+    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -221,7 +225,7 @@ pub async fn medium(
     let empty_relationship = MediumRelated::default();
     let related = related_to_mediums.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&medium, related);
-    let included = included(&tx, related_to_mediums, opts.include)
+    let included = included(&tx, related_to_mediums, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -231,5 +235,6 @@ pub async fn medium(
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
+        links: HashMap::new(),
     }))
 }

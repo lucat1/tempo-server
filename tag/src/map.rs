@@ -2,7 +2,7 @@ use crate::TagKey;
 use chrono::Datelike;
 use entity::{
     full::{ArtistInfo, FullRelease, FullTrack},
-    Artist, RelationType,
+    Artist, ArtistTrackRelationType,
 };
 use eyre::{eyre, Result};
 use std::collections::HashMap;
@@ -44,36 +44,36 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(TagKey::Genre, track.genres.0.clone());
     map.insert(
         TagKey::Performer,
-        artist_names(full_track.get_related(RelationType::Performer)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Performer)?),
     );
     map.insert(
         TagKey::Engineer,
-        artist_names(full_track.get_related(RelationType::Engineer)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Engineer)?),
     );
     map.insert(
         TagKey::Mixer,
-        artist_names(full_track.get_related(RelationType::Mix)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Mix)?),
     );
     map.insert(
         TagKey::Producer,
-        artist_names(full_track.get_related(RelationType::Producer)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Producer)?),
     );
     map.insert(
         TagKey::Lyricist,
-        artist_names(full_track.get_related(RelationType::Lyricist)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Lyricist)?),
     );
     map.insert(
         TagKey::Writer,
-        artist_names(full_track.get_related(RelationType::Writer)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Writer)?),
     );
     map.insert(
         TagKey::Composer,
-        artist_names(full_track.get_related(RelationType::Composer)?),
+        artist_names(full_track.get_related(ArtistTrackRelationType::Composer)?),
     );
     map.insert(
         TagKey::ComposerSortOrder,
         full_track
-            .get_related(RelationType::Composer)?
+            .get_related(ArtistTrackRelationType::Composer)?
             .into_iter()
             .map(|a| a.sort_name.to_string())
             .collect(),
@@ -163,6 +163,16 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
         TagKey::TotalTracks,
         vec![medium.iter().fold(0, |v, e| v + e.tracks).to_string()],
     );
+    Ok(map)
+}
+
+pub fn tags_from_artist(artist: &Artist) -> Result<TagMap> {
+    let Artist {
+        name, sort_name, ..
+    } = &artist;
+    let mut map = HashMap::new();
+    map.insert(TagKey::Artist, vec![name.to_owned()]);
+    map.insert(TagKey::ArtistSortOrder, vec![sort_name.to_owned()]);
     Ok(map)
 }
 

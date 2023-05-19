@@ -39,12 +39,17 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
         })?
         .downloads
         .clone();
-    let mut path = root_path.clone();
-    if let Some(subpath) = &query.path {
-        if subpath.is_relative() {
-            path = path.join(subpath);
-        }
-    }
+    let path = query
+        .path
+        .as_ref()
+        .map(|sub| {
+            if sub.is_relative() {
+                root_path.join(sub)
+            } else {
+                root_path.clone()
+            }
+        })
+        .unwrap_or_else(|| root_path.clone());
     let raw_files = read_dir(&path).map_err(|error| {
         tracing::warn! {%error, ?path, "Could not red directory"};
         StatusCode::BAD_REQUEST

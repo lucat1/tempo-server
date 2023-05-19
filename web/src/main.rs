@@ -1,7 +1,10 @@
 mod aura;
 pub mod documents;
+pub mod fetch;
 mod internal;
 pub mod jsonapi;
+mod scheduling;
+pub mod tasks;
 
 use axum::Router;
 use clap::Parser;
@@ -19,8 +22,11 @@ use tracing_subscriber::{
     prelude::*,
 };
 
-use base::database::{get_database, open_database, DATABASE};
 use base::setting::{load, SETTINGS};
+use base::{
+    database::{get_database, open_database, DATABASE},
+    setting::get_settings,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -39,9 +45,12 @@ async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
 
-    let subscriber = tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::from_env(base::TAGGER_LOGLEVEL).add_directive(LevelFilter::DEBUG.into()));
+    let subscriber = tracing_subscriber::registry().with(fmt::layer()).with(
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::TRACE.into())
+            .with_env_var(base::TAGGER_LOGLEVEL)
+            .from_env_lossy(),
+    );
     tracing::subscriber::set_global_default(subscriber)?;
 
     let cli = Cli::parse();
@@ -55,14 +64,20 @@ async fn main() -> Result<()> {
         .await?;
     migration::Migrator::up(get_database()?, None).await?;
 
-    let conn = get_database()?.clone();
+    // background tasks
+    web::tasks::queue_loop()?;
+    let mut scheduler = scheduling::new().await?;
+    for (task, schedule) in get_settings()?.tasks.recurring.iter() {
+        scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+    }
+    scheduling::start(&mut scheduler).await?;
+
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)
         .allow_headers(Any);
-
     let tracing = TraceLayer::new_for_http();
-
+    let conn = get_database()?.clone();
     let app = Router::new()
         .nest("/aura", aura::router())
         .nest("/internal", internal::router())

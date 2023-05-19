@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use entity::RelationType;
+use entity::{ArtistTrackRelationType, ArtistUrlType};
 
 #[derive(Serialize)]
 pub struct ServerAttributes {
@@ -25,7 +27,7 @@ pub struct ArtistCreditAttributes {
 
 #[derive(Serialize)]
 pub struct RecordingAttributes {
-    pub role: RelationType,
+    pub role: ArtistTrackRelationType,
     pub detail: String,
 }
 
@@ -54,6 +56,10 @@ pub enum ImageRelation {
 pub struct ArtistAttributes {
     pub name: String,
     pub sort_name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub urls: HashMap<ArtistUrlType, String>,
 }
 
 #[derive(Serialize, Hash, PartialEq, Eq)]
@@ -69,7 +75,7 @@ pub enum ArtistRelation {
     Tracks,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum ArtistInclude {
     #[serde(rename = "images")]
     Images,
@@ -122,7 +128,7 @@ pub enum ReleaseRelation {
     Artists,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum ReleaseInclude {
     #[serde(rename = "image")]
     Image,
@@ -153,7 +159,7 @@ pub enum MediumRelation {
     Tracks,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum MediumInclude {
     #[serde(rename = "release")]
     Release,
@@ -204,7 +210,7 @@ pub enum TrackRelation {
     Recorders,
 }
 
-#[derive(Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum TrackInclude {
     #[serde(rename = "artists")]
     Artists,
