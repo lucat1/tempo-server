@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use axum::extract::{Path, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::{Request, StatusCode};
 use axum::{body::Body, response::IntoResponse, Json};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
+    QueryOrder, TransactionTrait,
 };
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -15,8 +15,8 @@ use crate::documents::{
     ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
 };
 use crate::jsonapi::{
-    dedup, Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
-    ResourceIdentifier, ResourceType, TrackResource,
+    dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta, Query,
+    Related, Relation, Relationship, ResourceIdentifier, ResourceType, TrackResource,
 };
 
 #[derive(Default)]
@@ -165,7 +165,7 @@ pub fn entity_to_included(entity: &entity::Track, related: &TrackRelated) -> Inc
 pub async fn included<C>(
     db: &C,
     related: Vec<TrackRelated>,
-    include: Vec<TrackInclude>,
+    include: &[TrackInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
@@ -238,6 +238,7 @@ where
 pub async fn tracks(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<entity::TrackColumn, TrackInclude, uuid::Uuid>,
+    OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<TrackResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -246,13 +247,15 @@ pub async fn tracks(
     })?;
 
     let mut tracks_query = entity::TrackEntity::find();
-    for (sort_key, sort_order) in opts.sort.into_iter() {
-        tracks_query = tracks_query.order_by(sort_key, sort_order);
+    for (sort_key, sort_order) in opts.sort.iter() {
+        tracks_query = tracks_query.order_by(sort_key.to_owned(), sort_order.to_owned());
     }
-    for (filter_key, filter_value) in opts.filter.into_iter() {
-        tracks_query = tracks_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    for (filter_key, filter_value) in opts.filter.iter() {
+        tracks_query = tracks_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
-    let tracks = tracks_query.all(&tx).await.map_err(|e| Error {
+    let mut _mediums_cursor = tracks_query.cursor_by(entity::TrackColumn::Id);
+    let tracks_cursor = make_cursor(&mut _mediums_cursor, &opts.page);
+    let tracks = tracks_cursor.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch all tracks".to_string(),
         detail: Some(e.into()),
@@ -266,7 +269,7 @@ pub async fn tracks(
     for (i, track) in tracks.iter().enumerate() {
         data.push(entity_to_resource(track, &related_to_tracks[i]));
     }
-    let included = included(&tx, related_to_tracks, opts.include)
+    let included = included(&tx, related_to_tracks, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -274,9 +277,9 @@ pub async fn tracks(
             detail: Some(e.into()),
         })?;
     Ok(Json(Document {
+        links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
-        links: HashMap::new(),
     }))
 }
 
@@ -302,7 +305,7 @@ pub async fn track(
     let empty_relationship = TrackRelated::default();
     let related = related_to_tracks.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&track, related);
-    let included = included(&tx, related_to_tracks, opts.include)
+    let included = included(&tx, related_to_tracks, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

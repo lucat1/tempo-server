@@ -381,6 +381,7 @@ where
             let prev_opts: RawQueryOptions<I> = QueryOptions {
                 page: Page {
                     before: Some(first.id.clone()),
+                    after: None,
                     ..opts_clone.page
                 },
                 ..opts_clone
@@ -396,6 +397,7 @@ where
         if data.len() == opts.page.size as usize {
             let next_opts: RawQueryOptions<I> = QueryOptions {
                 page: Page {
+                    before: None,
                     after: Some(last.id.clone()),
                     ..opts.page
                 },

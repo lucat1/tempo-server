@@ -148,9 +148,8 @@ where
         for (i, release) in releases.iter().enumerate() {
             included.push(releases::entity_to_included(release, &releases_related[i]))
         }
-        included.extend(
-            releases::included(db, releases_related, map_to_releases_include(include)).await?,
-        );
+        let releases_included = map_to_releases_include(include);
+        included.extend(releases::included(db, releases_related, &releases_included).await?);
     }
     Ok(included)
 }

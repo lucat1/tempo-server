@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use axum::extract::{Path, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::Datelike;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
+    QueryOrder, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -15,8 +15,8 @@ use crate::documents::{
     ArtistCreditAttributes, MediumInclude, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
 };
 use crate::jsonapi::{
-    dedup, Document, DocumentData, Error, Included, Meta, Query, Related, Relation, Relationship,
-    ReleaseResource, ResourceIdentifier, ResourceType,
+    dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta, Query,
+    Related, Relation, Relationship, ReleaseResource, ResourceIdentifier, ResourceType,
 };
 
 #[derive(Default)]
@@ -160,7 +160,7 @@ fn map_to_mediums_include(include: &[ReleaseInclude]) -> Vec<MediumInclude> {
 pub async fn included<C>(
     db: &C,
     related: Vec<ReleaseRelated>,
-    include: Vec<ReleaseInclude>,
+    include: &[ReleaseInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
@@ -204,9 +204,8 @@ where
         for (i, medium) in mediums.into_iter().enumerate() {
             included.push(mediums::entity_to_included(&medium, &mediums_related[i]));
         }
-        included.extend(
-            mediums::included(db, mediums_related, map_to_mediums_include(&include)).await?,
-        );
+        let mediums_included = map_to_mediums_include(include);
+        included.extend(mediums::included(db, mediums_related, &mediums_included).await?);
     }
     Ok(included)
 }
@@ -214,6 +213,7 @@ where
 pub async fn releases(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
+    OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ReleaseResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -222,13 +222,16 @@ pub async fn releases(
     })?;
 
     let mut releases_query = entity::ReleaseEntity::find();
-    for (sort_key, sort_order) in opts.sort.into_iter() {
-        releases_query = releases_query.order_by(sort_key, sort_order);
+    for (sort_key, sort_order) in opts.sort.iter() {
+        releases_query = releases_query.order_by(sort_key.to_owned(), sort_order.to_owned());
     }
-    for (filter_key, filter_value) in opts.filter.into_iter() {
-        releases_query = releases_query.filter(ColumnTrait::eq(&filter_key, filter_value));
+    for (filter_key, filter_value) in opts.filter.iter() {
+        releases_query =
+            releases_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
-    let releases = releases_query.all(&tx).await.map_err(|e| Error {
+    let mut _releases_cursor = releases_query.cursor_by(entity::ReleaseColumn::Id);
+    let releases_cursor = make_cursor(&mut _releases_cursor, &opts.page);
+    let releases = releases_cursor.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch all releases".to_string(),
         detail: Some(e.into()),
@@ -242,7 +245,7 @@ pub async fn releases(
     for (i, release) in releases.iter().enumerate() {
         data.push(entity_to_resource(release, &related_to_releases[i]));
     }
-    let included = included(&tx, related_to_releases, opts.include)
+    let included = included(&tx, related_to_releases, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -250,9 +253,9 @@ pub async fn releases(
             detail: Some(e.into()),
         })?;
     Ok(Json(Document {
+        links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
-        links: HashMap::new(),
     }))
 }
 
@@ -290,7 +293,7 @@ pub async fn release(
     let empty_relationship = ReleaseRelated::default();
     let related = related_to_releases.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&release, related);
-    let included = included(&tx, related_to_releases, opts.include)
+    let included = included(&tx, related_to_releases, &opts.include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
