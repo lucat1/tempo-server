@@ -1,5 +1,6 @@
 pub mod artist_description;
 pub mod artist_url;
+pub mod index_search;
 pub mod lastfm_artist_image;
 
 use base::{database::get_database, setting::get_settings};
@@ -22,6 +23,7 @@ pub enum Task {
     ArtistDescription(artist_description::Data),
     ArtistUrl(artist_url::Data),
     LastfmArtistImage(lastfm_artist_image::Data),
+    IndexSearch(index_search::Data),
 }
 
 pub fn queue_loop() -> Result<()> {
@@ -49,5 +51,6 @@ async fn run_task(db: &DbConn, task: Task) -> Result<()> {
         Task::ArtistDescription(data) => artist_description::run(db, data).await,
         Task::ArtistUrl(data) => artist_url::run(db, data).await,
         Task::LastfmArtistImage(data) => lastfm_artist_image::run(db, data).await,
+        Task::IndexSearch(data) => index_search::run(db, data).await,
     }
 }

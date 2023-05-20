@@ -1,4 +1,5 @@
 pub mod fetch;
+pub mod search;
 pub mod tasks;
 
 use sea_orm::DbConn;

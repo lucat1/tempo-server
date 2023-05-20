@@ -7,6 +7,7 @@ use mime::{Mime, IMAGE_GIF, IMAGE_JPEG, IMAGE_PNG};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
@@ -29,6 +30,8 @@ pub struct Settings {
     pub library: Library,
     #[serde(default)]
     pub downloads: PathBuf,
+    #[serde(default)]
+    pub search_index: PathBuf,
 
     #[serde(default)]
     pub tasks: Tasks,
@@ -258,6 +261,10 @@ fn get_downloads() -> Result<PathBuf> {
         .or_else(|_| PathBuf::from_str("/downloads").map_err(|e| eyre!(e)))
 }
 
+fn get_search_index(path: &Path) -> PathBuf {
+    path.join(".search")
+}
+
 pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     let path = path.unwrap_or({
         let dirs = ProjectDirs::from("com", "github", CLI_NAME)
@@ -275,6 +282,9 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     }
     if set.downloads == PathBuf::default() {
         set.downloads = get_downloads()?;
+    }
+    if set.search_index == PathBuf::default() {
+        set.search_index = get_search_index(&set.library.path);
     }
     tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
@@ -295,6 +305,7 @@ pub enum TaskType {
     ArtistUrl,
     ArtistDescription,
     LastfmArtistImage,
+    IndexSearch,
 }
 
 fn default_recurring() -> HashMap<TaskType, String> {

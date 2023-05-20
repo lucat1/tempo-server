@@ -4,6 +4,7 @@ pub mod fetch;
 mod internal;
 pub mod jsonapi;
 mod scheduling;
+pub mod search;
 pub mod tasks;
 
 use axum::Router;
@@ -27,6 +28,7 @@ use base::{
     database::{get_database, open_database, DATABASE},
     setting::get_settings,
 };
+use web::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -63,6 +65,14 @@ async fn main() -> Result<()> {
         .get_or_try_init(async { open_database().await })
         .await?;
     migration::Migrator::up(get_database()?, None).await?;
+
+    // search index
+    INDEXES.get_or_try_init(async { open_indexes() }).await?;
+    INDEX_WRITERS
+        .lock()
+        .await
+        .get_or_try_init(async { open_index_writers() })
+        .await?;
 
     // background tasks
     web::tasks::queue_loop()?;
