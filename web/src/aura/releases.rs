@@ -138,6 +138,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             release_mbid: entity.id,
             release_group_mbid: entity.release_group_id,
         },
+        meta: HashMap::new(),
         relationships,
     }
 }

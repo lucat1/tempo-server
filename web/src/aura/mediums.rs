@@ -91,6 +91,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
             track_offset: entity.track_offset,
             format: entity.format.to_owned(),
         },
+        meta: HashMap::new(),
         relationships,
     }
 }

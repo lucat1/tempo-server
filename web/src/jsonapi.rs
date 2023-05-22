@@ -8,7 +8,7 @@ use axum::{
 use itertools::Itertools;
 use sea_orm::{
     sea_query::{IntoIden, IntoValueTuple},
-    ColumnTrait, Cursor, Order, SelectorTrait,
+    ColumnTrait, Cursor, DbConn, Order, SelectorTrait,
 };
 use serde::{Deserialize, Serialize};
 use serde_valid::Validate;
@@ -25,6 +25,9 @@ use crate::documents::{
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
 pub static MAX_PAGE_SIZE: u32 = 20;
+
+#[derive(Clone)]
+pub struct AppState(pub DbConn);
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +82,12 @@ pub enum DocumentData<R> {
     Multi(Vec<R>),
 }
 
+#[derive(Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceMetaKey {
+    Score,
+}
+
 #[derive(Serialize)]
 pub struct Resource<I, T, R> {
     pub r#type: ResourceType,
@@ -86,6 +95,8 @@ pub struct Resource<I, T, R> {
     pub attributes: T,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub relationships: HashMap<R, Relationship>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub meta: HashMap<ResourceMetaKey, String>,
 }
 
 #[derive(Serialize)]

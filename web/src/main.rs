@@ -23,12 +23,12 @@ use tracing_subscriber::{
     prelude::*,
 };
 
+use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 use base::setting::{load, SETTINGS};
 use base::{
     database::{get_database, open_database, DATABASE},
     setting::get_settings,
 };
-use web::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
         .await?;
 
     // background tasks
-    web::tasks::queue_loop()?;
+    crate::tasks::queue_loop()?;
     let mut scheduler = scheduling::new().await?;
     for (task, schedule) in get_settings()?.tasks.recurring.iter() {
         scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
         .nest("/internal", internal::router())
         .layer(cors)
         .layer(tracing)
-        .with_state(web::AppState(conn));
+        .with_state(jsonapi::AppState(conn));
 
     let addr: SocketAddr = cli
         .listen_address

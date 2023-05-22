@@ -5,13 +5,13 @@ use super::schema::{ARTISTS_SCHEMA, RELEASES_SCHEMA, TRACKS_SCHEMA};
 
 #[derive(Clone, Copy)]
 pub struct ArtistFields {
-    id: Field,
-    name: Field,
-    sort_name: Field,
-    description: Field,
+    pub id: Field,
+    pub name: Field,
+    pub sort_name: Field,
+    pub description: Field,
 }
 
-fn artist_fields() -> Option<ArtistFields> {
+pub fn artist_fields() -> Option<ArtistFields> {
     Some(ArtistFields {
         id: ARTISTS_SCHEMA.get_field("id")?,
         name: ARTISTS_SCHEMA.get_field("name")?,
@@ -49,13 +49,13 @@ fn artists_string(artists: Vec<(entity::ArtistCredit, entity::Artist)>) -> Strin
 
 #[derive(Clone, Copy)]
 pub struct TrackFields {
-    id: Field,
-    artists: Field,
-    title: Field,
-    genres: Field,
+    pub id: Field,
+    pub artists: Field,
+    pub title: Field,
+    pub genres: Field,
 }
 
-fn track_fields() -> Option<TrackFields> {
+pub fn track_fields() -> Option<TrackFields> {
     Some(TrackFields {
         id: TRACKS_SCHEMA.get_field("id")?,
         artists: TRACKS_SCHEMA.get_field("artists")?,
@@ -85,16 +85,16 @@ pub fn track_to_document(
 
 #[derive(Clone, Copy)]
 pub struct ReleaseFields {
-    id: Field,
-    artists: Field,
-    title: Field,
-    release_type: Field,
-    genres: Field,
-    date: Field,
-    original_date: Field,
+    pub id: Field,
+    pub artists: Field,
+    pub title: Field,
+    pub release_type: Field,
+    pub genres: Field,
+    pub date: Field,
+    pub original_date: Field,
 }
 
-fn release_fields() -> Option<ReleaseFields> {
+pub fn release_fields() -> Option<ReleaseFields> {
     Some(ReleaseFields {
         id: RELEASES_SCHEMA.get_field("id")?,
         artists: RELEASES_SCHEMA.get_field("artists")?,

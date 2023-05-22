@@ -256,6 +256,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
                 .map(|rel| (rel.r#type, rel.url.to_owned()))
                 .collect(),
         },
+        meta: HashMap::new(),
         relationships,
     }
 }
@@ -264,7 +265,6 @@ pub fn entity_to_included(entity: &entity::Artist, related: &ArtistRelated) -> I
     Included::Artist(entity_to_resource(entity, related))
 }
 
-#[axum_macros::debug_handler]
 pub async fn artists(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,

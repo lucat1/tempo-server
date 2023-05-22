@@ -2,6 +2,7 @@ mod artists;
 mod images;
 mod mediums;
 mod releases;
+mod search;
 mod tracks;
 
 use std::collections::HashMap;
@@ -10,10 +11,8 @@ use axum::{routing::get, Json, Router};
 
 use crate::{
     documents::ServerAttributes,
-    jsonapi::{Document, DocumentData, ResourceType, ServerResource},
+    jsonapi::{AppState, Document, DocumentData, ResourceType, ServerResource},
 };
-
-use web::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -29,6 +28,7 @@ pub fn router() -> Router<AppState> {
         .route("/tracks", get(tracks::tracks))
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
+        .route("/search", get(search::search))
 }
 
 async fn server() -> Json<Document<ServerResource>> {
@@ -47,6 +47,7 @@ async fn server() -> Json<Document<ServerResource>> {
                     .collect(),
             },
             relationships: HashMap::new(),
+            meta: HashMap::new(),
         }),
         included: Vec::new(),
         links: HashMap::new(),

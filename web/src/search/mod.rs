@@ -1,4 +1,4 @@
-mod db;
+pub mod db;
 pub mod documents;
 mod schema;
 

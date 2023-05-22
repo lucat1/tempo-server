@@ -9,8 +9,9 @@ use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
 use crate::documents::ImageAttributes;
-use crate::jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType};
-use web::AppState;
+use crate::jsonapi::{
+    AppState, Document, DocumentData, Error, ImageResource, Included, ResourceType,
+};
 
 pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
     ImageResource {
@@ -24,6 +25,7 @@ pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
             height: image.height,
             size: image.size,
         },
+        meta: HashMap::new(),
         relationships: HashMap::new(),
     }
 }

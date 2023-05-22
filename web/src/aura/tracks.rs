@@ -155,6 +155,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             size: None, // TODO
         },
         relationships,
+        meta: HashMap::new(),
     }
 }
 

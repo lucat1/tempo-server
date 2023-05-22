@@ -1,7 +1,7 @@
+use crate::{tasks, tasks::get_queue, tasks::Task};
 use base::{database::get_database, setting::TaskType};
 use eyre::Result;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use web::{get_queue, tasks, tasks::Task};
 
 pub async fn new() -> Result<JobScheduler> {
     Ok(JobScheduler::new().await?)
