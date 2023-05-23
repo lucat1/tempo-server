@@ -90,8 +90,6 @@ pub struct ReleaseFields {
     pub title: Field,
     pub release_type: Field,
     pub genres: Field,
-    pub date: Field,
-    pub original_date: Field,
 }
 
 pub fn release_fields() -> Option<ReleaseFields> {
@@ -101,8 +99,6 @@ pub fn release_fields() -> Option<ReleaseFields> {
         title: RELEASES_SCHEMA.get_field("title")?,
         release_type: RELEASES_SCHEMA.get_field("release_type")?,
         genres: RELEASES_SCHEMA.get_field("genres")?,
-        date: RELEASES_SCHEMA.get_field("date")?,
-        original_date: RELEASES_SCHEMA.get_field("original_date")?,
     })
 }
 
@@ -115,8 +111,6 @@ pub fn release_to_document(
         title,
         release_type,
         genres,
-        date,
-        original_date,
     } = release_fields().ok_or(eyre!("Could not get search index release fields"))?;
 
     let mut document = doc!(
@@ -126,12 +120,6 @@ pub fn release_to_document(
     );
     if let Some(rel_typ) = release_data.release_type {
         document.add_text(release_type, rel_typ);
-    }
-    if let Some(d) = release_data.date {
-        document.add_text(date, d);
-    }
-    if let Some(od) = release_data.original_date {
-        document.add_text(original_date, od);
     }
     document.add_text(artists, artists_string(artists_data));
     Ok(document)

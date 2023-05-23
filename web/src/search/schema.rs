@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use tantivy::schema::{Schema, INDEXED, STORED, STRING, TEXT};
+use tantivy::schema::{Schema, STORED, STRING, TEXT};
 
 lazy_static! {
     pub static ref ARTISTS_SCHEMA: Schema = make_artists_schema();
@@ -32,7 +32,5 @@ fn make_releases_schema() -> Schema {
     schema_builder.add_text_field("title", TEXT);
     schema_builder.add_text_field("release_type", STRING);
     schema_builder.add_text_field("genres", TEXT);
-    schema_builder.add_date_field("date", INDEXED);
-    schema_builder.add_date_field("original_date", INDEXED);
     schema_builder.build()
 }

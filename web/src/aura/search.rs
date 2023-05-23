@@ -1,16 +1,16 @@
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use eyre::{bail, eyre, Result};
+use eyre::{eyre, Result};
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, DbConn, EntityTrait, QueryFilter, TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value, ReloadPolicy};
 use uuid::Uuid;
 
-use super::artists;
+use super::{artists, releases, tracks};
 use crate::jsonapi::{
     dedup, AppState, ArtistResource, Document, DocumentData, Error, ReleaseResource,
     ResourceMetaKey, TrackResource,
@@ -39,7 +39,7 @@ fn default_limit() -> u32 {
     20
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Index<'a> {
     Artists(&'a tantivy::Index),
     Releases(&'a tantivy::Index),
@@ -82,8 +82,6 @@ fn do_search(index: Index, search: &SearchQuery) -> Result<Vec<(f32, Value)>> {
                         fields.title,
                         fields.release_type,
                         fields.genres,
-                        fields.date,
-                        fields.original_date,
                     ],
                 ),
             )
@@ -127,21 +125,58 @@ where
     C: ConnectionTrait,
 {
     let artists_docs = do_search(index, search)?;
-    let artist_ids = get_ids(artists_docs)?;
-    let mut cond = Condition::any();
-    for (_score, id) in artist_ids.iter() {
-        cond = cond.add(ColumnTrait::eq(&entity::ArtistColumn::Id, id.to_owned()));
-    }
-    let artists = entity::ArtistEntity::find().filter(cond).all(db).await?;
-
-    let related_to_artists = artists::related(db, &artists, false).await?;
+    let ids = get_ids(artists_docs)?;
     let mut data = Vec::new();
-    for (i, artist) in artists.iter().enumerate() {
-        let mut entity = artists::entity_to_resource(artist, &related_to_artists[i]);
-        entity
-            .meta
-            .insert(ResourceMetaKey::Score, artist_ids[i].0.to_string());
-        data.push(SearchResult::Artist(entity));
+
+    match index {
+        Index::Artists(_) => {
+            let mut cond = Condition::any();
+            for (_score, id) in ids.iter() {
+                cond = cond.add(ColumnTrait::eq(&entity::ArtistColumn::Id, id.to_owned()));
+            }
+            let artists = entity::ArtistEntity::find().filter(cond).all(db).await?;
+
+            let related_to_artists = artists::related(db, &artists, false).await?;
+            for (i, artist) in artists.iter().enumerate() {
+                let mut entity = artists::entity_to_resource(artist, &related_to_artists[i]);
+                entity
+                    .meta
+                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                data.push(SearchResult::Artist(entity));
+            }
+        }
+        Index::Releases(_) => {
+            let mut cond = Condition::any();
+            for (_score, id) in ids.iter() {
+                cond = cond.add(ColumnTrait::eq(&entity::ReleaseColumn::Id, id.to_owned()));
+            }
+            let releases = entity::ReleaseEntity::find().filter(cond).all(db).await?;
+
+            let related_to_releases = releases::related(db, &releases, false).await?;
+            for (i, release) in releases.iter().enumerate() {
+                let mut entity = releases::entity_to_resource(release, &related_to_releases[i]);
+                entity
+                    .meta
+                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                data.push(SearchResult::Release(entity));
+            }
+        }
+        Index::Tracks(_) => {
+            let mut cond = Condition::any();
+            for (_score, id) in ids.iter() {
+                cond = cond.add(ColumnTrait::eq(&entity::TrackColumn::Id, id.to_owned()));
+            }
+            let tracks = entity::TrackEntity::find().filter(cond).all(db).await?;
+
+            let related_to_tracks = tracks::related(db, &tracks, false).await?;
+            for (i, track) in tracks.iter().enumerate() {
+                let mut entity = tracks::entity_to_resource(track, &related_to_tracks[i]);
+                entity
+                    .meta
+                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                data.push(SearchResult::Track(entity));
+            }
+        }
     }
 
     Ok(data)
@@ -162,7 +197,7 @@ pub async fn search(
         title: "Couldn't get a hold of the search indexes".to_string(),
         detail: Some(e.into()),
     })?;
-    let artists = search_and_map(&tx, Index::Artists(&indexes.artists), &search)
+    let mut artists = search_and_map(&tx, Index::Artists(&indexes.artists), &search)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -170,9 +205,31 @@ pub async fn search(
             detail: Some(e.into()),
         })?;
 
+    let mut releases = search_and_map(&tx, Index::Releases(&indexes.releases), &search)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not search for releases".to_string(),
+            detail: Some(e.into()),
+        })?;
+    tracing::info!(len = ?releases.len(), "Releases");
+
+    let mut tracks = search_and_map(&tx, Index::Tracks(&indexes.tracks), &search)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not search for tracks".to_string(),
+            detail: Some(e.into()),
+        })?;
+
+    let mut results = Vec::new();
+    results.append(&mut artists);
+    results.append(&mut releases);
+    results.append(&mut tracks);
+
     Ok(Json(Document {
         links: HashMap::new(),
-        data: DocumentData::Multi(artists),
+        data: DocumentData::Multi(results),
         included: dedup(Vec::new()),
     }))
 }

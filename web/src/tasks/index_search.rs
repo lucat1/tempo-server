@@ -87,7 +87,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
                 }
 
                 writer
-                    .tracks
+                    .releases
                     .add_document(documents::release_to_document((release, artists_data))?)?;
             }
             writer.releases.commit()?;
