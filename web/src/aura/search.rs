@@ -6,6 +6,7 @@ use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
+use serde_valid::Validate;
 use std::collections::HashMap;
 use tantivy::{collector::TopDocs, query::QueryParser, schema::Value, ReloadPolicy};
 use uuid::Uuid;
@@ -28,15 +29,16 @@ pub enum SearchResult {
     Track(TrackResource),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct SearchQuery {
     query: String,
     #[serde(default = "default_limit")]
+    #[validate(maximum = 50)]
     limit: u32,
 }
 
 fn default_limit() -> u32 {
-    20
+    25
 }
 
 #[derive(Clone, Copy, Debug)]
