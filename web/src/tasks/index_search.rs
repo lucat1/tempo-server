@@ -47,7 +47,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
                 ))?;
                 let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
                 let mut artists_data = Vec::new();
-                for (i, artist_credit) in artist_credits.into_iter().enumerate() {
+                for (i, artist_credit) in artist_credits.iter().enumerate() {
                     let artist = artists
                         .get(i)
                         .and_then(|a| a.to_owned())
@@ -78,7 +78,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
                 ))?;
                 let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
                 let mut artists_data = Vec::new();
-                for (i, artist_credit) in artist_credits.into_iter().enumerate() {
+                for (i, artist_credit) in artist_credits.iter().enumerate() {
                     let artist = artists
                         .get(i)
                         .and_then(|a| a.to_owned())
