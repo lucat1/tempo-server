@@ -16,8 +16,8 @@ pub use core::convert::AsRef;
 pub use eyre::{Report, Result};
 pub use key::TagKey;
 pub use map::{
-    strs_from_combination, tag_to_string_map, tags_from_combination, tags_from_full_release,
-    tags_from_full_track, StringMap, TagMap,
+    sanitize_filename, sanitize_map, strs_from_combination, tag_to_string_map,
+    tags_from_combination, tags_from_full_release, tags_from_full_track, StringMap, TagMap,
 };
 pub use picture::{Picture, PictureType};
 

@@ -1,9 +1,3 @@
-use base::database::get_database;
-use base::setting::get_settings;
-use base::setting::Library;
-use base::util::dedup;
-use base::util::mkdirp;
-use base::util::path_to_str;
 use entity::conflict::{
     ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
     ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, IMAGE_CONFLICT_1,
@@ -29,12 +23,6 @@ use std::fs::write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use strfmt::strfmt;
-use tag::tag_to_string_map;
-use tag::tags_from_combination;
-use tag::tags_from_full_release;
-use tag::Picture;
-use tag::PictureType;
-use tag::TagKey;
 use uuid::Uuid;
 
 use crate::fetch;
@@ -44,6 +32,15 @@ use crate::internal;
 use crate::rank;
 use crate::rank::CoverRating;
 use crate::track::TrackFile;
+use base::{
+    database::get_database,
+    setting::{get_settings, Library},
+    util::{dedup, mkdirp, path_to_str},
+};
+use tag::{
+    sanitize_map, tag_to_string_map, tags_from_combination, tags_from_full_release, Picture,
+    PictureType, TagKey,
+};
 
 #[derive(Serialize, Clone)]
 pub struct RatedSearchResult {
@@ -207,7 +204,7 @@ pub async fn run(import: Import) -> Result<()> {
     let release_root = library.path.join(PathBuf::from_str(
         strfmt(
             library.release_name.as_str(),
-            &tag_to_string_map(&tags_from_full_release(&full_release)?),
+            &sanitize_map(tag_to_string_map(&tags_from_full_release(&full_release)?)),
         )?
         .as_str(),
     )?);
@@ -219,7 +216,7 @@ pub async fn run(import: Import) -> Result<()> {
             let full_track = &mut full_tracks[*to];
             let tags = tags_from_combination(&full_release, full_track)?;
             let vars = tag_to_string_map(&tags);
-            let track_name = strfmt(library.track_name.as_str(), &vars)?;
+            let track_name = strfmt(library.track_name.as_str(), &sanitize_map(vars.clone()))?;
             let dest = release_root.join(PathBuf::from_str(
                 format!(
                     "{}.{}",
