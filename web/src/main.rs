@@ -1,4 +1,5 @@
 mod aura;
+pub mod auth;
 pub mod documents;
 pub mod fetch;
 mod internal;
