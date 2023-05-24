@@ -206,13 +206,13 @@ pub fn tag_to_string_map(input: &TagMap) -> StringMap {
 }
 
 pub fn sanitize_filename(str: &str) -> String {
-    str.replace('/', "-").replace('\\', "-")
+    str.replace(['/', '\\'], "-")
 }
 
 pub fn sanitize_map(map: StringMap) -> StringMap {
     map.into_iter()
         .map(|(k, v)| {
-            let sanitized_value = if v.contains("/") {
+            let sanitized_value = if v.contains('/') {
                 sanitize_filename(&v)
             } else {
                 v

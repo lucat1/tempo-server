@@ -216,7 +216,7 @@ pub async fn run(import: Import) -> Result<()> {
             let full_track = &mut full_tracks[*to];
             let tags = tags_from_combination(&full_release, full_track)?;
             let vars = tag_to_string_map(&tags);
-            let track_name = strfmt(library.track_name.as_str(), &sanitize_map(vars.clone()))?;
+            let track_name = strfmt(library.track_name.as_str(), &sanitize_map(vars))?;
             let dest = release_root.join(PathBuf::from_str(
                 format!(
                     "{}.{}",
