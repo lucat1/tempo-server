@@ -206,7 +206,7 @@ pub fn tag_to_string_map(input: &TagMap) -> StringMap {
 }
 
 pub fn sanitize_filename(str: &str) -> String {
-    str.replace('/', "-")
+    str.replace('/', "-").replace('\\', "-")
 }
 
 pub fn sanitize_map(map: StringMap) -> StringMap {
