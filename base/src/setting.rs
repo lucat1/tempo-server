@@ -334,7 +334,7 @@ pub struct Keys {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum AuthMethod {
     Local,
-    LDAP,
+    Ldap,
 }
 
 fn default_priority() -> Vec<AuthMethod> {

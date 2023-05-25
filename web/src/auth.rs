@@ -152,7 +152,7 @@ pub async fn login(
 
     let refresh_expiry = Utc::now().add(Duration::days(30));
     let refresh_claims = RefreshClaims {
-        username: user.username.to_owned(),
+        username: user.username,
         exp: refresh_expiry.timestamp() as usize,
     };
     let refresh_token = encode(

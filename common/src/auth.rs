@@ -150,11 +150,10 @@ pub async fn authenticate(username: &str, password: &str) -> Result<entity::User
     let settings = get_settings()?;
     let db = get_database()?;
 
-    let mut methods = settings.auth.priority.iter();
-    while let Some(method) = methods.next() {
+    for method in settings.auth.priority.iter() {
         let result = match method {
-            AuthMethod::Local => try_local_login(&settings, username, password).await,
-            AuthMethod::LDAP => try_ldap_login(&settings, username, password).await,
+            AuthMethod::Local => try_local_login(settings, username, password).await,
+            AuthMethod::Ldap => try_ldap_login(settings, username, password).await,
         };
         match result {
             Ok(fields) => return update_or_create(db, *method, fields).await,

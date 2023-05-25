@@ -7,11 +7,7 @@ mod tracks;
 
 use std::collections::HashMap;
 
-use axum::{
-    middleware::from_fn,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::{middleware::from_fn, routing::get, Json, Router};
 
 use crate::{
     auth::{auth, auth_middleware, login},
@@ -35,8 +31,7 @@ pub fn router() -> Router<AppState> {
         .route("/search", get(search::search))
         .layer(from_fn(auth_middleware))
         .route("/server", get(server))
-        .route("/auth", get(auth))
-        .route("/auth/login", post(login))
+        .route("/auth", get(auth).post(login))
 }
 
 async fn server() -> Json<Document<ServerResource>> {
@@ -49,7 +44,7 @@ async fn server() -> Json<Document<ServerResource>> {
                 server: base::CLI_NAME.to_string(),
                 server_version: base::VERSION.to_string(),
                 auth_required: true,
-                features: ["artists", "releases", "mediums", "tracks"]
+                features: ["artists", "releases", "mediums", "tracks", "users"]
                     .into_iter()
                     .map(|s| s.to_string())
                     .collect(),

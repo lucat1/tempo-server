@@ -10,7 +10,7 @@ pub enum AuthProvider {
     #[sea_orm(num_value = 0)]
     Local,
     #[sea_orm(num_value = 1)]
-    LDAP,
+    Ldap,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -28,7 +28,7 @@ impl From<AuthMethod> for AuthProvider {
     fn from(value: AuthMethod) -> Self {
         match value {
             AuthMethod::Local => AuthProvider::Local,
-            AuthMethod::LDAP => AuthProvider::LDAP,
+            AuthMethod::Ldap => AuthProvider::Ldap,
         }
     }
 }
@@ -37,7 +37,7 @@ impl From<AuthProvider> for AuthMethod {
     fn from(value: AuthProvider) -> Self {
         match value {
             AuthProvider::Local => AuthMethod::Local,
-            AuthProvider::LDAP => AuthMethod::LDAP,
+            AuthProvider::Ldap => AuthMethod::Ldap,
         }
     }
 }
