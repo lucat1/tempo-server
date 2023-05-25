@@ -4,6 +4,7 @@ use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
 use mime::{Mime, IMAGE_GIF, IMAGE_JPEG, IMAGE_PNG};
+use rand::distributions::{Alphanumeric, DistString};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -286,6 +287,10 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     if set.search_index == PathBuf::default() {
         set.search_index = get_search_index(&set.library.path);
     }
+    if set.keys.jwt_secret == String::default() {
+        set.keys.jwt_secret = Alphanumeric.sample_string(&mut rand::thread_rng(), 32);
+        tracing::warn!(secret = %set.keys.jwt_secret, "Using random JWT secret. Please define one in the config to make authentication persistant across restarts");
+    }
     tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
 }
@@ -319,6 +324,8 @@ fn default_recurring() -> HashMap<TaskType, String> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
+    pub jwt_secret: String,
+
     pub lastfm_apikey: String,
     pub lastfm_shared_secret: String,
 }
