@@ -4,6 +4,7 @@ use eyre::{eyre, Result};
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
 use mime::{Mime, IMAGE_GIF, IMAGE_JPEG, IMAGE_PNG};
+use rand::distributions::{Alphanumeric, DistString};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -38,6 +39,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub keys: Keys,
+
+    #[serde(default)]
+    pub auth: Auth,
 }
 
 fn default_library_name() -> String {
@@ -286,6 +290,10 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     if set.search_index == PathBuf::default() {
         set.search_index = get_search_index(&set.library.path);
     }
+    if set.auth.jwt_secret == String::default() {
+        set.auth.jwt_secret = Alphanumeric.sample_string(&mut rand::thread_rng(), 32);
+        tracing::warn!(secret = %set.auth.jwt_secret, "Using random JWT secret. Please define one in the config to make authentication persistant across restarts");
+    }
     tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
 }
@@ -321,6 +329,129 @@ fn default_recurring() -> HashMap<TaskType, String> {
 pub struct Keys {
     pub lastfm_apikey: String,
     pub lastfm_shared_secret: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AuthMethod {
+    Local,
+    LDAP,
+}
+
+fn default_priority() -> Vec<AuthMethod> {
+    vec![AuthMethod::Local]
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Auth {
+    #[serde(default)]
+    pub jwt_secret: String,
+    #[serde(default = "default_priority")]
+    pub priority: Vec<AuthMethod>,
+
+    #[serde(default)]
+    pub ldap: LDAP,
+
+    #[serde(default)]
+    pub users: Vec<User>,
+}
+
+impl Default for Auth {
+    fn default() -> Self {
+        Self {
+            jwt_secret: String::new(),
+            priority: default_priority(),
+
+            ldap: LDAP::default(),
+            users: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LDAP {
+    #[serde(default = "default_ldap_uri")]
+    pub uri: iref::IriBuf,
+    #[serde(default = "default_ldap_base_dn")]
+    pub base_dn: String,
+    #[serde(default = "default_ldap_admin_pw")]
+    pub admin_dn: String,
+    #[serde(default = "default_ldap_admin_pw")]
+    pub admin_pw: String,
+    #[serde(default = "default_ldap_user_filter")]
+    pub user_filter: String,
+    #[serde(default)]
+    pub attr_map: LdapAttrMap,
+}
+
+impl Default for LDAP {
+    fn default() -> Self {
+        Self {
+            uri: default_ldap_uri(),
+            base_dn: default_ldap_base_dn(),
+            admin_dn: default_ldap_admin_dn(),
+            admin_pw: default_ldap_admin_pw(),
+            user_filter: default_ldap_user_filter(),
+            attr_map: LdapAttrMap::default(),
+        }
+    }
+}
+
+fn default_ldap_uri() -> iref::IriBuf {
+    iref::IriBuf::new("ldapi:///").unwrap()
+}
+
+fn default_ldap_base_dn() -> String {
+    "dc=example,dc=com".to_string()
+}
+
+fn default_ldap_admin_dn() -> String {
+    "cn=admin,dc=example,dc=com".to_string()
+}
+
+fn default_ldap_admin_pw() -> String {
+    "admin_password".to_string()
+}
+
+fn default_ldap_user_filter() -> String {
+    "(&(objectClass=inetOrgPerson)(uid={username}))".to_string()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LdapAttrMap {
+    #[serde(default = "default_attr_username")]
+    pub username: String,
+    #[serde(default = "default_attr_first_name")]
+    pub first_name: String,
+    #[serde(default = "default_attr_last_name")]
+    pub last_name: String,
+}
+
+fn default_attr_username() -> String {
+    "uid".to_string()
+}
+fn default_attr_first_name() -> String {
+    "givenName".to_string()
+}
+fn default_attr_last_name() -> String {
+    "sn".to_string()
+}
+
+impl Default for LdapAttrMap {
+    fn default() -> Self {
+        Self {
+            username: default_attr_username(),
+            first_name: default_attr_first_name(),
+            last_name: default_attr_last_name(),
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+    pub password: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 pub fn get_settings() -> Result<&'static Settings> {

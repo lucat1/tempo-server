@@ -4,6 +4,7 @@ mod m20220101_000001_init;
 mod m20230416_000001_image;
 mod m20230511_000001_artist_description;
 mod m20230513_000001_artist_url;
+mod m20230525_000001_user;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230416_000001_image::Migration),
             Box::new(m20230511_000001_artist_description::Migration),
             Box::new(m20230513_000001_artist_url::Migration),
+            Box::new(m20230525_000001_user::Migration),
         ]
     }
 }

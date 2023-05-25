@@ -7,16 +7,20 @@ mod tracks;
 
 use std::collections::HashMap;
 
-use axum::{routing::get, Json, Router};
+use axum::{
+    middleware::from_fn,
+    routing::{get, post},
+    Json, Router,
+};
 
 use crate::{
+    auth::{auth, auth_middleware, login},
     documents::ServerAttributes,
     jsonapi::{AppState, Document, DocumentData, ResourceType, ServerResource},
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/server", get(server))
         .route("/images/:id", get(images::image))
         .route("/images/:id/file", get(images::file))
         .route("/artists", get(artists::artists))
@@ -29,6 +33,10 @@ pub fn router() -> Router<AppState> {
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
         .route("/search", get(search::search))
+        .layer(from_fn(auth_middleware))
+        .route("/server", get(server))
+        .route("/auth", get(auth))
+        .route("/auth/login", post(login))
 }
 
 async fn server() -> Json<Document<ServerResource>> {
@@ -40,7 +48,7 @@ async fn server() -> Json<Document<ServerResource>> {
                 aura_version: "0.2.0".to_string(),
                 server: base::CLI_NAME.to_string(),
                 server_version: base::VERSION.to_string(),
-                auth_required: false,
+                auth_required: true,
                 features: ["artists", "releases", "mediums", "tracks"]
                     .into_iter()
                     .map(|s| s.to_string())

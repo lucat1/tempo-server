@@ -15,6 +15,8 @@ mod image;
 mod image_artist;
 mod image_release;
 
+mod user;
+
 pub mod conflict;
 pub mod full;
 
@@ -79,6 +81,11 @@ pub use image_release::ActiveModel as ImageReleaseActive;
 pub use image_release::Column as ImageReleaseColumn;
 pub use image_release::Entity as ImageReleaseEntity;
 pub use image_release::Model as ImageRelease;
+
+pub use user::ActiveModel as UserActive;
+pub use user::Column as UserColumn;
+pub use user::Entity as UserEntity;
+pub use user::Model as User;
 
 pub trait IgnoreNone {
     fn ignore_none(self) -> Result<(), DbErr>;

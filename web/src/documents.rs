@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
+use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use entity::{ArtistTrackRelationType, ArtistUrlType};
@@ -218,4 +218,23 @@ pub enum TrackInclude {
     Medium,
     #[serde(rename = "recorders")]
     Recorders,
+}
+
+#[derive(Serialize)]
+pub struct AuthAttributes {
+    pub token: Token,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh: Option<Token>,
+}
+
+#[derive(Serialize)]
+pub struct Token {
+    pub value: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthRelation {
+    User,
 }
