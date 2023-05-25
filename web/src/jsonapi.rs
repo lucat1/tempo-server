@@ -20,7 +20,8 @@ use super::documents::{
     ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
 };
 use crate::documents::{
-    ArtistCreditAttributes, ImageAttributes, ImageRelation, RecordingAttributes,
+    ArtistCreditAttributes, AuthAttributes, AuthRelation, ImageAttributes, ImageRelation,
+    RecordingAttributes,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
@@ -33,6 +34,9 @@ pub struct AppState(pub DbConn);
 #[serde(rename_all = "snake_case")]
 pub enum ResourceType {
     Server,
+    Auth,
+    User,
+
     Image,
     Artist,
     Track,
@@ -41,6 +45,8 @@ pub enum ResourceType {
 }
 
 pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
+pub type AuthResource = Resource<Uuid, AuthAttributes, AuthRelation>;
+
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
@@ -114,6 +120,8 @@ pub enum Relation {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum Related {
+    User(ResourceIdentifier<Uuid>),
+
     Artist(ResourceIdentifier<Uuid>),
     Track(ResourceIdentifier<Uuid>),
     Medium(ResourceIdentifier<Uuid>),
