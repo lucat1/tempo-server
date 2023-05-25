@@ -331,18 +331,68 @@ pub struct Keys {
     pub lastfm_shared_secret: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum AuthMethod {
     Local,
     LDAP,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+fn default_priority() -> Vec<AuthMethod> {
+    vec![AuthMethod::Local]
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Auth {
     pub jwt_secret: String,
+    #[serde(default = "default_priority")]
     pub priority: Vec<AuthMethod>,
 
+    #[serde(default = "default_ldap_uri")]
+    pub ldap_uri: iref::IriBuf,
+    pub ldap_user_dn: String,
+    pub ldap_attr_map: LdapAttrMap,
+
     pub users: Vec<User>,
+}
+
+fn default_ldap_uri() -> iref::IriBuf {
+    iref::IriBuf::new("ldapi:///").unwrap()
+}
+
+fn default_ldap_user_dn() -> String {
+    "uid={username}".to_string()
+}
+
+impl Default for Auth {
+    fn default() -> Self {
+        Self {
+            jwt_secret: String::new(),
+            priority: default_priority(),
+
+            ldap_uri: default_ldap_uri(),
+            ldap_user_dn: default_ldap_user_dn(),
+            ldap_attr_map: LdapAttrMap::default(),
+
+            users: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LdapAttrMap {
+    pub username: String,
+    pub first_name: String,
+    pub last_name: String,
+}
+
+impl Default for LdapAttrMap {
+    fn default() -> Self {
+        Self {
+            username: "uid".to_string(),
+            first_name: "cn".to_string(),
+            last_name: "sn".to_string(),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

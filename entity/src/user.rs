@@ -1,16 +1,45 @@
 use std::hash::Hash;
 
+use base::setting::AuthMethod;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
+
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = "i8", db_type = "Integer")]
+pub enum AuthProvider {
+    #[sea_orm(num_value = 0)]
+    Local,
+    #[sea_orm(num_value = 1)]
+    LDAP,
+}
 
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "user")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub username: String,
+    pub provider: AuthProvider,
 
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+}
+
+impl From<AuthMethod> for AuthProvider {
+    fn from(value: AuthMethod) -> Self {
+        match value {
+            AuthMethod::Local => AuthProvider::Local,
+            AuthMethod::LDAP => AuthProvider::LDAP,
+        }
+    }
+}
+
+impl From<AuthProvider> for AuthMethod {
+    fn from(value: AuthProvider) -> Self {
+        match value {
+            AuthProvider::Local => AuthMethod::Local,
+            AuthProvider::LDAP => AuthMethod::LDAP,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

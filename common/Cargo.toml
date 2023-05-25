@@ -51,3 +51,4 @@ password-hash = "0.5.0"
 argon2 = "0.5.0"
 pbkdf2 = { version = "0.12.1", features = ["simple"] }
 scrypt = "0.11.0"
+ldap3 = "0.11.1"
