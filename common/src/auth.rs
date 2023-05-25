@@ -11,8 +11,9 @@ use base::{
     database::get_database,
     setting::{get_settings, AuthMethod, Settings},
 };
-use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
 
+#[derive(Debug, Clone)]
 struct UserFields {
     username: String,
     first_name: Option<String>,
@@ -112,7 +113,7 @@ async fn try_ldap_login(settings: &Settings, username: &str, password: &str) -> 
     })
 }
 
-async fn get_or_populate<C>(
+async fn update_or_create<C>(
     db: &C,
     provider: AuthMethod,
     fields: UserFields,
@@ -123,7 +124,15 @@ where
     let user = entity::UserEntity::find_by_id(fields.username.to_owned())
         .one(db)
         .await?;
-    if let Some(user) = user {
+    if let Some(mut user) = user {
+        if user.first_name != fields.first_name || user.last_name != fields.last_name {
+            tracing::trace!(?fields, "Updating user with new field values");
+            let mut active_user = user.into_active_model();
+            active_user.first_name = ActiveValue::Set(fields.first_name);
+            active_user.last_name = ActiveValue::Set(fields.last_name);
+            active_user.clone().update(db).await?;
+            user = active_user.try_into()?;
+        }
         Ok(user)
     } else {
         let user = entity::User {
@@ -148,7 +157,7 @@ pub async fn authenticate(username: &str, password: &str) -> Result<entity::User
             AuthMethod::LDAP => try_ldap_login(&settings, username, password).await,
         };
         match result {
-            Ok(fields) => return get_or_populate(db, *method, fields).await,
+            Ok(fields) => return update_or_create(db, *method, fields).await,
             Err(e) => tracing::trace!(?method, %e, "Login attempt failed"),
         }
     }
