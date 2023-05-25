@@ -343,24 +343,16 @@ fn default_priority() -> Vec<AuthMethod> {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Auth {
+    #[serde(default)]
     pub jwt_secret: String,
     #[serde(default = "default_priority")]
     pub priority: Vec<AuthMethod>,
 
-    #[serde(default = "default_ldap_uri")]
-    pub ldap_uri: iref::IriBuf,
-    pub ldap_user_dn: String,
-    pub ldap_attr_map: LdapAttrMap,
+    #[serde(default)]
+    pub ldap: LDAP,
 
+    #[serde(default)]
     pub users: Vec<User>,
-}
-
-fn default_ldap_uri() -> iref::IriBuf {
-    iref::IriBuf::new("ldapi:///").unwrap()
-}
-
-fn default_ldap_user_dn() -> String {
-    "uid={username}".to_string()
 }
 
 impl Default for Auth {
@@ -369,28 +361,87 @@ impl Default for Auth {
             jwt_secret: String::new(),
             priority: default_priority(),
 
-            ldap_uri: default_ldap_uri(),
-            ldap_user_dn: default_ldap_user_dn(),
-            ldap_attr_map: LdapAttrMap::default(),
-
+            ldap: LDAP::default(),
             users: Vec::new(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LDAP {
+    #[serde(default = "default_ldap_uri")]
+    pub uri: iref::IriBuf,
+    #[serde(default = "default_ldap_base_dn")]
+    pub base_dn: String,
+    #[serde(default = "default_ldap_admin_pw")]
+    pub admin_dn: String,
+    #[serde(default = "default_ldap_admin_pw")]
+    pub admin_pw: String,
+    #[serde(default = "default_ldap_user_filter")]
+    pub user_filter: String,
+    #[serde(default)]
+    pub attr_map: LdapAttrMap,
+}
+
+impl Default for LDAP {
+    fn default() -> Self {
+        Self {
+            uri: default_ldap_uri(),
+            base_dn: default_ldap_base_dn(),
+            admin_dn: default_ldap_admin_dn(),
+            admin_pw: default_ldap_admin_pw(),
+            user_filter: default_ldap_user_filter(),
+            attr_map: LdapAttrMap::default(),
+        }
+    }
+}
+
+fn default_ldap_uri() -> iref::IriBuf {
+    iref::IriBuf::new("ldapi:///").unwrap()
+}
+
+fn default_ldap_base_dn() -> String {
+    "dc=example,dc=com".to_string()
+}
+
+fn default_ldap_admin_dn() -> String {
+    "cn=admin,dc=example,dc=com".to_string()
+}
+
+fn default_ldap_admin_pw() -> String {
+    "admin_password".to_string()
+}
+
+fn default_ldap_user_filter() -> String {
+    "(&(objectClass=inetOrgPerson)(uid={username}))".to_string()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LdapAttrMap {
+    #[serde(default = "default_attr_username")]
     pub username: String,
+    #[serde(default = "default_attr_first_name")]
     pub first_name: String,
+    #[serde(default = "default_attr_last_name")]
     pub last_name: String,
+}
+
+fn default_attr_username() -> String {
+    "uid".to_string()
+}
+fn default_attr_first_name() -> String {
+    "givenName".to_string()
+}
+fn default_attr_last_name() -> String {
+    "sn".to_string()
 }
 
 impl Default for LdapAttrMap {
     fn default() -> Self {
         Self {
-            username: "uid".to_string(),
-            first_name: "cn".to_string(),
-            last_name: "sn".to_string(),
+            username: default_attr_username(),
+            first_name: default_attr_first_name(),
+            last_name: default_attr_last_name(),
         }
     }
 }

@@ -44,35 +44,71 @@ async fn try_local_login(
 }
 
 async fn try_ldap_login(settings: &Settings, username: &str, password: &str) -> Result<UserFields> {
-    let (conn, mut ldap) = LdapConnAsync::new("ldap://localhost:2389").await?;
+    let (conn, mut ldap) = LdapConnAsync::new(settings.auth.ldap.uri.as_str()).await?;
     ldap3::drive!(conn);
+    tracing::trace!(admin_dn = %settings.auth.ldap.admin_dn, "Binding as LDAP Admin user");
+    ldap.simple_bind(
+        settings.auth.ldap.admin_dn.as_str(),
+        settings.auth.ldap.admin_pw.as_str(),
+    )
+    .await?
+    .success()?;
+
     let vars = [("username".to_string(), username.to_string())].into();
-    let bind_dn = strfmt(settings.auth.ldap_user_dn.as_str(), &vars)?;
-    tracing::trace!(%bind_dn, "Binding on LDAP");
-    ldap.simple_bind(bind_dn.as_str(), password).await?;
+    let filter = strfmt(settings.auth.ldap.user_filter.as_str(), &vars)?;
+    tracing::trace!(%filter, base_dn = %settings.auth.ldap.base_dn,"Searching for user attributes");
     let (rs, _res) = ldap
         .search(
-            bind_dn.as_str(),
-            Scope::Base,
-            "",
+            settings.auth.ldap.base_dn.as_str(),
+            Scope::Subtree,
+            filter.as_str(),
             vec![
-                settings.auth.ldap_attr_map.username.as_str(),
-                settings.auth.ldap_attr_map.first_name.as_str(),
-                settings.auth.ldap_attr_map.last_name.as_str(),
+                settings.auth.ldap.attr_map.username.as_str(),
+                settings.auth.ldap.attr_map.first_name.as_str(),
+                settings.auth.ldap.attr_map.last_name.as_str(),
             ],
         )
         .await?
         .success()?;
-    let user = rs
+
+    let first_search_result = rs
         .into_iter()
         .next()
         .ok_or(eyre!("Expected to find the user after a successful bind"))?;
-    tracing::info!(entity = ?SearchEntry::construct(user), "user entity");
+    let entity = SearchEntry::construct(first_search_result);
+    tracing::info!(entity = ?entity, "Found user entity");
+    // ldap.unbind().await?;
+
+    tracing::trace!(bind_dn = entity.dn, "Binding as LDAP authenticating user");
+    ldap.simple_bind(entity.dn.as_str(), password)
+        .await?
+        .success()?;
     ldap.unbind().await?;
+
+    tracing::trace!(bind_dn = entity.dn, "Successfully authenticated");
+    let empty_vec = Vec::new();
+    let username = entity
+        .attrs
+        .get(&settings.auth.ldap.attr_map.username)
+        .unwrap_or(&empty_vec)
+        .first()
+        .ok_or(eyre!(
+            "LDAP user entity is missing the mapped field for username"
+        ))?;
+    let first_name = entity
+        .attrs
+        .get(&settings.auth.ldap.attr_map.first_name)
+        .unwrap_or(&empty_vec)
+        .first();
+    let last_name = entity
+        .attrs
+        .get(&settings.auth.ldap.attr_map.last_name)
+        .unwrap_or(&empty_vec)
+        .first();
     Ok(UserFields {
-        username: "".to_string(),
-        first_name: None,
-        last_name: None,
+        username: username.to_owned(),
+        first_name: first_name.map(|s| s.to_owned()),
+        last_name: last_name.map(|s| s.to_owned()),
     })
 }
 
