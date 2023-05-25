@@ -10,11 +10,11 @@ use axum::{
     Json,
 };
 use chrono::{prelude::*, Duration};
+use common::auth::authenticate;
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::{
     documents::{AuthAttributes, AuthRelation, Token},
@@ -27,13 +27,13 @@ use base::setting::get_settings;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
-    pub id: Uuid,
+    pub username: String,
     pub exp: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RefreshClaims {
-    pub id: Uuid,
+    pub username: String,
     pub exp: usize,
 }
 
@@ -45,7 +45,7 @@ fn check_token(token: &str) -> Result<TokenData<Claims>, Error> {
     })?;
     let claims = decode::<Claims>(
         token,
-        &DecodingKey::from_secret(settings.keys.jwt_secret.as_ref()),
+        &DecodingKey::from_secret(settings.auth.jwt_secret.as_ref()),
         &Validation::new(Algorithm::HS256),
     );
     match claims {
@@ -71,17 +71,17 @@ pub async fn auth_middleware<B>(
     Ok(response)
 }
 
-fn auth_resource(token: Token, refresh: Option<Token>, user_id: Uuid) -> AuthResource {
+fn auth_resource(token: Token, refresh: Option<Token>, username: String) -> AuthResource {
     Resource {
         r#type: ResourceType::Auth,
-        id: user_id,
+        id: username.to_owned(),
         attributes: AuthAttributes { token, refresh },
         relationships: [(
             AuthRelation::User,
             Relationship {
                 data: Relation::Single(Related::User(ResourceIdentifier {
                     r#type: ResourceType::User,
-                    id: user_id,
+                    id: username,
                     meta: None,
                 })),
             },
@@ -102,7 +102,7 @@ pub async fn auth(
                     expires_at: Utc::now(),
                 },
                 None,
-                token_data.claims.id,
+                token_data.claims.username,
             )),
             included: vec![],
             links: HashMap::new(),
@@ -126,15 +126,23 @@ pub async fn login(
         title: "Error while checking user authentication".to_owned(),
         detail: Some(e.into()),
     })?;
+    let user = authenticate(login_data.username.as_str(), login_data.password.as_str())
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::UNAUTHORIZED,
+            title: "Authentication failed".to_string(),
+            detail: Some(e.into()),
+        })?;
+
     let token_expiry = Utc::now().add(Duration::days(7));
     let claims = Claims {
-        id: Uuid::new_v4(),
+        username: user.username.to_owned(),
         exp: token_expiry.timestamp() as usize,
     };
     let token = encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(settings.keys.jwt_secret.as_ref()),
+        &EncodingKey::from_secret(settings.auth.jwt_secret.as_ref()),
     )
     .map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -144,13 +152,13 @@ pub async fn login(
 
     let refresh_expiry = Utc::now().add(Duration::days(30));
     let refresh_claims = RefreshClaims {
-        id: claims.id,
+        username: user.username.to_owned(),
         exp: refresh_expiry.timestamp() as usize,
     };
     let refresh_token = encode(
         &Header::default(),
         &refresh_claims,
-        &EncodingKey::from_secret(settings.keys.jwt_secret.as_ref()),
+        &EncodingKey::from_secret(settings.auth.jwt_secret.as_ref()),
     )
     .map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -168,7 +176,7 @@ pub async fn login(
                 value: refresh_token,
                 expires_at: refresh_expiry,
             }),
-            claims.id,
+            claims.username,
         )),
         included: vec![],
         links: HashMap::new(),

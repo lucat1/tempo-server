@@ -45,7 +45,7 @@ pub enum ResourceType {
 }
 
 pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
-pub type AuthResource = Resource<Uuid, AuthAttributes, AuthRelation>;
+pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
 
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
@@ -120,7 +120,7 @@ pub enum Relation {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum Related {
-    User(ResourceIdentifier<Uuid>),
+    User(ResourceIdentifier<String>),
 
     Artist(ResourceIdentifier<Uuid>),
     Track(ResourceIdentifier<Uuid>),

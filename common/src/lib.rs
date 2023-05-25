@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod fetch;
 pub mod import;
 pub mod internal;

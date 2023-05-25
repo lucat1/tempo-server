@@ -39,6 +39,9 @@ pub struct Settings {
 
     #[serde(default)]
     pub keys: Keys,
+
+    #[serde(default)]
+    pub auth: Auth,
 }
 
 fn default_library_name() -> String {
@@ -287,9 +290,9 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     if set.search_index == PathBuf::default() {
         set.search_index = get_search_index(&set.library.path);
     }
-    if set.keys.jwt_secret == String::default() {
-        set.keys.jwt_secret = Alphanumeric.sample_string(&mut rand::thread_rng(), 32);
-        tracing::warn!(secret = %set.keys.jwt_secret, "Using random JWT secret. Please define one in the config to make authentication persistant across restarts");
+    if set.auth.jwt_secret == String::default() {
+        set.auth.jwt_secret = Alphanumeric.sample_string(&mut rand::thread_rng(), 32);
+        tracing::warn!(secret = %set.auth.jwt_secret, "Using random JWT secret. Please define one in the config to make authentication persistant across restarts");
     }
     tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
@@ -324,10 +327,30 @@ fn default_recurring() -> HashMap<TaskType, String> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
-    pub jwt_secret: String,
-
     pub lastfm_apikey: String,
     pub lastfm_shared_secret: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum AuthMethod {
+    Local,
+    LDAP,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Auth {
+    pub jwt_secret: String,
+    pub priority: Vec<AuthMethod>,
+
+    pub users: Vec<User>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct User {
+    pub username: String,
+    pub password: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 pub fn get_settings() -> Result<&'static Settings> {
