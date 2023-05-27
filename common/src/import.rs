@@ -286,7 +286,7 @@ pub async fn run(import: Import) -> Result<()> {
         artist_credit: artist_credit_active,
         artist: artist_active,
         ..
-    } = full_release.to_owned().into();
+    } = full_release.to_owned().dedup().into();
     ArtistEntity::insert_many(artist_active)
         .on_conflict(ARTIST_CONFLICT.to_owned())
         .exec(&tx)
@@ -350,7 +350,7 @@ pub async fn run(import: Import) -> Result<()> {
             artist_credit: artist_credit_active,
             artist_track_relation: artist_track_relation_active,
             artist: artist_active,
-        }: FullTrackActive = track.to_owned().into();
+        }: FullTrackActive = track.to_owned().dedup().into();
         ArtistEntity::insert_many(artist_active)
             .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(&tx)

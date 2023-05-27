@@ -11,6 +11,17 @@ pub struct FullRelease {
     pub artist: Vec<Artist>,
 }
 
+impl FullRelease {
+    pub fn dedup(mut self) -> Self {
+        self.artist_credit.sort_unstable_by_key(|a| a.id.clone());
+        self.artist_credit.dedup();
+        self.artist.sort_unstable_by_key(|a| a.id);
+        self.artist.dedup();
+
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FullReleaseActive {
     pub release: ReleaseActive,
@@ -40,15 +51,6 @@ impl From<FullRelease> for FullReleaseActive {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct FullTrackActive {
-    pub track: TrackActive,
-    pub artist_credit_track: Vec<ArtistCreditTrackActive>,
-    pub artist_credit: Vec<ArtistCreditActive>,
-    pub artist_track_relation: Vec<ArtistTrackRelationActive>,
-    pub artist: Vec<ArtistActive>,
-}
-
 #[derive(Serialize, Debug, Clone)]
 pub struct FullTrack {
     pub track: Track,
@@ -56,6 +58,26 @@ pub struct FullTrack {
     pub artist_credit: Vec<ArtistCredit>,
     pub artist_track_relation: Vec<ArtistTrackRelation>,
     pub artist: Vec<Artist>,
+}
+
+impl FullTrack {
+    pub fn dedup(mut self) -> Self {
+        self.artist_credit.sort_unstable_by_key(|a| a.id.clone());
+        self.artist_credit.dedup();
+        self.artist.sort_unstable_by_key(|a| a.id);
+        self.artist.dedup();
+
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FullTrackActive {
+    pub track: TrackActive,
+    pub artist_credit_track: Vec<ArtistCreditTrackActive>,
+    pub artist_credit: Vec<ArtistCreditActive>,
+    pub artist_track_relation: Vec<ArtistTrackRelationActive>,
+    pub artist: Vec<ArtistActive>,
 }
 
 impl From<FullTrack> for FullTrackActive {
