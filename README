@@ -1,3 +1,5 @@
+OLD README. Ignore.
+
 A music tagger pulling metadata from MusicBrainz and album arts from a iTunes
 and CoverArtArchive (more to come). Multi-valued tags support is a first-class
 citizen along with speedy performance (compared to Beets).

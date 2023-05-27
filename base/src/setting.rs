@@ -14,13 +14,12 @@ use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
 
 use super::image_format::ImageFormat;
-use super::util;
+use super::{util, CLI_NAME};
 
 lazy_static! {
     pub static ref SETTINGS: Arc<OnceCell<Settings>> = Arc::new(OnceCell::new());
 }
 
-const CLI_NAME: &str = "tagger";
 static DEFAULT_DB_FILE: &str = "lib.db";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
