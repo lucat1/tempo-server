@@ -18,9 +18,9 @@ matrix:
     - PLATFORM: aarch64-unknown-linux-musl
       IMAGE: aarch64-musl
       ARCH: aarch64
-    - PLATFORM: i686-unknown-linux-musl
-      IMAGE: i686-musl
-      ARCH: i686
+    # - PLATFORM: i686-unknown-linux-musl
+    #   IMAGE: i686-musl
+    #   ARCH: i686
     - PLATFORM: x86_64-unknown-linux-musl
       IMAGE: x86_64-musl
       ARCH: x86_64
