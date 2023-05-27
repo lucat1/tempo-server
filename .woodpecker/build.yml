@@ -9,7 +9,7 @@ pipeline:
     image: plugins/gitea-release
     settings:
       api_key:
-        from_secret: gitea_token
+        from_secret: codeberg_tooken
       base_url: https://codeberg.org
       files: target/server-${ARCH}
 
