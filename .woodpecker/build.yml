@@ -2,16 +2,16 @@ pipeline:
   build:
     image: ghcr.io/rust-cross/rust-musl-cross:${IMAGE}
     commands:
-      - cargo build --package web --release --target=${PLATFORM}
-      - musl-strip target/${PLATFORM}/release/web
-      - mv target/${PLATFORM}/release/web target/web-${ARCH}
+      - cargo build --package server --release --target=${PLATFORM}
+      - musl-strip target/${PLATFORM}/release/server
+      - mv target/${PLATFORM}/release/server target/server-${ARCH}
   deploy:
     image: plugins/gitea-release
     settings:
       api_key:
         from_secret: gitea_token
       base_url: https://codeberg.org
-      files: target/web-${ARCH}
+      files: target/server-${ARCH}
 
 matrix:
   include:
