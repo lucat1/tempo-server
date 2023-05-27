@@ -1,5 +1,5 @@
 [workspace]
-members = ["entity", "tag", "base", "common", "migration", "web"]
+members = ["entity", "tag", "base", "common", "migration", "server"]
 
 [profile.release]
 opt-level = "z"     # Optimize for size.
