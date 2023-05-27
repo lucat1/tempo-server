@@ -6,11 +6,15 @@ publish = false
 license = "AGPL-3.0-or-later"
 
 [features]
-default = ["flac", "id3"]
+default = ["flac", "id3", "sqlite", "postgres"]
 ape = ["tag/ape"]
 flac = ["tag/flac"]
 id3 = ["tag/id3"]
 mp4 = ["tag/mp4"]
+
+sqlite = ["sea-orm/sqlx-sqlite"]
+mysql = ["sea-orm/sqlx-mysql"]
+postgres = ["sea-orm/sqlx-postgres"]
 
 [dependencies]
 base = { path = "../base" }
@@ -41,7 +45,7 @@ futures = "0.3"
 serde = { version = "1.0", features = ["rc"] }
 itertools = "0.10.4"
 serde_derive = { version = "1.0" }
-sea-orm = { version = "0.11", features = [ "sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-time", "debug-print" ] }
+sea-orm = { version = "0.11", features = [ "runtime-tokio-rustls", "macros", "with-time", "debug-print" ] }
 
 mime = "0.3.16"
 serde_json = "1.0.85"
