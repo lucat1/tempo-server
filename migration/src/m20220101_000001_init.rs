@@ -14,10 +14,20 @@ impl MigrationTrait for Migration {
         let builder = manager.get_database_backend();
         let schema = Schema::new(builder);
         manager
-            .exec_stmt(schema.create_table_from_entity(ArtistCreditEntity))
+            .exec_stmt(schema.create_table_from_entity(ArtistEntity))
             .await?;
         manager
-            .exec_stmt(schema.create_table_from_entity(ArtistEntity))
+            .exec_stmt(schema.create_table_from_entity(ReleaseEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(MediumEntity))
+            .await?;
+        manager
+            .exec_stmt(schema.create_table_from_entity(TrackEntity))
+            .await?;
+
+        manager
+            .exec_stmt(schema.create_table_from_entity(ArtistCreditEntity))
             .await?;
         manager
             .exec_stmt(schema.create_table_from_entity(ArtistCreditReleaseEntity))
@@ -27,15 +37,6 @@ impl MigrationTrait for Migration {
             .await?;
         manager
             .exec_stmt(schema.create_table_from_entity(ArtistTrackRelationEntity))
-            .await?;
-        manager
-            .exec_stmt(schema.create_table_from_entity(MediumEntity))
-            .await?;
-        manager
-            .exec_stmt(schema.create_table_from_entity(ReleaseEntity))
-            .await?;
-        manager
-            .exec_stmt(schema.create_table_from_entity(TrackEntity))
             .await?;
         Ok(())
     }
