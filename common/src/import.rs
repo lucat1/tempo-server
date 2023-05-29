@@ -287,31 +287,39 @@ pub async fn run(import: Import) -> Result<()> {
         artist: artist_active,
         ..
     } = full_release.to_owned().dedup().into();
-    ArtistEntity::insert_many(artist_active)
-        .on_conflict(ARTIST_CONFLICT.to_owned())
-        .exec(&tx)
-        .await
-        .ignore_none()?;
+    if artist_active.len() > 0 {
+        ArtistEntity::insert_many(artist_active)
+            .on_conflict(ARTIST_CONFLICT.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+    }
     ReleaseEntity::insert(release_active)
         .on_conflict(RELEASE_CONFLICT.to_owned())
         .exec(&tx)
         .await
         .ignore_none()?;
-    ArtistCreditEntity::insert_many(artist_credit_active)
-        .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-        .exec(&tx)
-        .await
-        .ignore_none()?;
-    ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
-        .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
-        .exec(&tx)
-        .await
-        .ignore_none()?;
-    MediumEntity::insert_many(medium_active)
-        .on_conflict(MEDIUM_CONFLICT.to_owned())
-        .exec(&tx)
-        .await
-        .ignore_none()?;
+    if artist_credit_active.len() > 0 {
+        ArtistCreditEntity::insert_many(artist_credit_active)
+            .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+    }
+    if artist_credit_release_active.len() > 0 {
+        ArtistCreditReleaseEntity::insert_many(artist_credit_release_active)
+            .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+    }
+    if medium_active.len() > 0 {
+        MediumEntity::insert_many(medium_active)
+            .on_conflict(MEDIUM_CONFLICT.to_owned())
+            .exec(&tx)
+            .await
+            .ignore_none()?;
+    }
 
     if let Some((pic, image)) = picture.as_mut() {
         let cover_name = library.art.image_name.clone();
@@ -351,31 +359,39 @@ pub async fn run(import: Import) -> Result<()> {
             artist_track_relation: artist_track_relation_active,
             artist: artist_active,
         }: FullTrackActive = track.to_owned().dedup().into();
-        ArtistEntity::insert_many(artist_active)
-            .on_conflict(ARTIST_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
-        ArtistCreditEntity::insert_many(artist_credit_active)
-            .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
+        if artist_active.len() > 0 {
+            ArtistEntity::insert_many(artist_active)
+                .on_conflict(ARTIST_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
+        if artist_credit_active.len() > 0 {
+            ArtistCreditEntity::insert_many(artist_credit_active)
+                .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
         TrackEntity::insert(track_active)
             .on_conflict(TRACK_CONFLICT.to_owned())
             .exec(&tx)
             .await
             .ignore_none()?;
-        ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
-            .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
-        ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
-            .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
+        if artist_credit_track_active.len() > 0 {
+            ArtistCreditTrackEntity::insert_many(artist_credit_track_active)
+                .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
+        if artist_track_relation_active.len() > 0 {
+            ArtistTrackRelationEntity::insert_many(artist_track_relation_active)
+                .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
     }
     tx.commit().await?;
     Ok(())
