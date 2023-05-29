@@ -12,8 +12,8 @@ pub struct Model {
     pub id: Uuid,
     pub medium_id: Uuid,
     pub title: String,
-    pub length: u32,
-    pub number: u32,
+    pub length: i32,
+    pub number: i32,
     pub genres: crate::Genres,
     pub recording_id: Uuid,
 

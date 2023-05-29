@@ -153,9 +153,9 @@ async fn download(
             role: PictureType::Artist.to_string(),
             format,
             description,
-            width: img.width(),
-            height: img.height(),
-            size: len as u32,
+            width: img.width() as i32,
+            height: img.height() as i32,
+            size: len as i32,
             path: path_str,
         }));
     } else {

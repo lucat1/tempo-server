@@ -191,9 +191,9 @@ pub async fn run(import: Import) -> Result<()> {
             role: pic.picture_type.to_string(),
             format: library.art.format,
             description: None,
-            width,
-            height,
-            size,
+            width: width as i32,
+            height: height as i32,
+            size: size as i32,
             // will be replaced afterwards
             id: "".to_string(),
             path: "".to_string(),

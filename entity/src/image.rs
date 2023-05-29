@@ -10,9 +10,9 @@ pub struct Model {
     pub role: String,
     pub format: base::ImageFormat,
     pub description: Option<String>,
-    pub width: u32,
-    pub height: u32,
-    pub size: u32,
+    pub width: i32,
+    pub height: i32,
+    pub size: i32,
     #[sea_orm(unique)]
     pub path: String,
 }

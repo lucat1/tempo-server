@@ -123,7 +123,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
         id: entity.id,
         attributes: ReleaseAttributes {
             title: entity.title.to_owned(),
-            disctotal: mediums.len() as u32,
+            disctotal: mediums.len() as i32,
             tracktotal: mediums.iter().fold(0, |acc, m| acc + m.tracks),
             genres: entity.genres.0.to_owned(),
 

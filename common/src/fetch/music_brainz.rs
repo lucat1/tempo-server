@@ -80,11 +80,11 @@ pub struct Area {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Medium {
     pub id: Option<Uuid>,
-    pub position: Option<u32>,
+    pub position: Option<i32>,
     #[serde(rename = "track-offset")]
-    pub track_offset: Option<u32>,
+    pub track_offset: Option<i32>,
     #[serde(rename = "track-count")]
-    pub track_count: u32,
+    pub track_count: i32,
     pub tracks: Option<Vec<Track>>,
     pub format: Option<String>,
 }
@@ -94,8 +94,8 @@ pub struct Track {
     pub id: Uuid,
     pub recording: Recording,
     pub number: String,
-    pub position: u32,
-    pub length: Option<u32>,
+    pub position: i32,
+    pub length: Option<i32>,
     pub title: String,
 }
 
@@ -104,7 +104,7 @@ pub struct Recording {
     pub relations: Vec<Relation>,
     pub disambiguation: String,
     pub id: Uuid,
-    pub length: Option<u32>,
+    pub length: Option<i32>,
     pub video: bool,
     #[serde(rename = "first-release-date")]
     pub first_release_date: Option<String>,

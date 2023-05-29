@@ -13,9 +13,9 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub release_id: Uuid,
-    pub position: u32,
-    pub tracks: u32,
-    pub track_offset: u32,
+    pub position: i32,
+    pub tracks: i32,
+    pub track_offset: i32,
     pub format: Option<String>,
 }
 

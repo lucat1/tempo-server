@@ -37,9 +37,9 @@ pub struct ImageAttributes {
     pub format: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub width: u32,
-    pub height: u32,
-    pub size: u32,
+    pub width: i32,
+    pub height: i32,
+    pub size: i32,
 }
 
 #[derive(Serialize, Hash, PartialEq, Eq)]
@@ -90,8 +90,8 @@ pub enum ArtistInclude {
 #[derive(Serialize)]
 pub struct ReleaseAttributes {
     pub title: String,
-    pub disctotal: u32,
-    pub tracktotal: u32,
+    pub disctotal: i32,
+    pub tracktotal: i32,
     pub genres: Vec<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -144,10 +144,10 @@ pub enum ReleaseInclude {
 
 #[derive(Serialize)]
 pub struct MediumAttributes {
-    pub position: u32,
-    pub tracks: u32,
+    pub position: i32,
+    pub tracks: i32,
     #[serde(rename = "track-offset")]
-    pub track_offset: u32,
+    pub track_offset: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
 }
@@ -172,12 +172,12 @@ pub enum MediumInclude {
 #[derive(Serialize)]
 pub struct TrackAttributes {
     pub title: String,
-    pub track: u32,
+    pub track: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub disc: Option<u32>,
+    pub disc: Option<i32>,
     pub genres: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bpm: Option<u32>,
+    pub bpm: Option<i32>,
 
     #[serde(rename = "recording-mbid")]
     pub recording_mbid: Uuid,
@@ -187,19 +187,19 @@ pub struct TrackAttributes {
     pub comments: Option<String>,
 
     pub mimetype: String,
-    pub duration: u32,
+    pub duration: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub framerate: Option<u32>,
+    pub framerate: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub framecount: Option<u32>,
+    pub framecount: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub channels: Option<u32>,
+    pub channels: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitrate: Option<u32>,
+    pub bitrate: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bitdepth: Option<u32>,
+    pub bitdepth: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<u32>,
+    pub size: Option<i32>,
 }
 
 #[derive(Serialize, Hash, PartialEq, Eq)]
