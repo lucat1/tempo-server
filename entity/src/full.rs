@@ -15,6 +15,10 @@ impl FullRelease {
     pub fn dedup(mut self) -> Self {
         self.artist_credit.sort_unstable_by_key(|a| a.id.clone());
         self.artist_credit.dedup();
+        self.artist_credit_release.sort_unstable_by_key(|a| {
+            a.artist_credit_id.to_owned() + a.release_id.to_string().as_str()
+        });
+        self.artist_credit_release.dedup();
         self.artist.sort_unstable_by_key(|a| a.id);
         self.artist.dedup();
 
@@ -64,8 +68,19 @@ impl FullTrack {
     pub fn dedup(mut self) -> Self {
         self.artist_credit.sort_unstable_by_key(|a| a.id.clone());
         self.artist_credit.dedup();
+        self.artist_credit_track.sort_unstable_by_key(|a| {
+            a.artist_credit_id.to_owned() + a.track_id.to_string().as_str()
+        });
+        self.artist_credit_track.dedup();
         self.artist.sort_unstable_by_key(|a| a.id);
         self.artist.dedup();
+        self.artist_track_relation.sort_unstable_by_key(|a| {
+            a.artist_id.to_string()
+                + a.track_id.to_string().as_str()
+                + a.relation_type.to_string().as_str()
+                + a.relation_value.as_str()
+        });
+        self.artist_track_relation.dedup();
 
         self
     }
