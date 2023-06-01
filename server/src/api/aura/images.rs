@@ -4,13 +4,15 @@ use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
-use axum::Json;
 use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
-use crate::api::documents::ImageAttributes;
-use crate::api::jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType};
-use crate::api::AppState;
+use crate::api::{
+    documents::ImageAttributes,
+    extract::Json,
+    jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType},
+    AppState,
+};
 
 pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
     ImageResource {
@@ -50,7 +52,7 @@ pub async fn image(
             title: "Image not found".to_string(),
             detail: Some("Not found".into()),
         })?;
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         data: DocumentData::Single(entity_to_resource(&image)),
         included: Vec::new(),
         links: HashMap::new(),

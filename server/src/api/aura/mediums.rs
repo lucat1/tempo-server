@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
     QueryOrder, TransactionTrait,
@@ -10,12 +9,15 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::{releases, tracks};
-use crate::api::documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude};
-use crate::api::jsonapi::{
-    dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
-    MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
-};
 use crate::api::AppState;
+use crate::api::{
+    documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude},
+    extract::Json,
+    jsonapi::{
+        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
+        MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
+    },
+};
 
 #[derive(Default)]
 pub struct MediumRelated {
@@ -186,7 +188,7 @@ pub async fn mediums(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -234,7 +236,7 @@ pub async fn medium(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),

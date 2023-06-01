@@ -1,11 +1,12 @@
 use axum::extract::Query;
 use axum::http::StatusCode;
-use axum::Json;
-use base::setting::get_settings;
 use eyre::Result;
 use fs_extra::dir::get_size;
 use serde::{Deserialize, Serialize};
 use std::{fs::read_dir, path::PathBuf};
+
+use crate::api::extract::Json;
+use base::setting::get_settings;
 
 #[derive(Deserialize)]
 pub struct ListRequest {
@@ -69,7 +70,7 @@ pub async fn list(query: Query<ListRequest>) -> Result<Json<List>, StatusCode> {
             })
         })
         .collect();
-    Ok(Json(List {
+    Ok(Json::new(List {
         name: path
             .file_name()
             .map(|s| s.to_string_lossy().to_string())

@@ -7,13 +7,14 @@ mod tracks;
 
 use std::collections::HashMap;
 
-use axum::{middleware::from_fn, routing::get, Json, Router};
+use axum::{middleware::from_fn, routing::get, Router};
 
-use super::AppState;
 use super::{
     auth::{auth, auth_middleware, login},
     documents::ServerAttributes,
+    extract::Json,
     jsonapi::{Document, DocumentData, ResourceType, ServerResource},
+    AppState,
 };
 
 pub fn router() -> Router<AppState> {
@@ -36,7 +37,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn server() -> Json<Document<ServerResource>> {
-    Json(Document {
+    Json::new(Document {
         data: DocumentData::Single(ServerResource {
             r#type: ResourceType::Server,
             id: "0".to_string(),

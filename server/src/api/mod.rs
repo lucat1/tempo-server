@@ -1,6 +1,7 @@
 mod aura;
 pub mod auth;
 pub mod documents;
+pub mod extract;
 mod internal;
 pub mod jsonapi;
 

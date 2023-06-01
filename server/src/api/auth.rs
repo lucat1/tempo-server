@@ -1,13 +1,11 @@
 use std::{collections::HashMap, ops::Add};
 
 use axum::{
-    extract::TypedHeader,
     headers::authorization::{Authorization, Bearer},
     http::Request,
     http::StatusCode,
     middleware::Next,
     response::Response,
-    Json,
 };
 use chrono::{prelude::*, Duration};
 use common::auth::authenticate;
@@ -16,8 +14,9 @@ use jsonwebtoken::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{
+use crate::api::{
     documents::{AuthAttributes, AuthRelation, Token},
+    extract::{Json, TypedHeader},
     jsonapi::{
         AuthResource, Document, DocumentData, Error, Related, Relation, Relationship, Resource,
         ResourceIdentifier, ResourceType,
@@ -62,10 +61,11 @@ fn check_token(token: &str) -> Result<TokenData<Claims>, Error> {
 }
 
 pub async fn auth_middleware<B>(
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+    auth_header: TypedHeader<Authorization<Bearer>>,
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, Error> {
+    let auth = auth_header.inner();
     let _ = check_token(auth.token())?;
     let response = next.run(request).await;
     Ok(response)
@@ -92,10 +92,11 @@ fn auth_resource(token: Token, refresh: Option<Token>, username: String) -> Auth
 }
 
 pub async fn auth(
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+    auth_header: TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<Document<AuthResource>>, Error> {
+    let auth = auth_header.inner();
     match check_token(auth.token()) {
-        Ok(token_data) => Ok(Json(Document {
+        Ok(token_data) => Ok(Json::new(Document {
             data: DocumentData::Single(auth_resource(
                 Token {
                     value: auth.token().to_string(),
@@ -118,9 +119,9 @@ pub struct LoginData {
 }
 
 pub async fn login(
-    Json(login_data): Json<LoginData>,
+    json_login_data: Json<LoginData>,
 ) -> Result<Json<Document<AuthResource>>, Error> {
-    // TODO: check credentials against a user store
+    let login_data = json_login_data.inner();
     let settings = get_settings().map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Error while checking user authentication".to_owned(),
@@ -166,7 +167,7 @@ pub async fn login(
         detail: Some(e.into()),
     })?;
 
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         data: DocumentData::Single(auth_resource(
             Token {
                 value: token,

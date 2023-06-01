@@ -1,6 +1,5 @@
 use axum::extract::Path;
 use axum::http::StatusCode;
-use axum::Json;
 use base::setting::get_settings;
 use eyre::Result;
 use lazy_static::lazy_static;
@@ -10,6 +9,7 @@ use std::{collections::HashMap, path::PathBuf};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::api::extract::Json;
 use common::import;
 
 lazy_static! {
@@ -41,7 +41,8 @@ pub struct ImportError {
     message: String,
 }
 
-pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> {
+pub async fn begin(json_body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> {
+    let body = json_body.inner();
     let path = get_settings()
         .map_err(|error| {
             tracing::warn! { %error, "Could not get settings" };
@@ -61,7 +62,7 @@ pub async fn begin(body: Json<ImportBegin>) -> Result<Json<Import>, StatusCode> 
     };
     let mut imports = JOBS.lock().await;
     imports.insert(import.id, import.clone());
-    Ok(Json(import))
+    Ok(Json::new(import))
 }
 
 pub async fn get(Path(job): Path<Uuid>) -> Result<Json<Import>, StatusCode> {
@@ -69,19 +70,20 @@ pub async fn get(Path(job): Path<Uuid>) -> Result<Json<Import>, StatusCode> {
     imports
         .get(&job)
         .ok_or(StatusCode::NOT_FOUND)
-        .map(|v| Json(v.clone()))
+        .map(|v| Json::new(v.clone()))
 }
 
 pub async fn edit(
     Path(job): Path<Uuid>,
-    edit: Json<ImportEdit>,
+    json_edit: Json<ImportEdit>,
 ) -> Result<Json<Import>, StatusCode> {
+    let edit = json_edit.inner();
     let mut imports = JOBS.lock().await;
     let mut import = imports
         .get(&job)
         .ok_or(StatusCode::NOT_FOUND)
         .map(|v| v.clone())?;
-    match edit.0 {
+    match edit {
         ImportEdit::MbId(id) => {
             if !import
                 .import
@@ -102,30 +104,30 @@ pub async fn edit(
         }
     }
     imports.insert(job, import.clone());
-    Ok(Json(import))
+    Ok(Json::new(import))
 }
 
 pub async fn run(Path(job): Path<Uuid>) -> Result<Json<()>, (StatusCode, Json<ImportError>)> {
     let mut imports = JOBS.lock().await;
     let import = imports.remove(&job).ok_or((
         StatusCode::NOT_FOUND,
-        Json(ImportError {
+        Json::new(ImportError {
             message: "".to_string(),
         }),
     ))?;
     import::run(import.import).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ImportError {
+            Json::new(ImportError {
                 message: e.to_string(),
             }),
         )
     })?;
-    Ok(Json(()))
+    Ok(Json::new(()))
 }
 
 pub async fn delete(Path(job): Path<Uuid>) -> Result<Json<()>, StatusCode> {
     let mut imports = JOBS.lock().await;
     imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
-    Ok(Json(()))
+    Ok(Json::new(()))
 }

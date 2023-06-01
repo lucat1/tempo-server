@@ -1,6 +1,6 @@
 mod api;
-mod scheduling;
 pub mod fetch;
+mod scheduling;
 pub mod search;
 pub mod tasks;
 

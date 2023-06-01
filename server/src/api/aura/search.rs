@@ -1,6 +1,5 @@
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
-use axum::Json;
 use eyre::{eyre, Result};
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, TransactionTrait,
@@ -12,11 +11,14 @@ use tantivy::{collector::TopDocs, query::QueryParser, schema::Value, ReloadPolic
 use uuid::Uuid;
 
 use super::{artists, releases, tracks};
-use crate::api::jsonapi::{
-    dedup, ArtistResource, Document, DocumentData, Error, ReleaseResource, ResourceMetaKey,
-    TrackResource,
+use crate::api::{
+    extract::Json,
+    jsonapi::{
+        dedup, ArtistResource, Document, DocumentData, Error, ReleaseResource, ResourceMetaKey,
+        TrackResource,
+    },
+    AppState,
 };
-use crate::api::AppState;
 use crate::search::{
     documents::{artist_fields, release_fields, track_fields},
     get_indexes,
@@ -230,7 +232,7 @@ pub async fn search(
     results.append(&mut releases);
     results.append(&mut tracks);
 
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         links: HashMap::new(),
         data: DocumentData::Multi(results),
         included: dedup(Vec::new()),

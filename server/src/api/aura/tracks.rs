@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::{Request, StatusCode};
-use axum::{body::Body, response::IntoResponse, Json};
+use axum::{body::Body, response::IntoResponse};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
     QueryOrder, TransactionTrait,
@@ -11,14 +11,17 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use super::{artists, mediums};
-use crate::api::documents::{
-    ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
+use crate::api::{
+    documents::{
+        ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
+    },
+    extract::Json,
+    jsonapi::{
+        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta,
+        Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType, TrackResource,
+    },
+    AppState,
 };
-use crate::api::jsonapi::{
-    dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta, Query,
-    Related, Relation, Relationship, ResourceIdentifier, ResourceType, TrackResource,
-};
-use crate::api::AppState;
 
 #[derive(Default)]
 pub struct TrackRelated {
@@ -278,7 +281,7 @@ pub async fn tracks(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -314,7 +317,7 @@ pub async fn track(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json(Document {
+    Ok(Json::new(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),
