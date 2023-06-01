@@ -12,10 +12,11 @@ use tantivy::{collector::TopDocs, query::QueryParser, schema::Value, ReloadPolic
 use uuid::Uuid;
 
 use super::{artists, releases, tracks};
-use crate::jsonapi::{
-    dedup, AppState, ArtistResource, Document, DocumentData, Error, ReleaseResource,
-    ResourceMetaKey, TrackResource,
+use crate::api::jsonapi::{
+    dedup, ArtistResource, Document, DocumentData, Error, ReleaseResource, ResourceMetaKey,
+    TrackResource,
 };
+use crate::api::AppState;
 use crate::search::{
     documents::{artist_fields, release_fields, track_fields},
     get_indexes,

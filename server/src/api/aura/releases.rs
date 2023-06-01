@@ -10,14 +10,15 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use super::{artists, images, mediums, AppState};
-use crate::documents::{
+use super::{artists, images, mediums};
+use crate::api::documents::{
     ArtistCreditAttributes, MediumInclude, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
 };
-use crate::jsonapi::{
+use crate::api::jsonapi::{
     dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta, Query,
     Related, Relation, Relationship, ReleaseResource, ResourceIdentifier, ResourceType,
 };
+use crate::api::AppState;
 
 #[derive(Default)]
 pub struct ReleaseRelated {

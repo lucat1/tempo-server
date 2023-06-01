@@ -7,7 +7,7 @@ use axum::{
     Router,
 };
 
-use crate::jsonapi::AppState;
+use super::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()

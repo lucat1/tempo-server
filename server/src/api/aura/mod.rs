@@ -9,10 +9,11 @@ use std::collections::HashMap;
 
 use axum::{middleware::from_fn, routing::get, Json, Router};
 
-use crate::{
+use super::AppState;
+use super::{
     auth::{auth, auth_middleware, login},
     documents::ServerAttributes,
-    jsonapi::{AppState, Document, DocumentData, ResourceType, ServerResource},
+    jsonapi::{Document, DocumentData, ResourceType, ServerResource},
 };
 
 pub fn router() -> Router<AppState> {

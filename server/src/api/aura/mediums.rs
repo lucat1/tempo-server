@@ -9,12 +9,13 @@ use sea_orm::{
 };
 use uuid::Uuid;
 
-use super::{releases, tracks, AppState};
-use crate::documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude};
-use crate::jsonapi::{
+use super::{releases, tracks};
+use crate::api::documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude};
+use crate::api::jsonapi::{
     dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
     MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
 };
+use crate::api::AppState;
 
 #[derive(Default)]
 pub struct MediumRelated {

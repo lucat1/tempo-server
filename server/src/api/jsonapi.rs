@@ -8,7 +8,7 @@ use axum::{
 use itertools::Itertools;
 use sea_orm::{
     sea_query::{IntoIden, IntoValueTuple},
-    ColumnTrait, Cursor, DbConn, Order, SelectorTrait,
+    ColumnTrait, Cursor, Order, SelectorTrait,
 };
 use serde::{Deserialize, Serialize};
 use serde_valid::Validate;
@@ -16,19 +16,13 @@ use std::{cmp::Eq, collections::HashMap, default::Default, error::Error as StdEr
 use uuid::Uuid;
 
 use super::documents::{
-    ArtistAttributes, ArtistRelation, MediumAttributes, MediumRelation, ReleaseAttributes,
-    ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
-};
-use crate::documents::{
-    ArtistCreditAttributes, AuthAttributes, AuthRelation, ImageAttributes, ImageRelation,
-    RecordingAttributes,
+    ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
+    ImageAttributes, ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes,
+    ReleaseAttributes, ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes,
+    TrackRelation,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
-pub static MAX_PAGE_SIZE: u32 = 20;
-
-#[derive(Clone)]
-pub struct AppState(pub DbConn);
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -176,7 +170,7 @@ fn default_page_size() -> u32 {
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash, Validate)]
 pub struct Page<Id: Default> {
     #[serde(default = "default_page_size")]
-    #[validate(maximum = 20)]
+    #[validate(maximum = 20)] // max page size
     pub size: u32,
     pub before: Option<Id>,
     pub after: Option<Id>,

@@ -16,7 +16,7 @@ use jsonwebtoken::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use super::{
     documents::{AuthAttributes, AuthRelation, Token},
     jsonapi::{
         AuthResource, Document, DocumentData, Error, Related, Relation, Relationship, Resource,

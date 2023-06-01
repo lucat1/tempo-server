@@ -10,14 +10,15 @@ use sea_orm::{
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use super::{artists, mediums, AppState};
-use crate::documents::{
+use super::{artists, mediums};
+use crate::api::documents::{
     ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
 };
-use crate::jsonapi::{
+use crate::api::jsonapi::{
     dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta, Query,
     Related, Relation, Relationship, ResourceIdentifier, ResourceType, TrackResource,
 };
+use crate::api::AppState;
 
 #[derive(Default)]
 pub struct TrackRelated {

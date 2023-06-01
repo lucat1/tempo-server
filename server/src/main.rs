@@ -1,23 +1,14 @@
-mod aura;
-pub mod auth;
-pub mod documents;
-pub mod fetch;
-mod internal;
-pub mod jsonapi;
+mod api;
 mod scheduling;
+pub mod fetch;
 pub mod search;
 pub mod tasks;
 
-use axum::Router;
 use clap::Parser;
 use eyre::{eyre, Result, WrapErr};
 use sea_orm_migration::MigratorTrait;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::TraceLayer,
-};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
@@ -83,26 +74,14 @@ async fn main() -> Result<()> {
     }
     scheduling::start(&mut scheduler).await?;
 
-    let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_origin(Any)
-        .allow_headers(Any);
-    let tracing = TraceLayer::new_for_http();
-    let conn = get_database()?.clone();
-    let app = Router::new()
-        .nest("/aura", aura::router())
-        .nest("/internal", internal::router())
-        .layer(cors)
-        .layer(tracing)
-        .with_state(jsonapi::AppState(conn));
-
     let addr: SocketAddr = cli
         .listen_address
         .parse()
         .wrap_err(eyre!("Invalid listen address"))?;
     tracing::info! {%addr, "Listening"};
+    let router = api::router()?;
     axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+        .serve(router.into_make_service())
         .await
         .unwrap();
     Ok(())

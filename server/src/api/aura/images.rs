@@ -8,10 +8,9 @@ use axum::Json;
 use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
-use crate::documents::ImageAttributes;
-use crate::jsonapi::{
-    AppState, Document, DocumentData, Error, ImageResource, Included, ResourceType,
-};
+use crate::api::documents::ImageAttributes;
+use crate::api::jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType};
+use crate::api::AppState;
 
 pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
     ImageResource {
