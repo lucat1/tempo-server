@@ -8,12 +8,9 @@ use entity::{ArtistTrackRelationType, ArtistUrlType};
 
 #[derive(Serialize, Deserialize)]
 pub struct ServerAttributes {
-    #[serde(rename = "aura-version")]
-    pub aura_version: String,
+    pub tempo_version: String,
     pub server: String,
-    #[serde(rename = "server-version")]
     pub server_version: String,
-    #[serde(rename = "auth-required")]
     pub auth_required: bool,
     pub features: Vec<String>,
 }
@@ -108,12 +105,12 @@ pub struct ReleaseAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub original_day: Option<i16>,
 
-    #[serde(rename = "release-type")]
+    #[serde(rename = "release_type")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_type: Option<String>,
-    #[serde(rename = "release-mbid")]
+    #[serde(rename = "release_mbid")]
     pub release_mbid: Uuid,
-    #[serde(rename = "release-group-mbid")]
+    #[serde(rename = "release_group_mbid")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_group_mbid: Option<Uuid>,
 }
@@ -147,7 +144,6 @@ pub enum ReleaseInclude {
 pub struct MediumAttributes {
     pub position: i32,
     pub tracks: i32,
-    #[serde(rename = "track-offset")]
     pub track_offset: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
@@ -180,9 +176,7 @@ pub struct TrackAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bpm: Option<i32>,
 
-    #[serde(rename = "recording-mbid")]
     pub recording_mbid: Uuid,
-    #[serde(rename = "track-mbid")]
     pub track_mbid: Uuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comments: Option<String>,
@@ -231,6 +225,7 @@ pub struct AuthAttributes {
 #[derive(Serialize, Deserialize)]
 pub struct Token {
     pub value: String,
+    #[serde(with = "time::serde::iso8601")]
     pub expires_at: OffsetDateTime,
 }
 

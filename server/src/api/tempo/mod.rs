@@ -47,7 +47,7 @@ async fn server() -> Json<Document<ServerResource>> {
             r#type: ResourceType::Server,
             id: "0".to_string(),
             attributes: ServerAttributes {
-                aura_version: "0.2.0".to_string(),
+                tempo_version: "0.1.0".to_string(),
                 server: base::CLI_NAME.to_string(),
                 server_version: base::VERSION.to_string(),
                 auth_required: true,

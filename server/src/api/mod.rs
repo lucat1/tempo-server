@@ -1,9 +1,9 @@
-mod aura;
 pub mod auth;
 pub mod documents;
 pub mod extract;
 mod internal;
 pub mod jsonapi;
+mod tempo;
 
 use axum::Router;
 use base::database::get_database;
@@ -25,7 +25,7 @@ pub fn router() -> Result<Router> {
     let tracing = TraceLayer::new_for_http();
     let conn = get_database()?.clone();
     Ok(Router::new()
-        .nest("/aura", aura::router())
+        .nest("/tempo", tempo::router())
         .nest("/internal", internal::router())
         .layer(cors)
         .layer(tracing)
