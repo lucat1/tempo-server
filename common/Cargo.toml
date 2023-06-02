@@ -18,7 +18,6 @@ entity = { path = "../entity" }
 tag = { path = "../tag" }
 
 async-once-cell = "0.4.2"
-chrono = "0.4.22"
 directories = "4.0.1"
 eyre = "0.6.8"
 image = "0.24.5"

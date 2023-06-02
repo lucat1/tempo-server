@@ -1,8 +1,8 @@
 use sea_orm::entity::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum RelationType {
     #[sea_orm(string_value = "a")]

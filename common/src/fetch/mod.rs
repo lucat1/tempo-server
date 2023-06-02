@@ -4,7 +4,6 @@ mod itunes;
 mod music_brainz;
 
 pub mod cover;
-use base::setting::Library;
 pub use cover::Cover;
 pub use music_brainz::ReleaseSearch;
 
@@ -31,8 +30,8 @@ pub struct SearchResult(
     pub Vec<entity::full::FullTrack>,
 );
 
-fn release_to_result(library: &Library, r: music_brainz::Release) -> Result<SearchResult> {
-    let release: entity::full::FullRelease = r.clone().into_full_release(library)?;
+fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
+    let release: entity::full::FullRelease = r.clone().into_full_release()?;
     let tracks: Vec<entity::full::FullTrack> = r
         .media
         .unwrap_or_default()
@@ -52,7 +51,7 @@ fn release_to_result(library: &Library, r: music_brainz::Release) -> Result<Sear
     Ok(SearchResult(release, tracks))
 }
 
-pub async fn search(library: &Library, release: &Release) -> Result<Vec<SearchResult>> {
+pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
     let start = Instant::now();
     let raw_artists = release.artists.join(", ");
     let artists = match raw_artists.as_str() {
@@ -88,13 +87,10 @@ pub async fn search(library: &Library, release: &Release) -> Result<Vec<SearchRe
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     tracing::trace! {prase_time = ?(json_time - req_time), "Completed the MusicBrainz JSON parse"};
-    json.releases
-        .into_iter()
-        .map(|r| release_to_result(library, r))
-        .collect()
+    json.releases.into_iter().map(release_to_result).collect()
 }
 
-pub async fn get(library: &Library, id: &str) -> Result<SearchResult> {
+pub async fn get(id: &str) -> Result<SearchResult> {
     let start = Instant::now();
     let res = CLIENT
         .get(format!(
@@ -139,5 +135,5 @@ pub async fn get(library: &Library, id: &str) -> Result<SearchResult> {
             .wrap_err(eyre!("Error while decoding JSON: {}", text))?;
     let json_time = start.elapsed();
     tracing::trace! {parse_time = ?(json_time - req_time), "Completed the MusicBrainz JSON parse"};
-    release_to_result(library, json)
+    release_to_result(json)
 }

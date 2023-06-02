@@ -36,10 +36,13 @@ where
         AxumJson::<T>::from_request(req, state)
             .await
             .map(|val| Json(val))
-            .map_err(|e| Error {
-                status: StatusCode::BAD_REQUEST,
-                title: "Invalid JSON input".to_string(),
-                detail: Some(e.into()),
+            .map_err(|e| {
+                tracing::trace!(error = ?e, "Invalid JSON request");
+                Error {
+                    status: StatusCode::BAD_REQUEST,
+                    title: "Invalid JSON input".to_string(),
+                    detail: Some(e.into()),
+                }
             })
     }
 }

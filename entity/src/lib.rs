@@ -15,6 +15,7 @@ mod image;
 mod image_artist;
 mod image_release;
 
+mod scrobble;
 mod user;
 
 pub mod conflict;
@@ -82,6 +83,10 @@ pub use image_release::Column as ImageReleaseColumn;
 pub use image_release::Entity as ImageReleaseEntity;
 pub use image_release::Model as ImageRelease;
 
+pub use scrobble::ActiveModel as ScrobbleActive;
+pub use scrobble::Column as ScrobbleColumn;
+pub use scrobble::Entity as ScrobbleEntity;
+pub use scrobble::Model as Scrobble;
 pub use user::ActiveModel as UserActive;
 pub use user::Column as UserColumn;
 pub use user::Entity as UserEntity;

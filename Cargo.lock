@@ -171,7 +171,7 @@ dependencies = [
  "num-traits",
  "rusticata-macros",
  "thiserror",
- "time 0.3.21",
+ "time",
 ]
 
 [[package]]
@@ -509,7 +509,6 @@ name = "base"
 version = "0.1.0"
 dependencies = [
  "async-once-cell",
- "chrono",
  "directories",
  "eyre",
  "image",
@@ -523,6 +522,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_derive",
+ "time",
  "toml 0.7.4",
  "tracing",
 ]
@@ -755,12 +755,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e3c5919066adf22df73762e50cffcde3a758f2a848b113b586d1f86728b673b"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-integer",
  "num-traits",
  "serde",
- "time 0.1.45",
- "wasm-bindgen",
  "winapi 0.3.9",
 ]
 
@@ -907,7 +904,6 @@ dependencies = [
  "argon2",
  "async-once-cell",
  "base",
- "chrono",
  "const_format",
  "directories",
  "entity",
@@ -1381,7 +1377,6 @@ name = "entity"
 version = "0.1.0"
 dependencies = [
  "base",
- "chrono",
  "eyre",
  "infer 0.12.0",
  "lazy_static",
@@ -1390,6 +1385,7 @@ dependencies = [
  "sea-query",
  "serde",
  "serde_json",
+ "time",
  "uuid",
 ]
 
@@ -2574,8 +2570,11 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "base",
  "entity",
  "sea-orm-migration",
+ "time",
+ "uuid",
 ]
 
 [[package]]
@@ -3870,7 +3869,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.21",
+ "time",
  "tracing",
  "url",
  "uuid",
@@ -3933,7 +3932,7 @@ dependencies = [
  "rust_decimal",
  "sea-query-derive",
  "serde_json",
- "time 0.3.21",
+ "time",
  "uuid",
 ]
 
@@ -3949,7 +3948,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.21",
+ "time",
  "uuid",
 ]
 
@@ -4223,7 +4222,6 @@ dependencies = [
  "axum-server",
  "base",
  "bytes",
- "chrono",
  "clap 4.3.0",
  "color-eyre",
  "common",
@@ -4269,6 +4267,7 @@ dependencies = [
  "tag",
  "tantivy",
  "text-diff",
+ "time",
  "tokio",
  "tokio-cron-scheduler",
  "tokio-stream",
@@ -4367,7 +4366,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "thiserror",
- "time 0.3.21",
+ "time",
 ]
 
 [[package]]
@@ -4503,7 +4502,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.21",
+ "time",
  "tokio-stream",
  "url",
  "uuid",
@@ -4666,7 +4665,6 @@ version = "0.1.0"
 dependencies = [
  "ape",
  "base",
- "chrono",
  "entity",
  "eyre",
  "id3",
@@ -4725,7 +4723,7 @@ dependencies = [
  "tantivy-query-grammar",
  "tempfile",
  "thiserror",
- "time 0.3.21",
+ "time",
  "uuid",
  "winapi 0.3.9",
 ]
@@ -4878,17 +4876,6 @@ dependencies = [
  "flate2",
  "jpeg-decoder",
  "weezl",
-]
-
-[[package]]
-name = "time"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b797afad3f312d1c66a56d11d0316f916356d11bd158fbc6ca6389ff6bf805a"
-dependencies = [
- "libc",
- "wasi 0.10.0+wasi-snapshot-preview1",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5738,7 +5725,7 @@ dependencies = [
  "oid-registry",
  "rusticata-macros",
  "thiserror",
- "time 0.3.21",
+ "time",
 ]
 
 [[package]]

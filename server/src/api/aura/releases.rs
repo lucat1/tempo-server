@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
-use chrono::Datelike;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
     QueryOrder, TransactionTrait,
@@ -130,12 +129,12 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             tracktotal: mediums.iter().fold(0, |acc, m| acc + m.tracks),
             genres: entity.genres.0.to_owned(),
 
-            year: entity.date.map(|d| d.year()),
-            month: entity.date.map(|d| d.month()),
-            day: entity.date.map(|d| d.day()),
-            original_year: entity.original_date.map(|d| d.year()),
-            original_month: entity.original_date.map(|d| d.month()),
-            original_day: entity.original_date.map(|d| d.day()),
+            year: entity.year,
+            month: entity.month,
+            day: entity.day,
+            original_year: entity.year,
+            original_month: entity.month,
+            original_day: entity.day,
 
             release_type: entity.release_type.to_owned(),
             release_mbid: entity.id,

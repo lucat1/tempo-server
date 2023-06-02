@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use chrono::NaiveDate;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
 
@@ -18,8 +17,12 @@ pub struct Model {
     pub label: Option<String>,
     pub catalog_no: Option<String>,
     pub status: Option<String>,
-    pub date: Option<NaiveDate>,
-    pub original_date: Option<NaiveDate>,
+    pub year: Option<i32>,
+    pub month: Option<i16>,
+    pub day: Option<i16>,
+    pub original_year: Option<i32>,
+    pub original_month: Option<i16>,
+    pub original_day: Option<i16>,
     pub script: Option<String>,
 
     pub path: Option<String>,
@@ -95,8 +98,12 @@ impl TryFrom<String> for Column {
             "label" => Ok(Column::Label),
             "catalog-no" => Ok(Column::CatalogNo),
             "status" => Ok(Column::Status),
-            "date" => Ok(Column::Date),
-            "original-date" => Ok(Column::OriginalDate),
+            "year" => Ok(Column::Year),
+            "month" => Ok(Column::Month),
+            "day" => Ok(Column::Day),
+            "original_year" => Ok(Column::OriginalYear),
+            "original_month" => Ok(Column::OriginalMonth),
+            "original_day" => Ok(Column::OriginalDay),
             "script" => Ok(Column::Script),
             &_ => Err("Invalid column name".to_owned()),
         }

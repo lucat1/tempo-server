@@ -84,8 +84,6 @@ pub struct Tagging {
     pub clear: bool,
     #[serde(default)]
     pub genre_limit: Option<usize>, // TODO: reimplement genre limits
-    #[serde(default = "default_true")]
-    pub use_original_date: bool,
 
     #[serde(default = "default_id3_separator")]
     pub id3_separator: String,
@@ -112,7 +110,6 @@ impl Default for Tagging {
         Self {
             clear: default_true(),
             genre_limit: Option::default(),
-            use_original_date: default_true(),
             id3_separator: default_id3_separator(),
             mp4_separator: default_separator(),
             ape_separator: default_separator(),

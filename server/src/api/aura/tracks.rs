@@ -258,8 +258,8 @@ pub async fn tracks(
     for (filter_key, filter_value) in opts.filter.iter() {
         tracks_query = tracks_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
-    let mut _mediums_cursor = tracks_query.cursor_by(entity::TrackColumn::Id);
-    let tracks_cursor = make_cursor(&mut _mediums_cursor, &opts.page);
+    let mut _tracks_cursor = tracks_query.cursor_by(entity::TrackColumn::Id);
+    let tracks_cursor = make_cursor(&mut _tracks_cursor, &opts.page);
     let tracks = tracks_cursor.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch all tracks".to_string(),

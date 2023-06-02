@@ -1,5 +1,6 @@
 use crate::rank::{Release, Track};
 use levenshtein::levenshtein;
+use std::ops::Sub;
 
 static TRACK_TITLE_FACTOR: usize = 5000;
 static TRACK_LENGTH_FACTOR: u32 = 300;
@@ -13,8 +14,12 @@ static RELEASE_TRACKS_FACTOR: u32 = 1000;
 static RELEASE_COUNTRY_FACTOR: usize = 5;
 static RELEASE_LABEL_FACTOR: usize = 5;
 static RELEASE_RELEASE_TYPE_FACTOR: usize = 50;
-static RELEASE_DATE_FACTOR: i64 = 100;
-static RELEASE_ORIGINAL_DATE_FACTOR: i64 = 100;
+static RELEASE_YEAR_FACTOR: i32 = 100;
+static RELEASE_MONTH_FACTOR: u8 = 50;
+static RELEASE_DAY_FACTOR: u8 = 10;
+static RELEASE_ORIGINAL_YEAR_FACTOR: i32 = 100;
+static RELEASE_ORIGINAL_MONTH_FACTOR: u8 = 50;
+static RELEASE_ORIGINAL_DAY_FACTOR: u8 = 10;
 
 pub trait Diff {
     fn diff(&self, other: &Self) -> i64;
@@ -80,12 +85,28 @@ impl Diff for Release {
                 },
             )
             .unwrap_or_default()
-            + if_both(self.date, other.date, |d1, d2| {
-                d1.signed_duration_since(d2).num_days().abs() * RELEASE_DATE_FACTOR
+            + if_both(self.year, other.year, |d1, d2| {
+                (d1.sub(d2).abs() * RELEASE_YEAR_FACTOR) as i64
             })
             .unwrap_or_default()
-            + if_both(self.original_date, other.original_date, |d1, d2| {
-                d1.signed_duration_since(d2).num_days().abs() * RELEASE_ORIGINAL_DATE_FACTOR
+            + if_both(self.month, other.month, |d1, d2| {
+                (d1.abs_diff(d2) * RELEASE_MONTH_FACTOR) as i64
+            })
+            .unwrap_or_default()
+            + if_both(self.day, other.day, |d1, d2| {
+                (d1.abs_diff(d2) * RELEASE_DAY_FACTOR) as i64
+            })
+            .unwrap_or_default()
+            + if_both(self.original_year, other.original_year, |d1, d2| {
+                (d1.sub(d2).abs() * RELEASE_ORIGINAL_YEAR_FACTOR) as i64
+            })
+            .unwrap_or_default()
+            + if_both(self.original_month, other.original_month, |d1, d2| {
+                (d1.abs_diff(d2) * RELEASE_ORIGINAL_MONTH_FACTOR) as i64
+            })
+            .unwrap_or_default()
+            + if_both(self.original_day, other.original_day, |d1, d2| {
+                (d1.abs_diff(d2) * RELEASE_ORIGINAL_DAY_FACTOR) as i64
             })
             .unwrap_or_default()
     }

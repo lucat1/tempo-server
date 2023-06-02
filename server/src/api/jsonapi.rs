@@ -18,8 +18,8 @@ use uuid::Uuid;
 use super::documents::{
     ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
     ImageAttributes, ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes,
-    ReleaseAttributes, ReleaseRelation, ServerAttributes, ServerRelation, TrackAttributes,
-    TrackRelation,
+    ReleaseAttributes, ReleaseRelation, ScrobbleAttributes, ScrobbleRelation, ServerAttributes,
+    ServerRelation, TrackAttributes, TrackRelation,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
@@ -30,6 +30,7 @@ pub enum ResourceType {
     Server,
     Auth,
     User,
+    Scrobble,
 
     Image,
     Artist,
@@ -40,6 +41,7 @@ pub enum ResourceType {
 
 pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
 pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
+pub type ScrobbleResource = Resource<i64, ScrobbleAttributes, ScrobbleRelation>;
 
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
@@ -47,7 +49,7 @@ pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
 pub type MediumResource = Resource<Uuid, MediumAttributes, MediumRelation>;
 pub type ReleaseResource = Resource<Uuid, ReleaseAttributes, ReleaseRelation>;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Included {
     Image(ImageResource),
@@ -57,7 +59,7 @@ pub enum Included {
     Release(ReleaseResource),
 }
 
-#[derive(Serialize, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum LinkKey {
     Prev,
@@ -66,7 +68,7 @@ pub enum LinkKey {
     Last,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Document<R> {
     pub data: DocumentData<R>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -75,43 +77,45 @@ pub struct Document<R> {
     pub links: HashMap<LinkKey, String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DocumentData<R> {
     Single(R),
     Multi(Vec<R>),
 }
 
-#[derive(Serialize, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceMetaKey {
     Score,
 }
 
-#[derive(Serialize)]
-pub struct Resource<I, T, R> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Resource<I, T, R: Eq + Hash> {
     pub r#type: ResourceType,
     pub id: I,
     pub attributes: T,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default = "HashMap::new")]
     pub relationships: HashMap<R, Relationship>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default = "HashMap::new")]
     pub meta: HashMap<ResourceMetaKey, String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Relationship {
     pub data: Relation,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Relation {
     Single(Related),
     Multi(Vec<Related>),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Related {
     User(ResourceIdentifier<String>),
@@ -123,18 +127,19 @@ pub enum Related {
     Image(ResourceIdentifier<String>),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Meta {
     ArtistCredit(ArtistCreditAttributes),
     Recording(RecordingAttributes),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResourceIdentifier<I> {
     pub r#type: ResourceType,
     pub id: I,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub meta: Option<Meta>,
 }
 
@@ -144,7 +149,7 @@ pub struct Error {
     pub detail: Option<Box<dyn StdError>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct SerializableError {
     pub status: u16,
     pub title: String,
@@ -373,7 +378,7 @@ where
     cursor
 }
 
-pub fn links_from_resource<I, T, R, C, Inc>(
+pub fn links_from_resource<I, T, R: Eq + Hash, C, Inc>(
     data: &[Resource<I, T, R>],
     opts: QueryOptions<C, Inc, I>,
     uri: &Uri,

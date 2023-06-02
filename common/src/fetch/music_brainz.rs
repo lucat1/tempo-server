@@ -4,7 +4,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use uuid::Uuid;
 
-use base::setting::Library;
 use base::util::{dedup, maybe_date};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -275,12 +274,13 @@ impl From<TrackWithMediumId> for entity::full::FullTrack {
 }
 
 impl Release {
-    pub fn into_full_release(self, library: &Library) -> Result<FullRelease> {
+    pub fn into_full_release(self) -> Result<FullRelease> {
         let original_date = maybe_date(
             self.release_group
                 .as_ref()
                 .and_then(|r| r.first_release_date.clone()),
         );
+        let date = maybe_date(self.date);
         let label = self.label_info.first();
         let genres = self
             .media
@@ -313,12 +313,12 @@ impl Release {
                     .map(|l| l.name.to_string()),
                 catalog_no: label.as_ref().and_then(|l| l.catalog_number.clone()),
                 status: self.status,
-                date: if library.tagging.use_original_date {
-                    original_date
-                } else {
-                    maybe_date(self.date)
-                },
-                original_date,
+                year: date.year,
+                month: date.month.map(|m| m as i16),
+                day: date.day.map(|d| d as i16),
+                original_year: original_date.year,
+                original_month: original_date.month.map(|m| m as i16),
+                original_day: original_date.day.map(|d| d as i16),
                 script: self.text_representation.and_then(|t| t.script),
                 path: None,
             },

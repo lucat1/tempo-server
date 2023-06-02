@@ -47,8 +47,12 @@ lazy_static! {
             ReleaseColumn::Label,
             ReleaseColumn::CatalogNo,
             ReleaseColumn::Status,
-            ReleaseColumn::Date,
-            ReleaseColumn::OriginalDate,
+            ReleaseColumn::Year,
+            ReleaseColumn::Month,
+            ReleaseColumn::Day,
+            ReleaseColumn::OriginalYear,
+            ReleaseColumn::OriginalMonth,
+            ReleaseColumn::OriginalDay,
             ReleaseColumn::Script,
         ])
         .to_owned();

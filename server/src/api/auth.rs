@@ -1,18 +1,19 @@
-use std::{collections::HashMap, ops::Add};
-
 use axum::{
+    async_trait,
+    extract::FromRequestParts,
     headers::authorization::{Authorization, Bearer},
     http::Request,
-    http::StatusCode,
+    http::{request::Parts, StatusCode},
     middleware::Next,
     response::Response,
 };
-use chrono::{prelude::*, Duration};
 use common::auth::authenticate;
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::Add};
+use time::{Duration, OffsetDateTime};
 
 use crate::api::{
     documents::{AuthAttributes, AuthRelation, Token},
@@ -25,9 +26,24 @@ use crate::api::{
 use base::setting::get_settings;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
+pub struct Claims {
     pub username: String,
     pub exp: usize,
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let header = TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
+            .await?
+            .inner();
+        check_token(header.token()).map(|td| td.claims)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,12 +77,10 @@ fn check_token(token: &str) -> Result<TokenData<Claims>, Error> {
 }
 
 pub async fn auth_middleware<B>(
-    auth_header: TypedHeader<Authorization<Bearer>>,
+    _claims: Claims,
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, Error> {
-    let auth = auth_header.inner();
-    let _ = check_token(auth.token())?;
     let response = next.run(request).await;
     Ok(response)
 }
@@ -100,7 +114,7 @@ pub async fn auth(
             data: DocumentData::Single(auth_resource(
                 Token {
                     value: auth.token().to_string(),
-                    expires_at: Utc::now(),
+                    expires_at: OffsetDateTime::now_utc(),
                 },
                 None,
                 token_data.claims.username,
@@ -135,10 +149,10 @@ pub async fn login(
             detail: Some(e.into()),
         })?;
 
-    let token_expiry = Utc::now().add(Duration::days(7));
+    let token_expiry = OffsetDateTime::now_utc().add(Duration::days(7));
     let claims = Claims {
         username: user.username.to_owned(),
-        exp: token_expiry.timestamp() as usize,
+        exp: token_expiry.unix_timestamp() as usize,
     };
     let token = encode(
         &Header::default(),
@@ -151,10 +165,10 @@ pub async fn login(
         detail: Some(e.into()),
     })?;
 
-    let refresh_expiry = Utc::now().add(Duration::days(30));
+    let refresh_expiry = OffsetDateTime::now_utc().add(Duration::days(30));
     let refresh_claims = RefreshClaims {
         username: user.username,
-        exp: refresh_expiry.timestamp() as usize,
+        exp: refresh_expiry.unix_timestamp() as usize,
     };
     let refresh_token = encode(
         &Header::default(),

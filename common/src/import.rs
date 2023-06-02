@@ -106,12 +106,12 @@ pub async fn begin(path: &PathBuf) -> Result<Import> {
     let source_release: internal::Release = tracks.clone().into();
     let source_tracks: Vec<internal::Track> = tracks.iter().map(|t| t.clone().into()).collect();
     tracing::info! {artists = source_release.artists.join(", "), title = source_release.title, "Searching for"};
-    let compressed_search_results = fetch::search(library, &source_release)
+    let compressed_search_results = fetch::search(&source_release)
         .await
         .wrap_err(eyre!("Error while fetching for album releases"))?;
     let mut search_results: Vec<fetch::SearchResult> = vec![];
     for result in compressed_search_results.into_iter() {
-        search_results.push(fetch::get(library, result.0.release.id.to_string().as_str()).await?);
+        search_results.push(fetch::get(result.0.release.id.to_string().as_str()).await?);
     }
     let mut rated_search_results = search_results
         .into_iter()

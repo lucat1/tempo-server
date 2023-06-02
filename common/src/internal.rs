@@ -1,4 +1,3 @@
-use chrono::NaiveDate;
 use entity::full::{FullRelease, FullTrack};
 use itertools::Itertools;
 use serde::Serialize;
@@ -29,8 +28,12 @@ pub struct Release {
     pub country: Option<String>,
     pub label: Option<String>,
     pub release_type: Option<String>,
-    pub date: Option<NaiveDate>,
-    pub original_date: Option<NaiveDate>,
+    pub year: Option<i32>,
+    pub month: Option<u8>,
+    pub day: Option<u8>,
+    pub original_year: Option<i32>,
+    pub original_month: Option<u8>,
+    pub original_day: Option<u8>,
 }
 
 impl From<FullRelease> for Release {
@@ -50,8 +53,12 @@ impl From<FullRelease> for Release {
             country: release.country,
             label: release.label,
             release_type: release.release_type,
-            date: release.date,
-            original_date: release.original_date,
+            year: release.year,
+            month: release.month.map(|m| m as u8),
+            day: release.day.map(|d| d as u8),
+            original_year: release.original_year,
+            original_month: release.original_month.map(|m| m as u8),
+            original_day: release.original_day.map(|d| d as u8),
         }
     }
 }
@@ -130,6 +137,14 @@ impl From<Vec<TrackFile>> for Release {
             v1
         };
 
+        let date = maybe_date(
+            first_tag(&tracks, TagKey::ReleaseDate)
+                .or_else(|| first_tag(&tracks, TagKey::ReleaseYear)),
+        );
+        let original_date = maybe_date(
+            first_tag(&tracks, TagKey::OriginalReleaseDate)
+                .or_else(|| first_tag(&tracks, TagKey::OriginalReleaseYear)),
+        );
         Release {
             title: first_tag(&tracks, TagKey::Album).unwrap_or_else(|| UNKNOWN_TITLE.to_string()),
             artists,
@@ -139,14 +154,12 @@ impl From<Vec<TrackFile>> for Release {
             country: first_tag(&tracks, TagKey::ReleaseCountry),
             label: first_tag(&tracks, TagKey::RecordLabel),
             release_type: first_tag(&tracks, TagKey::ReleaseType),
-            date: maybe_date(
-                first_tag(&tracks, TagKey::ReleaseDate)
-                    .or_else(|| first_tag(&tracks, TagKey::ReleaseYear)),
-            ),
-            original_date: maybe_date(
-                first_tag(&tracks, TagKey::OriginalReleaseDate)
-                    .or_else(|| first_tag(&tracks, TagKey::OriginalReleaseYear)),
-            ),
+            year: date.year,
+            month: date.month,
+            day: date.day,
+            original_year: original_date.year,
+            original_month: original_date.month,
+            original_day: original_date.day,
         }
     }
 }

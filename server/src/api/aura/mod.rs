@@ -2,6 +2,7 @@ mod artists;
 mod images;
 mod mediums;
 mod releases;
+mod scrobbles;
 mod search;
 mod tracks;
 
@@ -30,6 +31,10 @@ pub fn router() -> Router<AppState> {
         .route("/tracks", get(tracks::tracks))
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
+        .route(
+            "/scrobbles",
+            get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),
+        )
         .route("/search", get(search::search))
         .layer(from_fn(auth_middleware))
         .route("/server", get(server))

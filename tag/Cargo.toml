@@ -16,7 +16,6 @@ mp4 = ["dep:mp4ameta"]
 base = { path = "../base" }
 entity = { path = "../entity" }
 
-chrono = "0.4.23"
 eyre = "0.6.8"
 itertools = "0.10.5"
 mime = "0.3.16"

@@ -1,11 +1,12 @@
-use chrono::prelude::*;
+use sea_orm::prelude::TimeDateTime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use entity::{ArtistTrackRelationType, ArtistUrlType};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ServerAttributes {
     #[serde(rename = "aura-version")]
     pub aura_version: String,
@@ -17,21 +18,21 @@ pub struct ServerAttributes {
     pub features: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServerRelation {}
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ArtistCreditAttributes {
     pub join_phrase: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RecordingAttributes {
     pub role: ArtistTrackRelationType,
     pub detail: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ImageAttributes {
     pub role: String,
     pub format: String,
@@ -42,7 +43,7 @@ pub struct ImageAttributes {
     pub size: i32,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageRelation {
     #[serde(rename = "artists")]
@@ -52,7 +53,7 @@ pub enum ImageRelation {
     // TODO: tracks?
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ArtistAttributes {
     pub name: String,
     pub sort_name: String,
@@ -62,7 +63,7 @@ pub struct ArtistAttributes {
     pub urls: HashMap<ArtistUrlType, String>,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtistRelation {
     #[serde(rename = "recordings")]
@@ -75,7 +76,7 @@ pub enum ArtistRelation {
     Tracks,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ArtistInclude {
     #[serde(rename = "images")]
     Images,
@@ -87,7 +88,7 @@ pub enum ArtistInclude {
     ReleasesArtists,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ReleaseAttributes {
     pub title: String,
     pub disctotal: i32,
@@ -97,15 +98,15 @@ pub struct ReleaseAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub month: Option<u32>,
+    pub month: Option<i16>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub day: Option<u32>,
+    pub day: Option<i16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub original_year: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub original_month: Option<u32>,
+    pub original_month: Option<i16>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub original_day: Option<u32>,
+    pub original_day: Option<i16>,
 
     #[serde(rename = "release-type")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,7 +118,7 @@ pub struct ReleaseAttributes {
     pub release_group_mbid: Option<Uuid>,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseRelation {
     #[serde(rename = "image")]
@@ -128,7 +129,7 @@ pub enum ReleaseRelation {
     Artists,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ReleaseInclude {
     #[serde(rename = "image")]
     Image,
@@ -142,7 +143,7 @@ pub enum ReleaseInclude {
     MediumsTracksArtists,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MediumAttributes {
     pub position: i32,
     pub tracks: i32,
@@ -152,14 +153,14 @@ pub struct MediumAttributes {
     pub format: Option<String>,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MediumRelation {
     Release,
     Tracks,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MediumInclude {
     #[serde(rename = "release")]
     Release,
@@ -169,7 +170,7 @@ pub enum MediumInclude {
     TracksArtists,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TrackAttributes {
     pub title: String,
     pub track: i32,
@@ -202,7 +203,7 @@ pub struct TrackAttributes {
     pub size: Option<i32>,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TrackRelation {
     Artists,
@@ -210,7 +211,7 @@ pub enum TrackRelation {
     Recorders,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TrackInclude {
     #[serde(rename = "artists")]
     Artists,
@@ -220,21 +221,33 @@ pub enum TrackInclude {
     Recorders,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AuthAttributes {
     pub token: Token,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh: Option<Token>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Token {
     pub value: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: OffsetDateTime,
 }
 
-#[derive(Serialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthRelation {
     User,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ScrobbleAttributes {
+    pub at: TimeDateTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScrobbleRelation {
+    User,
+    Track,
 }

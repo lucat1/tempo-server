@@ -1,5 +1,4 @@
 use crate::TagKey;
-use chrono::Datelike;
 use entity::{
     full::{ArtistInfo, FullRelease, FullTrack},
     Artist, ArtistTrackRelationType,
@@ -112,19 +111,34 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     if let Some(rel_type) = &release.release_type {
         map.insert(TagKey::ReleaseType, vec![rel_type.to_string()]);
     }
-    if let Some(rel_date) = &release.date {
-        map.insert(TagKey::ReleaseDate, vec![rel_date.to_string()]);
-        map.insert(TagKey::ReleaseYear, vec![rel_date.year().to_string()]);
+    if let Some(rel_year) = &release.year {
+        map.insert(TagKey::ReleaseYear, vec![rel_year.to_string()]);
+        let month = release
+            .month
+            .map(|m| m.to_string())
+            .map_or(String::new(), |m| "-".to_string() + m.as_str());
+        let day = release
+            .day
+            .map(|m| m.to_string())
+            .map_or(String::new(), |d| "-".to_string() + d.as_str());
+        let date = rel_year.to_string() + month.as_str() + day.as_str();
+        map.insert(TagKey::ReleaseDate, vec![date]);
     }
-    if let Some(rel_original_date) = &release.original_date {
-        map.insert(
-            TagKey::OriginalReleaseDate,
-            vec![rel_original_date.to_string()],
-        );
+    if let Some(rel_original_year) = &release.original_year {
         map.insert(
             TagKey::OriginalReleaseYear,
-            vec![rel_original_date.year().to_string()],
+            vec![rel_original_year.to_string()],
         );
+        let month = release
+            .original_month
+            .map(|m| m.to_string())
+            .map_or(String::new(), |m| "-".to_string() + m.as_str());
+        let day = release
+            .original_day
+            .map(|m| m.to_string())
+            .map_or(String::new(), |d| "-".to_string() + d.as_str());
+        let date = rel_original_year.to_string() + month.as_str() + day.as_str();
+        map.insert(TagKey::OriginalReleaseDate, vec![date]);
     }
     if let Some(rel_script) = &release.script {
         map.insert(TagKey::Script, vec![rel_script.to_string()]);
