@@ -29,9 +29,9 @@ pub fn artist_to_document(data: entity::Artist) -> Result<Document> {
     } = artist_fields().ok_or(eyre!("Could not get search index artist fields"))?;
 
     let mut document = doc!(
-    id => data.id.to_string(),
-    name => data.name,
-    sort_name => data.sort_name,
+        id => data.id.to_string(),
+        name => data.name,
+        sort_name => data.sort_name,
     );
     if let Some(desc) = data.description {
         document.add_text(description, desc);
@@ -75,9 +75,9 @@ pub fn track_to_document(
     } = track_fields().ok_or(eyre!("Could not get search index track fields"))?;
 
     let mut document = doc!(
-    id => track_data.id.to_string(),
-    title => track_data.title,
-    genres => track_data.genres.0.join(" "),
+        id => track_data.id.to_string(),
+        title => track_data.title,
+        genres => track_data.genres.0.join(" "),
     );
     document.add_text(artists, artists_string(artists_data));
     Ok(document)
@@ -114,9 +114,9 @@ pub fn release_to_document(
     } = release_fields().ok_or(eyre!("Could not get search index release fields"))?;
 
     let mut document = doc!(
-    id => release_data.id.to_string(),
-    title => release_data.title,
-    genres => release_data.genres.0.join(" "),
+        id => release_data.id.to_string(),
+        title => release_data.title,
+        genres => release_data.genres.0.join(" "),
     );
     if let Some(rel_typ) = release_data.release_type {
         document.add_text(release_type, rel_typ);

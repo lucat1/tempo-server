@@ -43,7 +43,16 @@ impl From<AuthProvider> for AuthMethod {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::scrobble::Entity")]
+    Scrobble,
+}
+
+impl Related<super::scrobble::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Scrobble.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}
 

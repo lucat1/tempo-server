@@ -19,7 +19,7 @@ use super::documents::{
     ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
     ImageAttributes, ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes,
     ReleaseAttributes, ReleaseRelation, ScrobbleAttributes, ScrobbleRelation, ServerAttributes,
-    ServerRelation, TrackAttributes, TrackRelation,
+    ServerRelation, TrackAttributes, TrackRelation, UserAttributes, UserRelation,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
@@ -41,17 +41,28 @@ pub enum ResourceType {
 
 pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
 pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
+pub type UserResource = Resource<String, UserAttributes, UserRelation>;
 pub type ScrobbleResource = Resource<i64, ScrobbleAttributes, ScrobbleRelation>;
-
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
 pub type MediumResource = Resource<Uuid, MediumAttributes, MediumRelation>;
 pub type ReleaseResource = Resource<Uuid, ReleaseAttributes, ReleaseRelation>;
 
+// pub type InsertServerResource = InsertResource<ServerAttributes, ServerRelation>;
+// pub type InsertAuthResource = InsertResource<AuthAttributes, AuthRelation>;
+// pub type InsertUserResource = InsertResource<UserAttributes, UserRelation>;
+pub type InsertScrobbleResource = InsertResource<ScrobbleAttributes, ScrobbleRelation>;
+// pub type InsertImageResource = InsertResource<ImageAttributes, ImageRelation>;
+// pub type InsertArtistResource = InsertResource<ArtistAttributes, ArtistRelation>;
+// pub type InsertTrackResource = InsertResource<TrackAttributes, TrackRelation>;
+// pub type InsertMediumResource = InsertResource<MediumAttributes, MediumRelation>;
+// pub type InsertReleaseResource = InsertResource<ReleaseAttributes, ReleaseRelation>;
+
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Included {
+    User(UserResource),
     Image(ImageResource),
     Artist(ArtistResource),
     Track(TrackResource),
@@ -75,6 +86,11 @@ pub struct Document<R> {
     pub included: Vec<Included>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub links: HashMap<LinkKey, String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InsertDocument<R> {
+    pub data: DocumentData<R>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -104,6 +120,18 @@ pub struct Resource<I, T, R: Eq + Hash> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct InsertResource<T, R: Eq + Hash> {
+    pub r#type: ResourceType,
+    pub attributes: T,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default = "HashMap::new")]
+    pub relationships: HashMap<R, Relationship>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default = "HashMap::new")]
+    pub meta: HashMap<ResourceMetaKey, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Relationship {
     pub data: Relation,
 }
@@ -118,13 +146,9 @@ pub enum Relation {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Related {
-    User(ResourceIdentifier<String>),
-
-    Artist(ResourceIdentifier<Uuid>),
-    Track(ResourceIdentifier<Uuid>),
-    Medium(ResourceIdentifier<Uuid>),
-    Release(ResourceIdentifier<Uuid>),
-    Image(ResourceIdentifier<String>),
+    Uuid(ResourceIdentifier<Uuid>),
+    String(ResourceIdentifier<String>),
+    Int(ResourceIdentifier<i64>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -334,6 +358,7 @@ where
 #[derive(PartialEq)]
 enum Identifier {
     Image(String),
+    User(String),
     Artist(Uuid),
     Track(Uuid),
     Medium(Uuid),
@@ -351,6 +376,7 @@ pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
     });
     included.dedup_by_key(|e| match e {
         Included::Image(e) => Identifier::Image(e.id.to_owned()),
+        Included::User(e) => Identifier::User(e.id.to_owned()),
         Included::Artist(e) => Identifier::Artist(e.id),
         Included::Track(e) => Identifier::Track(e.id),
         Included::Medium(e) => Identifier::Medium(e.id),

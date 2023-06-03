@@ -5,6 +5,7 @@ mod releases;
 mod scrobbles;
 mod search;
 mod tracks;
+mod users;
 
 use std::collections::HashMap;
 

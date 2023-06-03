@@ -9,7 +9,7 @@ use uuid::Uuid;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
     pub id: i64,
-    pub at: TimeDateTime,
+    pub at: TimeDateTimeWithTimeZone,
     pub user: String,
     pub track: Uuid,
 }

@@ -87,7 +87,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
                     artist_credits
                         .iter()
                         .map(|ac| {
-                            Related::Artist(ResourceIdentifier {
+                            Related::Uuid(ResourceIdentifier {
                                 r#type: ResourceType::Artist,
                                 id: ac.artist_id.to_owned(),
                                 meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
@@ -108,8 +108,8 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
                     recorders
                         .iter()
                         .map(|r| {
-                            Related::Artist(ResourceIdentifier {
-                                r#type: ResourceType::Track,
+                            Related::Uuid(ResourceIdentifier {
+                                r#type: ResourceType::Artist,
                                 id: r.artist_id,
                                 meta: Some(Meta::Recording(RecordingAttributes {
                                     role: r.relation_type,
@@ -126,7 +126,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
         relationships.insert(
             TrackRelation::Medium,
             Relationship {
-                data: Relation::Single(Related::Medium(ResourceIdentifier {
+                data: Relation::Single(Related::Uuid(ResourceIdentifier {
                     r#type: ResourceType::Medium,
                     id: med.id,
                     meta: None,

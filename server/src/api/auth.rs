@@ -93,7 +93,7 @@ fn auth_resource(token: Token, refresh: Option<Token>, username: String) -> Auth
         relationships: [(
             AuthRelation::User,
             Relationship {
-                data: Relation::Single(Related::User(ResourceIdentifier {
+                data: Relation::Single(Related::String(ResourceIdentifier {
                     r#type: ResourceType::User,
                     id: username,
                     meta: None,

@@ -57,7 +57,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
         relationships.insert(
             MediumRelation::Release,
             Relationship {
-                data: Relation::Single(Related::Release(ResourceIdentifier {
+                data: Relation::Single(Related::Uuid(ResourceIdentifier {
                     r#type: ResourceType::Release,
                     id: rel.id,
                     meta: None,
@@ -73,7 +73,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
                     tracks
                         .iter()
                         .map(|t| {
-                            Related::Track(ResourceIdentifier {
+                            Related::Uuid(ResourceIdentifier {
                                 r#type: ResourceType::Track,
                                 id: t.id,
                                 meta: None,

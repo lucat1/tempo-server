@@ -1,4 +1,3 @@
-use sea_orm::prelude::TimeDateTime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
@@ -236,13 +235,42 @@ pub enum AuthRelation {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct UserAttributes {
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum UserRelation {
+    Scrobbles,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum UserInclude {
+    #[serde(rename = "scrobbles")]
+    Scrobbles,
+    #[serde(rename = "scrobbles.tracks")]
+    ScrobblesTracks,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ScrobbleAttributes {
-    pub at: TimeDateTime,
+    #[serde(with = "time::serde::iso8601")]
+    pub at: OffsetDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScrobbleRelation {
     User,
+    Track,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ScrobbleInclude {
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "track")]
     Track,
 }

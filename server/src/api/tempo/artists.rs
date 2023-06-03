@@ -175,7 +175,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
                     images
                         .iter()
                         .map(|i| {
-                            Related::Image(ResourceIdentifier {
+                            Related::String(ResourceIdentifier {
                                 r#type: ResourceType::Image,
                                 id: i.image_id.to_owned(),
                                 meta: None,
@@ -194,7 +194,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
                     recordings
                         .iter()
                         .map(|r| {
-                            Related::Track(ResourceIdentifier {
+                            Related::Uuid(ResourceIdentifier {
                                 r#type: ResourceType::Track,
                                 id: r.track_id,
                                 meta: Some(Meta::Recording(RecordingAttributes {
@@ -212,7 +212,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
     let mut related_tracks = Vec::new();
     for (i, ac) in artist_credits.iter().enumerate() {
         related_releases.extend(releases[i].iter().map(|r| {
-            Related::Release(ResourceIdentifier {
+            Related::Uuid(ResourceIdentifier {
                 r#type: ResourceType::Release,
                 id: r.release_id.to_owned(),
                 meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
@@ -221,7 +221,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
             })
         }));
         related_tracks.extend(tracks[i].iter().map(|r| {
-            Related::Track(ResourceIdentifier {
+            Related::Uuid(ResourceIdentifier {
                 r#type: ResourceType::Track,
                 id: r.track_id.to_owned(),
                 meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {

@@ -75,7 +75,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
                     artist_credits
                         .iter()
                         .map(|ac| {
-                            Related::Artist(ResourceIdentifier {
+                            Related::Uuid(ResourceIdentifier {
                                 r#type: ResourceType::Artist,
                                 id: ac.artist_id.to_owned(),
                                 meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
@@ -96,7 +96,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
                     mediums
                         .iter()
                         .map(|m| {
-                            Related::Medium(ResourceIdentifier {
+                            Related::Uuid(ResourceIdentifier {
                                 r#type: ResourceType::Medium,
                                 id: m.id,
                                 meta: None,
@@ -111,7 +111,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
         relationships.insert(
             ReleaseRelation::Image,
             Relationship {
-                data: Relation::Single(Related::Image(ResourceIdentifier {
+                data: Relation::Single(Related::String(ResourceIdentifier {
                     r#type: ResourceType::Image,
                     id: img.image_id.to_owned(),
                     meta: None,
