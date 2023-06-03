@@ -1,14 +1,14 @@
-use std::collections::HashMap;
-
-use axum::extract::{OriginalUri, State};
+use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use eyre::{eyre, Result};
 use sea_orm::{
     ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, IntoActiveModel,
     LoaderTrait, PaginatorTrait, QueryFilter, TransactionTrait,
 };
+use std::collections::HashMap;
 
 use super::{tracks, users};
+use crate::api::documents::TrackInclude;
 use crate::api::{
     auth::Claims,
     documents::{ScrobbleAttributes, ScrobbleInclude, ScrobbleRelation},
@@ -53,6 +53,19 @@ pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     }
 }
 
+fn map_to_tracks_include(include: &[ScrobbleInclude]) -> Vec<TrackInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            ScrobbleInclude::TrackArtists => Some(TrackInclude::Artists),
+            ScrobbleInclude::TrackMedium => Some(TrackInclude::Medium),
+            ScrobbleInclude::TrackMediumRelease => Some(TrackInclude::MediumRelease),
+            ScrobbleInclude::TrackMediumReleaseArtists => Some(TrackInclude::MediumReleaseArtists),
+            _ => None,
+        })
+        .collect()
+}
+
 pub async fn included<C>(
     db: &C,
     entities: Vec<entity::Scrobble>,
@@ -85,6 +98,8 @@ where
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
         }
+        let tracks_include = map_to_tracks_include(include);
+        included.extend(tracks::included(db, tracks_related, &tracks_include).await?);
     }
     Ok(included)
 }
@@ -217,11 +232,48 @@ pub async fn scrobbles(
         title: "Couldn't begin database transaction".to_string(),
         detail: Some(e.into()),
     })?;
-    // TODO: pagination
     let (data, included) = fetch_scrobbles(&tx, claims.username, &opts.page, &opts.include).await?;
     Ok(Json::new(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
+        included: dedup(included),
+    }))
+}
+
+pub async fn scrobble(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::ScrobbleColumn, ScrobbleInclude, i64>,
+    Path(id): Path<i64>,
+) -> Result<Json<Document<ScrobbleResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let scrobble = entity::ScrobbleEntity::find_by_id(id)
+        .one(&tx)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch all tracks".to_string(),
+            detail: Some(e.into()),
+        })?
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Not found".to_string(),
+            detail: Some("Not found".into()),
+        })?;
+    let resource = entity_to_resource(&scrobble);
+    let included = included(&tx, vec![scrobble], &opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json::new(Document {
+        links: HashMap::new(),
+        data: DocumentData::Single(resource),
         included: dedup(included),
     }))
 }

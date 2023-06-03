@@ -1,14 +1,15 @@
-use std::collections::HashMap;
-
+use async_recursion::async_recursion;
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
     QueryOrder, TransactionTrait,
 };
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use super::{releases, tracks};
+use crate::api::documents::ReleaseInclude;
 use crate::api::AppState;
 use crate::api::{
     documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude},
@@ -113,6 +114,17 @@ fn map_to_tracks_include(include: &[MediumInclude]) -> Vec<TrackInclude> {
         .collect()
 }
 
+fn map_to_release_include(include: &[MediumInclude]) -> Vec<ReleaseInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            MediumInclude::ReleaseArtists => Some(ReleaseInclude::Artists),
+            _ => None,
+        })
+        .collect()
+}
+
+#[async_recursion]
 pub async fn included<C>(
     db: &C,
     related: Vec<MediumRelated>,
@@ -131,6 +143,8 @@ where
         for (i, release) in releases.into_iter().enumerate() {
             included.push(releases::entity_to_included(&release, &releases_related[i]));
         }
+        let releases_included = map_to_release_include(include);
+        included.extend(releases::included(db, releases_related, &releases_included).await?);
     }
     if include.contains(&MediumInclude::Tracks) {
         let tracks = related

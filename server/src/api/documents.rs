@@ -159,6 +159,8 @@ pub enum MediumRelation {
 pub enum MediumInclude {
     #[serde(rename = "release")]
     Release,
+    #[serde(rename = "release.artists")]
+    ReleaseArtists,
     #[serde(rename = "tracks")]
     Tracks,
     #[serde(rename = "tracks.artists")]
@@ -210,6 +212,10 @@ pub enum TrackInclude {
     Artists,
     #[serde(rename = "medium")]
     Medium,
+    #[serde(rename = "medium.release")]
+    MediumRelease,
+    #[serde(rename = "medium.release.artists")]
+    MediumReleaseArtists,
     #[serde(rename = "recorders")]
     Recorders,
 }
@@ -273,4 +279,12 @@ pub enum ScrobbleInclude {
     User,
     #[serde(rename = "track")]
     Track,
+    #[serde(rename = "track.artists")]
+    TrackArtists,
+    #[serde(rename = "track.medium")]
+    TrackMedium,
+    #[serde(rename = "track.medium.release")]
+    TrackMediumRelease,
+    #[serde(rename = "track.medium.release.artists")]
+    TrackMediumReleaseArtists,
 }

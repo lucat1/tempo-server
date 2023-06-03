@@ -11,6 +11,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use super::{artists, mediums};
+use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
         ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
@@ -167,6 +168,17 @@ pub fn entity_to_included(entity: &entity::Track, related: &TrackRelated) -> Inc
     Included::Track(entity_to_resource(entity, related))
 }
 
+fn map_to_mediums_include(include: &[TrackInclude]) -> Vec<MediumInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            TrackInclude::MediumRelease => Some(MediumInclude::Release),
+            TrackInclude::MediumReleaseArtists => Some(MediumInclude::ReleaseArtists),
+            _ => None,
+        })
+        .collect()
+}
+
 pub async fn included<C>(
     db: &C,
     related: Vec<TrackRelated>,
@@ -201,6 +213,8 @@ where
         for (i, medium) in mediums.into_iter().enumerate() {
             included.push(mediums::entity_to_included(&medium, &mediums_related[i]));
         }
+        let mediums_included = map_to_mediums_include(include);
+        included.extend(mediums::included(db, mediums_related, &mediums_included).await?);
     }
     if include.contains(&TrackInclude::Recorders) {
         let recorders = related

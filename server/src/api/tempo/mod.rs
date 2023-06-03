@@ -36,6 +36,10 @@ pub fn router() -> Router<AppState> {
             "/scrobbles",
             get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),
         )
+        .route(
+            "/scrobbles/:id",
+            get(scrobbles::scrobble)
+        )
         .route("/search", get(search::search))
         .layer(from_fn(auth_middleware))
         .route("/server", get(server))
