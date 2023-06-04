@@ -15,11 +15,11 @@ static RELEASE_COUNTRY_FACTOR: usize = 5;
 static RELEASE_LABEL_FACTOR: usize = 5;
 static RELEASE_RELEASE_TYPE_FACTOR: usize = 50;
 static RELEASE_YEAR_FACTOR: i32 = 100;
-static RELEASE_MONTH_FACTOR: u8 = 50;
-static RELEASE_DAY_FACTOR: u8 = 10;
+static RELEASE_MONTH_FACTOR: i64 = 50;
+static RELEASE_DAY_FACTOR: i64 = 10;
 static RELEASE_ORIGINAL_YEAR_FACTOR: i32 = 100;
-static RELEASE_ORIGINAL_MONTH_FACTOR: u8 = 50;
-static RELEASE_ORIGINAL_DAY_FACTOR: u8 = 10;
+static RELEASE_ORIGINAL_MONTH_FACTOR: i64 = 50;
+static RELEASE_ORIGINAL_DAY_FACTOR: i64 = 10;
 
 pub trait Diff {
     fn diff(&self, other: &Self) -> i64;
@@ -90,11 +90,11 @@ impl Diff for Release {
             })
             .unwrap_or_default()
             + if_both(self.month, other.month, |d1, d2| {
-                (d1.abs_diff(d2) * RELEASE_MONTH_FACTOR) as i64
+                (d1.abs_diff(d2) as i64) * RELEASE_MONTH_FACTOR
             })
             .unwrap_or_default()
             + if_both(self.day, other.day, |d1, d2| {
-                (d1.abs_diff(d2) * RELEASE_DAY_FACTOR) as i64
+                (d1.abs_diff(d2) as i64) * RELEASE_DAY_FACTOR
             })
             .unwrap_or_default()
             + if_both(self.original_year, other.original_year, |d1, d2| {
@@ -102,11 +102,11 @@ impl Diff for Release {
             })
             .unwrap_or_default()
             + if_both(self.original_month, other.original_month, |d1, d2| {
-                (d1.abs_diff(d2) * RELEASE_ORIGINAL_MONTH_FACTOR) as i64
+                (d1.abs_diff(d2) as i64) * RELEASE_ORIGINAL_MONTH_FACTOR
             })
             .unwrap_or_default()
             + if_both(self.original_day, other.original_day, |d1, d2| {
-                (d1.abs_diff(d2) * RELEASE_ORIGINAL_DAY_FACTOR) as i64
+                (d1.abs_diff(d2) as i64) * RELEASE_ORIGINAL_DAY_FACTOR
             })
             .unwrap_or_default()
     }
