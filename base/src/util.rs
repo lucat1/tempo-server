@@ -30,9 +30,9 @@ pub fn mkdirp<P: AsRef<Path>>(path: P) -> io::Result<()> {
 lazy_static! {
     static ref FORMAT_YEAR: &'static [FormatItem<'static>] = format_description!("[year]");
     static ref FORMAT_YEAR_MONTH: &'static [FormatItem<'static>] =
-        format_description!("[month]-[year]");
+        format_description!("[year]-[month]");
     static ref FORMAT_YEAR_MONTH_DAY: &'static [FormatItem<'static>] =
-        format_description!("[month]-[year]-[day]");
+        format_description!("[year]-[month]-[day]");
 }
 
 pub struct OptionalDate {
