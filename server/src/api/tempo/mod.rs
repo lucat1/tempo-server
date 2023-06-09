@@ -1,18 +1,18 @@
 mod artists;
 mod images;
 mod mediums;
+mod provider;
 mod releases;
 mod scrobbles;
 mod search;
 mod tracks;
 mod users;
 
+use axum::{middleware::from_fn, routing::get, Router};
 use std::collections::HashMap;
 
-use axum::{middleware::from_fn, routing::get, Router};
-
 use super::{
-    auth::{auth, auth_middleware, login},
+    auth,
     documents::ServerAttributes,
     extract::Json,
     jsonapi::{Document, DocumentData, ResourceType, ServerResource},
@@ -36,14 +36,13 @@ pub fn router() -> Router<AppState> {
             "/scrobbles",
             get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),
         )
-        .route(
-            "/scrobbles/:id",
-            get(scrobbles::scrobble)
-        )
+        .route("/scrobbles/:id", get(scrobbles::scrobble))
         .route("/search", get(search::search))
-        .layer(from_fn(auth_middleware))
+        .route("/auth/:provider", get(provider::provider))
+        .layer(from_fn(auth::auth_middleware))
         .route("/server", get(server))
-        .route("/auth", get(auth).post(login))
+        .route("/auth", get(auth::auth).post(auth::login))
+        .route("/auth/:provider/callback", get(provider::callback))
 }
 
 async fn server() -> Json<Document<ServerResource>> {

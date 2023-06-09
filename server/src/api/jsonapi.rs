@@ -17,9 +17,10 @@ use uuid::Uuid;
 
 use super::documents::{
     ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
-    ImageAttributes, ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes,
-    ReleaseAttributes, ReleaseRelation, ScrobbleAttributes, ScrobbleRelation, ServerAttributes,
-    ServerRelation, TrackAttributes, TrackRelation, UserAttributes, UserRelation,
+    ConnectionAttributes, ConnectionRelation, ImageAttributes, ImageRelation, MediumAttributes,
+    MediumRelation, RecordingAttributes, ReleaseAttributes, ReleaseRelation, ScrobbleAttributes,
+    ScrobbleRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
+    UserAttributes, UserRelation,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
@@ -31,6 +32,7 @@ pub enum ResourceType {
     Auth,
     User,
     Scrobble,
+    Connection,
 
     Image,
     Artist,
@@ -43,6 +45,7 @@ pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
 pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
 pub type UserResource = Resource<String, UserAttributes, UserRelation>;
 pub type ScrobbleResource = Resource<i64, ScrobbleAttributes, ScrobbleRelation>;
+pub type ConnectionResource = Resource<String, ConnectionAttributes, ConnectionRelation>;
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;

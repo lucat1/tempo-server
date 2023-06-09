@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
+use url::Url;
 use uuid::Uuid;
 
 use entity::{ArtistTrackRelationType, ArtistUrlType};
@@ -288,3 +289,24 @@ pub enum ScrobbleInclude {
     #[serde(rename = "track.medium.release.artists")]
     TrackMediumReleaseArtists,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionFlow {
+    Redirect,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ConnectionAttributes {
+    pub flow: ConnectionFlow,
+    pub url: Url,
+    // #[serde(with = "time::serde::iso8601")]
+    // pub expires_at: OffsetDateTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionRelation {}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ConnectionInclude {}
