@@ -26,7 +26,7 @@ use super::documents::{
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceType {
     Server,
@@ -142,14 +142,14 @@ pub struct Relationship {
     pub data: Relation,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Relation {
     Single(Related),
     Multi(Vec<Related>),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Related {
     Uuid(ResourceIdentifier<Uuid>),
@@ -158,14 +158,14 @@ pub enum Related {
     ConnectionProvider(ResourceIdentifier<ConnectionProvider>),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Meta {
     ArtistCredit(ArtistCreditAttributes),
     Recording(RecordingAttributes),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResourceIdentifier<I> {
     pub r#type: ResourceType,
     pub id: I,

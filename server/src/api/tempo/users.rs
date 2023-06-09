@@ -127,6 +127,7 @@ where
     C: ConnectionTrait,
 {
     let mut included = Vec::new();
+    // TODO
     // if include.contains(&UserInclude::Connections) {
     //     included.extend(
     //         related
@@ -158,18 +159,9 @@ pub fn entity_to_included(entity: &entity::User, related: &UserRelated) -> Inclu
     Included::User(entity_to_resource(entity, related))
 }
 
-pub async fn user(
-    State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::UserColumn, UserInclude, String>,
-    Path(username): Path<String>,
-) -> Result<Json<Document<UserResource>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+async fn fetch_user<C>(db: &C, username: String, include: &[UserInclude]) -> Result<(UserResource, Vec<Included>), Error> where C: ConnectionTrait{
     let user = entity::UserEntity::find_by_id(username)
-        .one(&tx)
+        .one(db)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -181,7 +173,7 @@ pub async fn user(
             title: "Not found".to_string(),
             detail: Some("Not found".into()),
         })?;
-    let related = related(&tx, &vec![user.to_owned()], false)
+    let related = related(db, &vec![user.to_owned()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -192,16 +184,56 @@ pub async fn user(
         .next()
         .unwrap_or_default();
     let data = entity_to_resource(&user, &related);
-    let included = included(&tx, vec![related], &opts.include)
+    let included = included(db, vec![related], include)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
+    Ok((data, included))
+}
+
+pub async fn user(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::UserColumn, UserInclude, String>,
+    Path(username): Path<String>,
+) -> Result<Json<Document<UserResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let (data, included) = fetch_user(&tx, username, &opts.include).await?;
     Ok(Json::new(Document {
         links: HashMap::new(),
         data: DocumentData::Single(data),
+        included: dedup(included),
+    }))
+}
+
+pub async fn relation(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<entity::UserColumn, UserInclude, String>,
+    Path((username, relation)): Path<(String, UserRelation)>,
+) -> Result<Json<Document<Related>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let (data, included) = fetch_user(&tx, username, &opts.include).await?;
+    let related = data.relationships.get(&relation).map(|r| r.data.to_owned()).ok_or(Error{
+            status: StatusCode::NOT_FOUND,
+            title: "No relationship data".to_string(),
+            detail: None
+    })?;
+    Ok(Json::new(Document {
+        links: HashMap::new(),
+        data: match related {
+        Relation::Multi(r) => DocumentData::Multi(r),
+        Relation::Single(r) => DocumentData::Single(r),
+    },
         included: dedup(included),
     }))
 }

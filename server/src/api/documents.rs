@@ -18,12 +18,12 @@ pub struct ServerAttributes {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServerRelation {}
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ArtistCreditAttributes {
     pub join_phrase: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecordingAttributes {
     pub role: ArtistTrackRelationType,
     pub detail: String,
@@ -260,15 +260,15 @@ pub enum UserInclude {
     Connections,
     #[serde(rename = "scrobbles")]
     Scrobbles,
-    #[serde(rename = "scrobbles.tracks")]
+    #[serde(rename = "scrobbles.track")]
     ScrobblesTracks,
-    #[serde(rename = "scrobbles.tracks.artists")]
+    #[serde(rename = "scrobbles.track.artists")]
     ScrobblesTracksArtists,
-    #[serde(rename = "scrobbles.tracks.medium")]
+    #[serde(rename = "scrobbles.track.medium")]
     ScrobblesTracksMedium,
-    #[serde(rename = "scrobbles.tracks.medium.release")]
+    #[serde(rename = "scrobbles.track.medium.release")]
     ScrobblesTracksMediumRelease,
-    #[serde(rename = "scrobbles.tracks.medium.release.artists")]
+    #[serde(rename = "scrobbles.track.medium.release.artists")]
     ScrobblesTracksMediumReleaseArtists,
 }
 
