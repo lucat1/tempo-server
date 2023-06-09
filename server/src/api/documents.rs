@@ -251,14 +251,25 @@ pub struct UserAttributes {
 #[serde(rename_all = "snake_case")]
 pub enum UserRelation {
     Scrobbles,
+    Connections,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UserInclude {
+    #[serde(rename = "connections")]
+    Connections,
     #[serde(rename = "scrobbles")]
     Scrobbles,
     #[serde(rename = "scrobbles.tracks")]
     ScrobblesTracks,
+    #[serde(rename = "scrobbles.tracks.artists")]
+    ScrobblesTracksArtists,
+    #[serde(rename = "scrobbles.tracks.medium")]
+    ScrobblesTracksMedium,
+    #[serde(rename = "scrobbles.tracks.medium.release")]
+    ScrobblesTracksMediumRelease,
+    #[serde(rename = "scrobbles.tracks.medium.release.artists")]
+    ScrobblesTracksMediumReleaseArtists,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

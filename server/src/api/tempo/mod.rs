@@ -1,7 +1,7 @@
 mod artists;
+mod connections;
 mod images;
 mod mediums;
-mod provider;
 mod releases;
 mod scrobbles;
 mod search;
@@ -37,12 +37,16 @@ pub fn router() -> Router<AppState> {
             get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),
         )
         .route("/scrobbles/:id", get(scrobbles::scrobble))
+        .route("/users/:username", get(users::user))
         .route("/search", get(search::search))
-        .route("/auth/:provider", get(provider::provider))
+        .route("/connections/:provider", get(connections::provider))
         .layer(from_fn(auth::auth_middleware))
         .route("/server", get(server))
         .route("/auth", get(auth::auth).post(auth::login))
-        .route("/auth/:provider/callback", get(provider::callback))
+        .route(
+            "/connections/:provider/callback",
+            get(connections::callback),
+        )
 }
 
 async fn server() -> Json<Document<ServerResource>> {
@@ -55,10 +59,18 @@ async fn server() -> Json<Document<ServerResource>> {
                 server: base::CLI_NAME.to_string(),
                 server_version: base::VERSION.to_string(),
                 auth_required: true,
-                features: ["artists", "releases", "mediums", "tracks", "users"]
-                    .into_iter()
-                    .map(|s| s.to_string())
-                    .collect(),
+                features: [
+                    "artists",
+                    "releases",
+                    "mediums",
+                    "tracks",
+                    "users",
+                    "scrobbles",
+                    "connections",
+                ]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             },
             relationships: HashMap::new(),
             meta: HashMap::new(),

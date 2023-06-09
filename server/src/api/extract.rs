@@ -1,6 +1,7 @@
 use super::jsonapi::Error;
 use axum::{
     async_trait,
+    http::header::{self, HeaderValue},
     body::HttpBody,
     extract::{
         FromRequest, FromRequestParts, Json as AxumJson, Path as AxumPath,
@@ -12,6 +13,8 @@ use axum::{
     BoxError,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+static HEADER_VALUE: &str = "application/vnd.api+json";
 
 pub struct Json<T>(AxumJson<T>);
 
@@ -55,7 +58,7 @@ where
     T: Serialize,
 {
     fn into_response(self) -> Response {
-        self.0.into_response()
+        ([(header::CONTENT_TYPE, HeaderValue::from_static(HEADER_VALUE))], self.0.into_response()).into_response()
     }
 }
 

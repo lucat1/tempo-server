@@ -5,6 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use entity::ConnectionProvider;
 use itertools::Itertools;
 use sea_orm::{
     sea_query::{IntoIden, IntoValueTuple},
@@ -45,7 +46,8 @@ pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
 pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
 pub type UserResource = Resource<String, UserAttributes, UserRelation>;
 pub type ScrobbleResource = Resource<i64, ScrobbleAttributes, ScrobbleRelation>;
-pub type ConnectionResource = Resource<String, ConnectionAttributes, ConnectionRelation>;
+pub type ConnectionResource =
+    Resource<ConnectionProvider, ConnectionAttributes, ConnectionRelation>;
 pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
 pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
 pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
@@ -66,6 +68,7 @@ pub type InsertScrobbleResource = InsertResource<ScrobbleAttributes, ScrobbleRel
 #[serde(untagged)]
 pub enum Included {
     User(UserResource),
+    Scrobble(ScrobbleResource),
     Image(ImageResource),
     Artist(ArtistResource),
     Track(TrackResource),
@@ -152,6 +155,7 @@ pub enum Related {
     Uuid(ResourceIdentifier<Uuid>),
     String(ResourceIdentifier<String>),
     Int(ResourceIdentifier<i64>),
+    ConnectionProvider(ResourceIdentifier<ConnectionProvider>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -362,6 +366,7 @@ where
 enum Identifier {
     Image(String),
     User(String),
+    Scrobble(i64),
     Artist(Uuid),
     Track(Uuid),
     Medium(Uuid),
@@ -380,6 +385,7 @@ pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
     included.dedup_by_key(|e| match e {
         Included::Image(e) => Identifier::Image(e.id.to_owned()),
         Included::User(e) => Identifier::User(e.id.to_owned()),
+        Included::Scrobble(e) => Identifier::Scrobble(e.id.to_owned()),
         Included::Artist(e) => Identifier::Artist(e.id),
         Included::Track(e) => Identifier::Track(e.id),
         Included::Medium(e) => Identifier::Medium(e.id),

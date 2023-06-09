@@ -187,7 +187,7 @@ pub async fn provider(
 
     Ok(Json::new(Document {
         data: DocumentData::Single(ConnectionResource {
-            id: provider.to_string(),
+            id: provider,
             r#type: ResourceType::Connection,
             attributes: provider
                 .attributes(settings, &claims, uri, &opts)
