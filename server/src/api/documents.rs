@@ -256,8 +256,6 @@ pub enum UserRelation {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UserInclude {
-    #[serde(rename = "connections")]
-    Connections,
     #[serde(rename = "scrobbles")]
     Scrobbles,
     #[serde(rename = "scrobbles.track")]
@@ -301,23 +299,25 @@ pub enum ScrobbleInclude {
     TrackMediumReleaseArtists,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionFlow {
     Redirect,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConnectionAttributes {
+    pub homepage: Url,
     pub flow: ConnectionFlow,
-    pub url: Url,
-    // #[serde(with = "time::serde::iso8601")]
-    // pub expires_at: OffsetDateTime,
+    pub url: Option<Url>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionRelation {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ConnectionInclude {}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConnectionMetaAttributes {
+    pub username: String,
+    pub profile_url: Url,
+}

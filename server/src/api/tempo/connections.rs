@@ -17,17 +17,27 @@ use uuid::Uuid;
 
 use crate::api::{
     auth::Claims,
-    documents::{ConnectionAttributes, ConnectionFlow},
+    documents::{ConnectionAttributes, ConnectionFlow, ConnectionMetaAttributes},
     extract::{Json, Path},
-    jsonapi::{ConnectionResource, Document, DocumentData, Error, ResourceType},
+    jsonapi::{ConnectionResource, Document, DocumentData, Error, Meta, ResourceType},
     AppState,
 };
 use crate::fetch::lastfm;
 use base::setting::{get_settings, Settings};
 
 lazy_static! {
+    static ref LASTFM_URL: url::Url = url::Url::parse("https://last.fm").unwrap();
     static ref LASTFM_AUTH_URL: url::Url = url::Url::parse("http://www.last.fm/api/auth").unwrap();
+    static ref LASTFM_PROFILE_URL: url::Url = url::Url::parse("https://last.fm/user/").unwrap();
     static ref ID_MAP: Arc<Mutex<HashMap<Uuid, String>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref PROVIDERS: [(entity::ConnectionProvider, ConnectionAttributes); 1] = [(
+        entity::ConnectionProvider::LastFM,
+        ConnectionAttributes {
+            homepage: LASTFM_URL.to_owned(),
+            flow: ConnectionFlow::Redirect,
+            url: None,
+        },
+    )];
 }
 
 #[derive(Deserialize)]
@@ -43,7 +53,7 @@ pub struct CallbackOptions {
 }
 
 #[async_trait]
-trait ProviderImpl {
+pub trait ProviderImpl {
     async fn attributes(
         &self,
         settings: &Settings,
@@ -56,6 +66,7 @@ trait ProviderImpl {
         settings: &Settings,
         opts: &CallbackOptions,
     ) -> Result<serde_json::Value>;
+    fn meta(&self, json: &serde_json::Value) -> Result<Meta>;
 }
 
 #[derive(Deserialize)]
@@ -89,7 +100,7 @@ async fn id(username: &str) -> Uuid {
 }
 
 async fn username(id: &Uuid) -> Option<String> {
-    ID_MAP.lock().await.get(id).cloned()
+    ID_MAP.lock().await.remove(id)
 }
 
 #[async_trait]
@@ -122,8 +133,9 @@ impl ProviderImpl for entity::ConnectionProvider {
                         .append_pair("api_key", lastfm.apikey.as_str())
                         .append_pair("cb", cb_url.to_string().as_str());
                     Ok(ConnectionAttributes {
+                        homepage: LASTFM_URL.to_owned(),
                         flow: ConnectionFlow::Redirect,
-                        url,
+                        url: Some(url),
                     })
                 } else {
                     Err(eyre!("Provider {} not configured", self.to_string()))
@@ -170,6 +182,37 @@ impl ProviderImpl for entity::ConnectionProvider {
             }
         }
     }
+    fn meta(&self, json: &serde_json::Value) -> Result<Meta> {
+        match self {
+            entity::ConnectionProvider::LastFM => {
+                let data: entity::user_connection::LastFMData =
+                    serde_json::from_value(json.to_owned())?;
+                Ok(Meta::Connection(ConnectionMetaAttributes {
+                    profile_url: LASTFM_PROFILE_URL.join(data.username.as_str())?,
+                    username: data.username,
+                }))
+            }
+        }
+    }
+}
+
+pub async fn providers() -> Result<Json<Document<ConnectionResource>>, Error> {
+    Ok(Json::new(Document {
+        data: DocumentData::Multi(
+            PROVIDERS
+                .iter()
+                .map(|(id, attrs)| ConnectionResource {
+                    id: id.to_owned(),
+                    r#type: ResourceType::Connection,
+                    attributes: attrs.to_owned(),
+                    meta: HashMap::new(),
+                    relationships: HashMap::new(),
+                })
+                .collect(),
+        ),
+        included: vec![],
+        links: HashMap::new(),
+    }))
 }
 
 pub async fn provider(

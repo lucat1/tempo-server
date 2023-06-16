@@ -38,7 +38,12 @@ pub fn router() -> Router<AppState> {
         )
         .route("/scrobbles/:id", get(scrobbles::scrobble))
         .route("/users/:username", get(users::user))
-        .route("/users/:username/relationships/:relation", get(users::relation))
+        .route(
+            "/users/:username/relationships/:relation",
+            get(users::relation),
+        )
+        .route("/connections", get(connections::providers))
+        .route("/connections/:provider", get(connections::provider))
         .route("/search", get(search::search))
         .layer(from_fn(auth::auth_middleware))
         .route("/server", get(server))

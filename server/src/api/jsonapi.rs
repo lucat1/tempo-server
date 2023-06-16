@@ -18,10 +18,10 @@ use uuid::Uuid;
 
 use super::documents::{
     ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
-    ConnectionAttributes, ConnectionRelation, ImageAttributes, ImageRelation, MediumAttributes,
-    MediumRelation, RecordingAttributes, ReleaseAttributes, ReleaseRelation, ScrobbleAttributes,
-    ScrobbleRelation, ServerAttributes, ServerRelation, TrackAttributes, TrackRelation,
-    UserAttributes, UserRelation,
+    ConnectionAttributes, ConnectionMetaAttributes, ConnectionRelation, ImageAttributes,
+    ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes, ReleaseAttributes,
+    ReleaseRelation, ScrobbleAttributes, ScrobbleRelation, ServerAttributes, ServerRelation,
+    TrackAttributes, TrackRelation, UserAttributes, UserRelation,
 };
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
@@ -163,6 +163,7 @@ pub enum Related {
 pub enum Meta {
     ArtistCredit(ArtistCreditAttributes),
     Recording(RecordingAttributes),
+    Connection(ConnectionMetaAttributes),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -12,7 +12,7 @@ use crate::api::{
         dedup, Document, DocumentData, Error, Included, Query, Related, Relation, Relationship,
         ResourceIdentifier, ResourceType, UserResource,
     },
-    tempo::{connections, scrobbles},
+    tempo::{connections::ProviderImpl, scrobbles},
     AppState,
 };
 
@@ -81,7 +81,7 @@ pub fn entity_to_resource(entity: &entity::User, related: &UserRelated) -> UserR
                             Related::ConnectionProvider(ResourceIdentifier {
                                 r#type: ResourceType::Connection,
                                 id: s.provider,
-                                meta: None,
+                                meta: s.provider.meta(&s.data).ok(),
                             })
                         })
                         .collect(),
@@ -127,16 +127,6 @@ where
     C: ConnectionTrait,
 {
     let mut included = Vec::new();
-    // TODO
-    // if include.contains(&UserInclude::Connections) {
-    //     included.extend(
-    //         related
-    //             .iter()
-    //             .flat_map(|r| r.connections)
-    //             .map(|s| connections::entity_to_included(&s))
-    //             .collect::<Vec<_>>(),
-    //     );
-    // }
     if include.contains(&UserInclude::Scrobbles) {
         let scrobbles = related
             .into_iter()
@@ -159,7 +149,14 @@ pub fn entity_to_included(entity: &entity::User, related: &UserRelated) -> Inclu
     Included::User(entity_to_resource(entity, related))
 }
 
-async fn fetch_user<C>(db: &C, username: String, include: &[UserInclude]) -> Result<(UserResource, Vec<Included>), Error> where C: ConnectionTrait{
+async fn fetch_user<C>(
+    db: &C,
+    username: String,
+    include: &[UserInclude],
+) -> Result<(UserResource, Vec<Included>), Error>
+where
+    C: ConnectionTrait,
+{
     let user = entity::UserEntity::find_by_id(username)
         .one(db)
         .await
@@ -223,17 +220,21 @@ pub async fn relation(
         detail: Some(e.into()),
     })?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
-    let related = data.relationships.get(&relation).map(|r| r.data.to_owned()).ok_or(Error{
+    let related = data
+        .relationships
+        .get(&relation)
+        .map(|r| r.data.to_owned())
+        .ok_or(Error {
             status: StatusCode::NOT_FOUND,
             title: "No relationship data".to_string(),
-            detail: None
-    })?;
+            detail: None,
+        })?;
     Ok(Json::new(Document {
         links: HashMap::new(),
         data: match related {
-        Relation::Multi(r) => DocumentData::Multi(r),
-        Relation::Single(r) => DocumentData::Single(r),
-    },
+            Relation::Multi(r) => DocumentData::Multi(r),
+            Relation::Single(r) => DocumentData::Single(r),
+        },
         included: dedup(included),
     }))
 }
