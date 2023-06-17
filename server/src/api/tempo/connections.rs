@@ -136,7 +136,7 @@ impl ProviderImpl for entity::ConnectionProvider {
                     .append_pair("format", "json")
                     .append_pair("api_key", lastfm.apikey.as_str())
                     .append_pair("token", opts.token.as_str());
-                let signature = lastfm::signature(&url, lastfm.shared_secret.as_str());
+                let signature = lastfm::signature(url.query_pairs(), lastfm.shared_secret.as_str());
                 url.query_pairs_mut()
                     .append_pair("api_sig", signature.as_str());
                 let res = lastfm::send_request(Request::new(Method::GET, url)).await?;

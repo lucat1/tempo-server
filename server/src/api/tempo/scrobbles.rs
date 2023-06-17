@@ -2,16 +2,16 @@ use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use eyre::{eyre, Result};
 use sea_orm::{
-    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, IntoActiveModel,
-    LoaderTrait, PaginatorTrait, QueryFilter, TransactionTrait,
+    ActiveValue, ColumnTrait, Condition, ConnectionTrait, CursorTrait, DbErr, EntityTrait,
+    LoaderTrait, PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::{tracks, users};
-use crate::api::documents::TrackInclude;
 use crate::api::{
     auth::Claims,
-    documents::{ScrobbleAttributes, ScrobbleInclude, ScrobbleRelation},
+    documents::{ScrobbleAttributes, ScrobbleInclude, ScrobbleRelation, TrackInclude},
     extract::Json,
     jsonapi::{
         dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
@@ -20,6 +20,7 @@ use crate::api::{
     },
     AppState,
 };
+use crate::tasks;
 
 pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     let mut relationships = HashMap::new();
@@ -164,6 +165,49 @@ where
     Ok((data, included))
 }
 
+pub async fn schedule_scrobble_tasks<C, I>(db: &C, username: &str, tracks: I) -> Result<()>
+where
+    C: ConnectionTrait,
+    I: Iterator<Item = (Uuid, time::OffsetDateTime)>,
+{
+    let mut times = Vec::new();
+    let mut cond = Condition::any();
+    for (id, at) in tracks {
+        cond = cond.add(ColumnTrait::eq(&entity::TrackColumn::Id, id.to_owned()));
+        times.push(at);
+    }
+    let tracks = entity::TrackEntity::find().filter(cond).all(db).await?;
+    let artist_credits = tracks
+        .load_many_to_many(
+            entity::ArtistCreditEntity,
+            entity::ArtistCreditTrackEntity,
+            db,
+        )
+        .await?;
+    for (i, track) in tracks.into_iter().enumerate() {
+        let artist_credits = &artist_credits[i];
+        let artists: Vec<_> = artist_credits
+            .load_one(entity::ArtistEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        // TODO: use user's setting to determine the subset of connections he wants
+        // to scrobble to.
+        let data = tasks::scrobble::Data {
+            provider: entity::ConnectionProvider::LastFM,
+            username: username.to_owned(),
+            time: times[i],
+            track: track.to_owned(),
+            artist_credits: artist_credits.to_owned(),
+            artists,
+        };
+        tasks::get_queue().push(tasks::Task::Scrobble(data));
+    }
+    Ok(())
+}
+
 pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
@@ -179,6 +223,17 @@ pub async fn insert_scrobbles(
         DocumentData::Multi(v) => v,
         DocumentData::Single(r) => vec![r],
     };
+    for scrobble in scrobbles.iter() {
+        if let Some(Relationship { data: Relation::Single(Related::String(data)) }) = scrobble.relationships.get(&ScrobbleRelation::User) {
+            if data.id != claims.username {
+                return Err(Error{
+        status: StatusCode::BAD_REQUEST,
+        title: "You cannot insert a scrobble for another user".to_string(),
+        detail: None
+                })
+            }
+        }
+    }
     let entities = scrobbles
         .iter()
         .map(resource_to_active_entity)
@@ -189,11 +244,7 @@ pub async fn insert_scrobbles(
             detail: Some(e.into()),
         })?;
     tracing::info!(user = %claims.username, scrobbles = ?entities, "Scrobbling");
-    let entities = entities
-        .into_iter()
-        .map(|e| e.into_active_model())
-        .collect::<Vec<_>>();
-    let res = entity::ScrobbleEntity::insert_many(entities)
+    let res = entity::ScrobbleEntity::insert_many(entities.clone())
         .exec(&tx)
         .await
         .map_err(|e| Error {
@@ -212,6 +263,28 @@ pub async fn insert_scrobbles(
         title: "Couldn't begin database transaction".to_string(),
         detail: Some(e.into()),
     })?;
+
+    schedule_scrobble_tasks(
+        &tx,
+        claims.username.as_str(),
+        entities
+            .iter()
+            .map(|e| (e.track.clone().into_value(), e.at.clone().into_value()))
+            .filter_map(|i| match i {
+                (Some(Value::Uuid(Some(id))), Some(Value::TimeDateTimeWithTimeZone(Some(time)))) => {
+                    Some((*id.to_owned(), *time.to_owned()))
+                }
+                _ => None,
+            }),
+    )
+    .await
+    .map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Error while scheduling the scrobbling of tracks to the various connections"
+            .to_string(),
+        detail: Some(e.into()),
+    })?;
+
     let page = Page {
         size: u32::MAX,
         before: Some(res.last_insert_id + 1),

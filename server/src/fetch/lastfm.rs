@@ -6,7 +6,7 @@ use nonzero_ext::*;
 use reqwest::{header::HeaderValue, header::USER_AGENT, Error, Request, Response};
 use std::num::NonZeroU32;
 
-pub static LASTFM_BASE_STRURL: &str = "https://ws.audioscrobbler.com/2.0";
+pub static LASTFM_BASE_STRURL: &str = "https://ws.audioscrobbler.com/2.0/?format=json";
 static LASTFM_CALLS_PER_SECOND: NonZeroU32 = nonzero!(1u32);
 
 lazy_static! {
@@ -27,10 +27,12 @@ pub async fn send_request(mut req: Request) -> Result<Response, Error> {
     UNLIMITED_CLIENT.execute(req).await
 }
 
-pub fn signature(url: &url::Url, secret: &str) -> String {
-    let mut sorted_pairs: Vec<(String, String)> = url
-        .query_pairs()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+pub fn signature<I, T>(pairs: I, secret: &str) -> String
+
+where T: Into<String>, I: Iterator<Item = (T, T)>
+{
+    let mut sorted_pairs: Vec<(String, String)> = pairs
+        .map(|(k,v)| (k.into(), v.into()))
         .filter(|(k, _)| k != "format")
         .collect();
     sorted_pairs.sort_by_key(|(k, _)| k.to_owned());
