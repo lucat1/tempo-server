@@ -29,7 +29,7 @@ impl MigrationTrait for Migration {
             .await?;
         // If we do have the original_date column then we need to migrate data,
         // otherwise the DB has already been migrated with the new structure.
-        if has_dates.len() > 0 {
+        if has_dates.is_empty() {
             let dates = conn
                 .query_all(Statement::from_string(
                     backend,

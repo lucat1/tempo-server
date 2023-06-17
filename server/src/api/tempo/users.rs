@@ -277,7 +277,7 @@ pub async fn post_relation(
         title: "Could not check if the connectino already exists".to_string(),
         detail: Some(e.into()),
     })?;
-    if let Some(_) = connection {
+    if connection.is_some() {
         Err(Error{
         status: StatusCode::NOT_MODIFIED,
         title: "Connection already enstablished".to_string(),
@@ -291,7 +291,7 @@ pub async fn post_relation(
     })?;
 
         // TODO: redirect url
-        let url = relation.data[0].id.url(&settings, username.as_str(), None).await.map_err(|e| Error{
+        let url = relation.data[0].id.url(settings, username.as_str(), None).await.map_err(|e| Error{
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not generate connection URL".to_string(),
         detail: Some(e.into())
