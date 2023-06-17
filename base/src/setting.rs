@@ -22,7 +22,7 @@ lazy_static! {
 
 static DEFAULT_DB_FILE: &str = "lib.db";
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
     pub db: String,
@@ -43,6 +43,21 @@ pub struct Settings {
 
     #[serde(default)]
     pub auth: Auth,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            db: String::new(),
+            url: default_url(),
+            library: Library::default(),
+            downloads: PathBuf::default(),
+            search_index: PathBuf::default(),
+            tasks: Tasks::default(),
+            connections: Connections::default(),
+            auth: Auth::default(),
+        }
+    }
 }
 
 fn default_url() -> url::Url {

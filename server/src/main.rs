@@ -6,14 +6,20 @@ pub mod tasks;
 
 use clap::{Parser, Subcommand};
 use eyre::{eyre, Result, WrapErr};
+use rand::distributions::{Alphanumeric, DistString};
 use sea_orm_migration::MigratorTrait;
-use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::{fmt::Display, net::SocketAddr, str::FromStr};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
     prelude::*,
 };
+
+use argon2::Argon2;
+use password_hash::{PasswordHasher, SaltString};
+use pbkdf2::Pbkdf2;
+use scrypt::Scrypt;
 
 use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 use base::setting::{load, Settings, SETTINGS};
@@ -38,10 +44,52 @@ struct Cli {
     command: Option<Command>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 enum Command {
     DefaultConfig,
+    HashPassword(HashPasswordOptions),
     Serve,
+}
+
+#[derive(Parser)]
+struct HashPasswordOptions {
+    #[arg(short, long, name = "ALGORITHM", default_value_t = HashPasswordAlgorithm::Argon2)]
+    algorithm: HashPasswordAlgorithm,
+
+    #[arg(short, long, name = "SALT")]
+    salt: Option<String>,
+
+    #[arg(name = "PASSWORD", help = "The password you want to hash")]
+    password: String,
+}
+
+#[derive(Clone)]
+enum HashPasswordAlgorithm {
+    Argon2,
+    Pbkdf2,
+    Scrypt,
+}
+
+impl Display for HashPasswordAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HashPasswordAlgorithm::Argon2 => write!(f, "argon2"),
+            HashPasswordAlgorithm::Pbkdf2 => write!(f, "pbkdf2"),
+            HashPasswordAlgorithm::Scrypt => write!(f, "scrypt"),
+        }
+    }
+}
+
+impl FromStr for HashPasswordAlgorithm {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "argon2" => Ok(HashPasswordAlgorithm::Argon2),
+            "pbkdf2" => Ok(HashPasswordAlgorithm::Pbkdf2),
+            "scrypt" => Ok(HashPasswordAlgorithm::Scrypt),
+            s => Err(format!("Invalid hashing algorithm: {}", s)),
+        }
+    }
 }
 
 #[tokio::main]
@@ -64,6 +112,25 @@ async fn main() -> Result<()> {
             default = generate_default(default)?;
             let str = toml::to_string(&default)?;
             println!("{}", str);
+            Ok(())
+        }
+        Command::HashPassword(opts) => {
+            let salt = opts
+                .salt
+                .unwrap_or_else(|| Alphanumeric.sample_string(&mut rand::thread_rng(), 32));
+            let salt_str = SaltString::from_b64(salt.as_str())?;
+            let hash = match opts.algorithm {
+                HashPasswordAlgorithm::Argon2 => {
+                    Argon2::default().hash_password(opts.password.as_bytes(), &salt_str)
+                }
+                HashPasswordAlgorithm::Pbkdf2 => {
+                    Pbkdf2.hash_password(opts.password.as_bytes(), &salt_str)
+                }
+                HashPasswordAlgorithm::Scrypt => {
+                    Scrypt.hash_password(opts.password.as_bytes(), &salt_str)
+                }
+            }?;
+            println!("{}", hash);
             Ok(())
         }
         Command::Serve => {

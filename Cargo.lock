@@ -4234,6 +4234,7 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "argon2",
  "async-once-cell",
  "async-recursion",
  "async-trait",
@@ -4267,12 +4268,16 @@ dependencies = [
  "mime",
  "nonzero_ext",
  "once_cell",
+ "password-hash",
  "pathfinding",
+ "pbkdf2",
+ "rand 0.8.5",
  "rayon",
  "regex",
  "reqwest",
  "scan_dir",
  "scraper",
+ "scrypt",
  "sea-orm",
  "sea-orm-migration",
  "serde",
