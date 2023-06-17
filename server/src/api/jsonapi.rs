@@ -101,12 +101,12 @@ pub struct InsertDocument<R> {
 
 #[derive(Serialize, Deserialize)]
 pub struct InsertOneRelation<R> {
-    pub data: R
+    pub data: R,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct InsertManyRelation<R> {
-    pub data: Vec<R>
+    pub data: Vec<R>,
 }
 
 #[derive(Serialize, Deserialize)]

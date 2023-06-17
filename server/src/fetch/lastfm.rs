@@ -1,12 +1,11 @@
 use governor::{clock::*, middleware::*, state::*, Quota, RateLimiter};
-use hex::ToHex;
 use lazy_static::lazy_static;
 use md5::compute as md5;
 use nonzero_ext::*;
 use reqwest::{header::HeaderValue, header::USER_AGENT, Error, Request, Response};
 use std::num::NonZeroU32;
 
-pub static LASTFM_BASE_STRURL: &str = "https://ws.audioscrobbler.com/2.0";
+pub static LASTFM_BASE_STRURL: &str = "https://ws.audioscrobbler.com/2.0/?format=json";
 static LASTFM_CALLS_PER_SECOND: NonZeroU32 = nonzero!(1u32);
 
 lazy_static! {
@@ -27,10 +26,12 @@ pub async fn send_request(mut req: Request) -> Result<Response, Error> {
     UNLIMITED_CLIENT.execute(req).await
 }
 
-pub fn signature(url: &url::Url, secret: &str) -> String {
-    let mut sorted_pairs: Vec<(String, String)> = url
-        .query_pairs()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+pub fn signature<I, T>(pairs: I, secret: &str) -> String
+
+where T: Into<String>, I: Iterator<Item = (T, T)>
+{
+    let mut sorted_pairs: Vec<(String, String)> = pairs
+        .map(|(k,v)| (k.into(), v.into()))
         .filter(|(k, _)| k != "format")
         .collect();
     sorted_pairs.sort_by_key(|(k, _)| k.to_owned());
@@ -38,8 +39,7 @@ pub fn signature(url: &url::Url, secret: &str) -> String {
         .iter()
         .fold(String::new(), |concat, (key, value)| concat + key + value)
         + secret;
-    let bytes: [u8; 16] = md5(concat.as_bytes()).into();
-    let hex = bytes.encode_hex::<String>();
+    let hex = format!("{:x}", md5(concat.as_bytes()));
     tracing::debug!(signature = ?concat, md5 = ?hex, "LastFM signature");
     hex
 }

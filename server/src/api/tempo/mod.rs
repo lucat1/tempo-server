@@ -8,12 +8,7 @@ mod search;
 mod tracks;
 mod users;
 
-use axum::{
-    middleware::from_fn,
-    routing::{get},
-
-    Router,
-};
+use axum::{middleware::from_fn, routing::get, Router};
 use std::collections::HashMap;
 
 use super::{
@@ -45,7 +40,9 @@ pub fn router() -> Router<AppState> {
         .route("/users/:username", get(users::user))
         .route(
             "/users/:username/relationships/:relation",
-            get(users::relation).post(users::post_relation).delete(users::delete_relation),
+            get(users::relation)
+                .post(users::post_relation)
+                .delete(users::delete_relation),
         )
         .route("/connections", get(connections::connections))
         .route("/connections/:provider", get(connections::connection))

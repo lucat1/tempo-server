@@ -1,13 +1,13 @@
 use super::jsonapi::Error;
 use axum::{
     async_trait,
-    http::header::{self, HeaderValue},
     body::HttpBody,
     extract::{
         FromRequest, FromRequestParts, Json as AxumJson, Path as AxumPath,
         TypedHeader as AxumTypedHeader,
     },
     headers::Header,
+    http::header::{self, HeaderValue},
     http::{request::Parts, Request, StatusCode},
     response::{IntoResponse, Response},
     BoxError,
@@ -58,7 +58,11 @@ where
     T: Serialize,
 {
     fn into_response(self) -> Response {
-        ([(header::CONTENT_TYPE, HeaderValue::from_static(HEADER_VALUE))], self.0.into_response()).into_response()
+        (
+            [(header::CONTENT_TYPE, HeaderValue::from_static(HEADER_VALUE))],
+            self.0.into_response(),
+        )
+            .into_response()
     }
 }
 

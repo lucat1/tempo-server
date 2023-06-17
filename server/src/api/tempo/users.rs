@@ -1,20 +1,20 @@
 use axum::{
     extract::{Path, State},
-    TypedHeader,
     headers::{Header, HeaderValue, Location},
-    http::{StatusCode},
+    http::StatusCode,
+    TypedHeader,
 };
 use sea_orm::{ConnectionTrait, DbErr, EntityTrait, LoaderTrait, TransactionTrait};
-use std::collections::HashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 use crate::api::{
+    auth::Claims,
     documents::{ScrobbleInclude, UserAttributes, UserInclude, UserRelation},
     extract::Json,
-    auth::Claims,
     jsonapi::{
-        dedup, Document, DocumentData, Error, Included, Query, Related, Relation, Relationship,
-        ResourceIdentifier, ResourceType, UserResource, InsertManyRelation
+        dedup, Document, DocumentData, Error, Included, InsertManyRelation, Query, Related,
+        Relation, Relationship, ResourceIdentifier, ResourceType, UserResource,
     },
     tempo::{connections::ProviderImpl, scrobbles},
     AppState,
@@ -246,7 +246,7 @@ pub async fn relation(
 
 #[derive(Deserialize)]
 pub struct InsertExactlyOneRelation<R> {
-    pub data: [R;1]
+    pub data: [R; 1],
 }
 
 pub async fn post_relation(
@@ -256,48 +256,63 @@ pub async fn post_relation(
     body: Json<InsertExactlyOneRelation<ResourceIdentifier<entity::ConnectionProvider>>>,
 ) -> Result<(StatusCode, TypedHeader<Location>), Error> {
     if claims.username != username {
-        return Err(Error{
-        status: StatusCode::UNAUTHORIZED,
-        title: "You can only edit your own connections".to_string(),
-        detail: None
+        return Err(Error {
+            status: StatusCode::UNAUTHORIZED,
+            title: "You can only edit your own connections".to_string(),
+            detail: None,
         });
     }
     if relation != UserRelation::Connections {
-        return Err(Error{
-        status: StatusCode::BAD_REQUEST,
-        title: "Users can only edit connection relationships".to_string(),
-        detail: None
+        return Err(Error {
+            status: StatusCode::BAD_REQUEST,
+            title: "Users can only edit connection relationships".to_string(),
+            detail: None,
         });
     }
 
     let relation = body.inner();
 
-    let connection = entity::UserConnectionEntity::find_by_id((claims.username,relation.data[0].id)).one(&db).await.map_err(|e| Error{
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not check if the connectino already exists".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let connection =
+        entity::UserConnectionEntity::find_by_id((claims.username, relation.data[0].id))
+            .one(&db)
+            .await
+            .map_err(|e| Error {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                title: "Could not check if the connectino already exists".to_string(),
+                detail: Some(e.into()),
+            })?;
     if connection.is_some() {
-        Err(Error{
-        status: StatusCode::NOT_MODIFIED,
-        title: "Connection already enstablished".to_string(),
-        detail: None
+        Err(Error {
+            status: StatusCode::NOT_MODIFIED,
+            title: "Connection already enstablished".to_string(),
+            detail: None,
         })
     } else {
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while handling connection callback".to_owned(),
-        detail: Some(e.into()),
-    })?;
+        let settings = get_settings().map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Error while handling connection callback".to_owned(),
+            detail: Some(e.into()),
+        })?;
 
         // TODO: redirect url
-        let url = relation.data[0].id.url(settings, username.as_str(), None).await.map_err(|e| Error{
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not generate connection URL".to_string(),
-        detail: Some(e.into())
-        }
-        )?;
-        Ok((StatusCode::CREATED, TypedHeader(Location::decode(&mut [HeaderValue::from_str(url.to_string().as_str()).unwrap()].iter()).unwrap())))
+        let url = relation.data[0]
+            .id
+            .url(settings, username.as_str(), None)
+            .await
+            .map_err(|e| Error {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                title: "Could not generate connection URL".to_string(),
+                detail: Some(e.into()),
+            })?;
+        Ok((
+            StatusCode::CREATED,
+            TypedHeader(
+                Location::decode(
+                    &mut [HeaderValue::from_str(url.to_string().as_str()).unwrap()].iter(),
+                )
+                .unwrap(),
+            ),
+        ))
     }
 }
 
@@ -308,27 +323,30 @@ pub async fn delete_relation(
     body: Json<InsertManyRelation<ResourceIdentifier<entity::ConnectionProvider>>>,
 ) -> Result<StatusCode, Error> {
     if claims.username != username {
-        return Err(Error{
-        status: StatusCode::UNAUTHORIZED,
-        title: "You can only edit your own connections".to_string(),
-        detail: None
+        return Err(Error {
+            status: StatusCode::UNAUTHORIZED,
+            title: "You can only edit your own connections".to_string(),
+            detail: None,
         });
     }
     // TODO: support deleting scrobbles and others
     if relation != UserRelation::Connections {
-        return Err(Error{
-        status: StatusCode::BAD_REQUEST,
-        title: "Users can only edit connection relationships".to_string(),
-        detail: None
+        return Err(Error {
+            status: StatusCode::BAD_REQUEST,
+            title: "Users can only edit connection relationships".to_string(),
+            detail: None,
         });
     }
 
     let relation = body.inner();
-    entity::UserConnectionEntity::delete_by_id((claims.username,relation.data[0].id)).exec(&db).await.map_err(|e| Error{
-        status: StatusCode::FORBIDDEN,
-        title: "Could not delete the requested relations".to_string(),
-        detail: Some(e.into()),
-    })?;
+    entity::UserConnectionEntity::delete_by_id((claims.username, relation.data[0].id))
+        .exec(&db)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::FORBIDDEN,
+            title: "Could not delete the requested relations".to_string(),
+            detail: Some(e.into()),
+        })?;
 
     Ok(StatusCode::OK)
 }
