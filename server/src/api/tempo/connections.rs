@@ -21,8 +21,8 @@ use crate::api::{
     AppState,
 };
 use crate::fetch::lastfm;
-use entity::user_connection::Named;
 use base::setting::{get_settings, Settings};
+use entity::user_connection::Named;
 
 lazy_static! {
     static ref LASTFM_URL: url::Url = url::Url::parse("https://last.fm").unwrap();
@@ -125,34 +125,35 @@ impl ProviderImpl for entity::ConnectionProvider {
     ) -> Result<serde_json::Value> {
         match self {
             entity::ConnectionProvider::LastFM => {
-                if let Some(lastfm) = &settings.connections.lastfm {
-                    let mut url = lastfm::LASTFM_BASE_URL.clone();
-                    url.query_pairs_mut()
-                        .append_pair("method", "auth.getSession")
-                        .append_pair("format", "json")
-                        .append_pair("api_key", lastfm.apikey.as_str())
-                        .append_pair("token", opts.token.as_str());
-                    let signature = lastfm::signature(&url, lastfm.shared_secret.as_str());
-                    url.query_pairs_mut()
-                        .append_pair("api_sig", signature.as_str());
-                    let res = lastfm::send_request(Request::new(Method::GET, url)).await?;
-                    let raw_data: LastFMAuthResponse = res.json().await.map_err(|e| eyre!(e))?;
-                    match raw_data {
-                        LastFMAuthResponse::Success(raw_data) => {
-                            let data = entity::user_connection::LastFMData {
-                                token: raw_data.session.key,
-                                username: raw_data.session.name,
-                            };
-                            Ok(serde_json::to_value(data)?)
-                        }
-                        LastFMAuthResponse::Error(err) => Err(eyre!(
-                            "LastFM returned error code {}: {}",
-                            err.code,
-                            err.message
-                        )),
+                let lastfm = settings
+                    .connections
+                    .lastfm
+                    .as_ref()
+                    .ok_or(eyre!("Provider {} not configured", self.name()))?;
+                let mut url = lastfm::LASTFM_BASE_URL.clone();
+                url.query_pairs_mut()
+                    .append_pair("method", "auth.getSession")
+                    .append_pair("format", "json")
+                    .append_pair("api_key", lastfm.apikey.as_str())
+                    .append_pair("token", opts.token.as_str());
+                let signature = lastfm::signature(&url, lastfm.shared_secret.as_str());
+                url.query_pairs_mut()
+                    .append_pair("api_sig", signature.as_str());
+                let res = lastfm::send_request(Request::new(Method::GET, url)).await?;
+                let raw_data: LastFMAuthResponse = res.json().await.map_err(|e| eyre!(e))?;
+                match raw_data {
+                    LastFMAuthResponse::Success(raw_data) => {
+                        let data = entity::user_connection::LastFMData {
+                            token: raw_data.session.key,
+                            username: raw_data.session.name,
+                        };
+                        Ok(serde_json::to_value(data)?)
                     }
-                } else {
-                    Err(eyre!("Provider {} not configured", self.to_string()))
+                    LastFMAuthResponse::Error(err) => Err(eyre!(
+                        "LastFM returned error code {}: {}",
+                        err.code,
+                        err.message
+                    )),
                 }
             }
         }

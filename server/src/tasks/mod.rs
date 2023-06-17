@@ -2,6 +2,7 @@ pub mod artist_description;
 pub mod artist_url;
 pub mod index_search;
 pub mod lastfm_artist_image;
+pub mod scrobble;
 
 use base::{database::get_database, setting::get_settings};
 use deadqueue::unlimited::Queue;
@@ -24,6 +25,8 @@ pub enum Task {
     ArtistUrl(artist_url::Data),
     LastfmArtistImage(lastfm_artist_image::Data),
     IndexSearch(index_search::Data),
+
+    Scrobble(scrobble::Data),
 }
 
 pub fn queue_loop() -> Result<()> {
@@ -52,5 +55,6 @@ async fn run_task(db: &DbConn, task: Task) -> Result<()> {
         Task::ArtistUrl(data) => artist_url::run(db, data).await,
         Task::LastfmArtistImage(data) => lastfm_artist_image::run(db, data).await,
         Task::IndexSearch(data) => index_search::run(db, data).await,
+        Task::Scrobble(data) => scrobble::run(db, data).await,
     }
 }
