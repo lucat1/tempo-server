@@ -272,7 +272,7 @@ pub async fn insert_scrobbles(
             .map(|e| (e.track.clone().into_value(), e.at.clone().into_value()))
             .filter_map(|i| match i {
                 (Some(Value::Uuid(Some(id))), Some(Value::TimeDateTimeWithTimeZone(Some(time)))) => {
-                    Some((*id.to_owned(), *time.to_owned()))
+                    Some((*id, *time))
                 }
                 _ => None,
             }),
