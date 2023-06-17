@@ -22,7 +22,7 @@ lazy_static! {
 
 static DEFAULT_DB_FILE: &str = "lib.db";
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
     #[serde(default)]
     pub db: String,
@@ -274,6 +274,12 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     tracing::info! {?path, "Loading config file"};
     let content = fs::read_to_string(path).unwrap_or_else(|_| "".to_string());
     let mut set: Settings = toml::from_str(content.as_str()).map_err(|e| eyre!(e))?;
+    set = generate_default(set)?;
+    tracing::trace! {settings = ?set,"Loaded settings"};
+    Ok(set)
+}
+
+pub fn generate_default(mut set: Settings) -> Result<Settings> {
     if set.db == String::default() {
         set.db = format!(
             "sqlite://{}?mode=rwc",
@@ -286,11 +292,13 @@ pub fn load(path: Option<PathBuf>) -> Result<Settings> {
     if set.search_index == PathBuf::default() {
         set.search_index = get_search_index(&set.library.path);
     }
+    if set.tasks.recurring == HashMap::default() {
+        set.tasks.recurring = default_recurring();
+    }
     if set.auth.jwt_secret == String::default() {
         set.auth.jwt_secret = Alphanumeric.sample_string(&mut rand::thread_rng(), 32);
         tracing::warn!(secret = %set.auth.jwt_secret, "Using random JWT secret. Please define one in the config to make authentication persistant across restarts");
     }
-    tracing::trace! {settings = ?set,"Loaded settings"};
     Ok(set)
 }
 

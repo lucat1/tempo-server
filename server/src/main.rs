@@ -4,7 +4,7 @@ mod scheduling;
 pub mod search;
 pub mod tasks;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use eyre::{eyre, Result, WrapErr};
 use sea_orm_migration::MigratorTrait;
 use std::net::SocketAddr;
@@ -16,14 +16,15 @@ use tracing_subscriber::{
 };
 
 use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
-use base::setting::{load, SETTINGS};
+use base::setting::{load, Settings, SETTINGS};
 use base::{
     database::{get_database, open_database, DATABASE},
-    setting::get_settings,
+    setting::{generate_default, get_settings},
+    CLI_NAME,
 };
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(name = CLI_NAME,author, version, about, long_about = None)]
 #[command(next_line_help = true)]
 struct Cli {
     /// Sets a custom config file
@@ -32,6 +33,15 @@ struct Cli {
 
     #[arg(short, long, name = "ADDRESS", default_value_t = String::from("127.0.0.1:3000"))]
     listen_address: String,
+
+    #[clap(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    DefaultConfig,
+    Serve,
 }
 
 #[tokio::main]
@@ -48,41 +58,51 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let cli = Cli::parse();
+    match cli.command.unwrap_or(Command::Serve) {
+        Command::DefaultConfig => {
+            let mut default = Settings::default();
+            default = generate_default(default)?;
+            let str = toml::to_string(&default)?;
+            println!("{}", str);
+            Ok(())
+        }
+        Command::Serve => {
+            // settings
+            SETTINGS.get_or_try_init(async { load(cli.config) }).await?;
 
-    // settings
-    SETTINGS.get_or_try_init(async { load(cli.config) }).await?;
+            // database
+            DATABASE
+                .get_or_try_init(async { open_database().await })
+                .await?;
+            migration::Migrator::up(get_database()?, None).await?;
 
-    // database
-    DATABASE
-        .get_or_try_init(async { open_database().await })
-        .await?;
-    migration::Migrator::up(get_database()?, None).await?;
+            // search index
+            INDEXES.get_or_try_init(async { open_indexes() }).await?;
+            INDEX_WRITERS
+                .lock()
+                .await
+                .get_or_try_init(async { open_index_writers() })
+                .await?;
 
-    // search index
-    INDEXES.get_or_try_init(async { open_indexes() }).await?;
-    INDEX_WRITERS
-        .lock()
-        .await
-        .get_or_try_init(async { open_index_writers() })
-        .await?;
+            // background tasks
+            crate::tasks::queue_loop()?;
+            let mut scheduler = scheduling::new().await?;
+            for (task, schedule) in get_settings()?.tasks.recurring.iter() {
+                scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+            }
+            scheduling::start(&mut scheduler).await?;
 
-    // background tasks
-    crate::tasks::queue_loop()?;
-    let mut scheduler = scheduling::new().await?;
-    for (task, schedule) in get_settings()?.tasks.recurring.iter() {
-        scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+            let addr: SocketAddr = cli
+                .listen_address
+                .parse()
+                .wrap_err(eyre!("Invalid listen address"))?;
+            tracing::info! {%addr, "Listening"};
+            let router = api::router()?;
+            axum::Server::bind(&addr)
+                .serve(router.into_make_service())
+                .await
+                .unwrap();
+            Ok(())
+        }
     }
-    scheduling::start(&mut scheduler).await?;
-
-    let addr: SocketAddr = cli
-        .listen_address
-        .parse()
-        .wrap_err(eyre!("Invalid listen address"))?;
-    tracing::info! {%addr, "Listening"};
-    let router = api::router()?;
-    axum::Server::bind(&addr)
-        .serve(router.into_make_service())
-        .await
-        .unwrap();
-    Ok(())
 }
