@@ -1,8 +1,7 @@
 use axum::{
     async_trait,
-    extract::{OriginalUri, Query, State},
+    extract::{Query, State},
     http::StatusCode,
-    http::Uri,
     response::{IntoResponse, Redirect, Response},
 };
 use eyre::{eyre, Result};
@@ -16,13 +15,13 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::api::{
-    auth::Claims,
     documents::{ConnectionAttributes, ConnectionFlow, ConnectionMetaAttributes},
     extract::{Json, Path},
     jsonapi::{ConnectionResource, Document, DocumentData, Error, Meta, ResourceType},
     AppState,
 };
 use crate::fetch::lastfm;
+use entity::user_connection::Named;
 use base::setting::{get_settings, Settings};
 
 lazy_static! {
@@ -35,14 +34,8 @@ lazy_static! {
         ConnectionAttributes {
             homepage: LASTFM_URL.to_owned(),
             flow: ConnectionFlow::Redirect,
-            url: None,
         },
     )];
-}
-
-#[derive(Deserialize)]
-pub struct ProviderOptions {
-    pub redirect: Option<Url>,
 }
 
 #[derive(Deserialize)]
@@ -54,13 +47,7 @@ pub struct CallbackOptions {
 
 #[async_trait]
 pub trait ProviderImpl {
-    async fn attributes(
-        &self,
-        settings: &Settings,
-        claims: &Claims,
-        uri: Uri,
-        opts: &ProviderOptions,
-    ) -> Result<ConnectionAttributes>;
+    async fn url(&self, settings: &Settings, username: &str, redirect: Option<Url>) -> Result<Url>;
     async fn callback(
         &self,
         settings: &Settings,
@@ -105,44 +92,32 @@ async fn username(id: &Uuid) -> Option<String> {
 
 #[async_trait]
 impl ProviderImpl for entity::ConnectionProvider {
-    async fn attributes(
-        &self,
-        settings: &Settings,
-        claims: &Claims,
-        uri: Uri,
-        opts: &ProviderOptions,
-    ) -> Result<ConnectionAttributes> {
+    async fn url(&self, settings: &Settings, username: &str, redirect: Option<Url>) -> Result<Url> {
         match self {
             entity::ConnectionProvider::LastFM => {
                 if let Some(lastfm) = &settings.connections.lastfm {
                     let mut url = LASTFM_AUTH_URL.clone();
                     let mut cb_url = settings.url.clone();
-                    cb_url.set_path(uri.path().to_string().as_str());
-                    if let Ok(mut params) = cb_url.path_segments_mut() {
-                        params.push("callback");
-                    };
-                    let id = id(&claims.username).await.to_string();
+                    cb_url.set_path(format!("tempo/connections/{}/callback", self.name()).as_str());
+                    let id = id(username).await.to_string();
                     {
                         let cb_url_params = &mut cb_url.query_pairs_mut();
                         cb_url_params.append_pair("id", id.as_str());
-                        if let Some(redir) = &opts.redirect {
+                        if let Some(redir) = &redirect {
                             cb_url_params.append_pair("redirect", redir.to_string().as_str());
                         }
                     }
                     url.query_pairs_mut()
                         .append_pair("api_key", lastfm.apikey.as_str())
                         .append_pair("cb", cb_url.to_string().as_str());
-                    Ok(ConnectionAttributes {
-                        homepage: LASTFM_URL.to_owned(),
-                        flow: ConnectionFlow::Redirect,
-                        url: Some(url),
-                    })
+                    Ok(url)
                 } else {
                     Err(eyre!("Provider {} not configured", self.to_string()))
                 }
             }
         }
     }
+
     async fn callback(
         &self,
         settings: &Settings,
@@ -196,7 +171,7 @@ impl ProviderImpl for entity::ConnectionProvider {
     }
 }
 
-pub async fn providers() -> Result<Json<Document<ConnectionResource>>, Error> {
+pub async fn connections() -> Result<Json<Document<ConnectionResource>>, Error> {
     Ok(Json::new(Document {
         data: DocumentData::Multi(
             PROVIDERS
@@ -215,31 +190,24 @@ pub async fn providers() -> Result<Json<Document<ConnectionResource>>, Error> {
     }))
 }
 
-pub async fn provider(
+pub async fn connection(
     path_provider: Path<entity::ConnectionProvider>,
-    claims: Claims,
-    Query(opts): Query<ProviderOptions>,
-    OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ConnectionResource>>, Error> {
     let provider = path_provider.inner();
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while generating connection attributes".to_owned(),
-        detail: Some(e.into()),
-    })?;
+    let (id, attrs) = PROVIDERS
+        .iter()
+        .find(|(id, _)| id == &provider)
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Unkown connection provider".to_owned(),
+            detail: None,
+        })?;
 
     Ok(Json::new(Document {
         data: DocumentData::Single(ConnectionResource {
-            id: provider,
+            id: id.to_owned(),
             r#type: ResourceType::Connection,
-            attributes: provider
-                .attributes(settings, &claims, uri, &opts)
-                .await
-                .map_err(|e| Error {
-                    status: StatusCode::INTERNAL_SERVER_ERROR,
-                    title: "Error while handling connection callback".to_owned(),
-                    detail: Some(e.into()),
-                })?,
+            attributes: attrs.to_owned(),
             meta: HashMap::new(),
             relationships: HashMap::new(),
         }),
@@ -291,7 +259,7 @@ pub async fn callback(
     } else {
         Ok(format!(
             "Successfully logged into {}, you can now close this page",
-            provider.to_string()
+            provider.name()
         )
         .into_response())
     }

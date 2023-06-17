@@ -309,7 +309,6 @@ pub enum ConnectionFlow {
 pub struct ConnectionAttributes {
     pub homepage: Url,
     pub flow: ConnectionFlow,
-    pub url: Option<Url>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]

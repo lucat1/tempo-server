@@ -100,6 +100,16 @@ pub struct InsertDocument<R> {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct InsertOneRelation<R> {
+    pub data: R
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InsertManyRelation<R> {
+    pub data: Vec<R>
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DocumentData<R> {
     Single(R),

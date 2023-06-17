@@ -9,6 +9,18 @@ pub enum ConnectionProvider {
     LastFM,
 }
 
+pub trait Named {
+    fn name(&self) -> &'static str;
+}
+
+impl Named for ConnectionProvider {
+    fn name(&self) -> &'static str {
+        match self {
+            ConnectionProvider::LastFM => "lastfm",
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct LastFMData {
     pub token: String,
