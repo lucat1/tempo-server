@@ -17,6 +17,7 @@ mod image_release;
 
 mod scrobble;
 mod user;
+pub mod user_connection;
 
 pub mod conflict;
 pub mod full;
@@ -91,6 +92,11 @@ pub use user::ActiveModel as UserActive;
 pub use user::Column as UserColumn;
 pub use user::Entity as UserEntity;
 pub use user::Model as User;
+pub use user_connection::ActiveModel as UserConnectionActive;
+pub use user_connection::Column as UserConnectionColumn;
+pub use user_connection::ConnectionProvider;
+pub use user_connection::Entity as UserConnectionEntity;
+pub use user_connection::Model as UserConnection;
 
 pub trait IgnoreNone {
     fn ignore_none(self) -> Result<(), DbErr>;

@@ -1,4 +1,5 @@
 mod artists;
+mod connections;
 mod images;
 mod mediums;
 mod releases;
@@ -7,12 +8,16 @@ mod search;
 mod tracks;
 mod users;
 
+use axum::{
+    middleware::from_fn,
+    routing::{get},
+
+    Router,
+};
 use std::collections::HashMap;
 
-use axum::{middleware::from_fn, routing::get, Router};
-
 use super::{
-    auth::{auth, auth_middleware, login},
+    auth,
     documents::ServerAttributes,
     extract::Json,
     jsonapi::{Document, DocumentData, ResourceType, ServerResource},
@@ -36,14 +41,22 @@ pub fn router() -> Router<AppState> {
             "/scrobbles",
             get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),
         )
+        .route("/scrobbles/:id", get(scrobbles::scrobble))
+        .route("/users/:username", get(users::user))
         .route(
-            "/scrobbles/:id",
-            get(scrobbles::scrobble)
+            "/users/:username/relationships/:relation",
+            get(users::relation).post(users::post_relation).delete(users::delete_relation),
         )
+        .route("/connections", get(connections::connections))
+        .route("/connections/:provider", get(connections::connection))
         .route("/search", get(search::search))
-        .layer(from_fn(auth_middleware))
+        .layer(from_fn(auth::auth_middleware))
         .route("/server", get(server))
-        .route("/auth", get(auth).post(login))
+        .route("/auth", get(auth::auth).post(auth::login))
+        .route(
+            "/connections/:provider/callback",
+            get(connections::callback),
+        )
 }
 
 async fn server() -> Json<Document<ServerResource>> {
@@ -56,10 +69,18 @@ async fn server() -> Json<Document<ServerResource>> {
                 server: base::CLI_NAME.to_string(),
                 server_version: base::VERSION.to_string(),
                 auth_required: true,
-                features: ["artists", "releases", "mediums", "tracks", "users"]
-                    .into_iter()
-                    .map(|s| s.to_string())
-                    .collect(),
+                features: [
+                    "artists",
+                    "releases",
+                    "mediums",
+                    "tracks",
+                    "users",
+                    "scrobbles",
+                    "connections",
+                ]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             },
             relationships: HashMap::new(),
             meta: HashMap::new(),

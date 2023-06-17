@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
+use url::Url;
 use uuid::Uuid;
 
 use entity::{ArtistTrackRelationType, ArtistUrlType};
@@ -17,12 +18,12 @@ pub struct ServerAttributes {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServerRelation {}
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ArtistCreditAttributes {
     pub join_phrase: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecordingAttributes {
     pub role: ArtistTrackRelationType,
     pub detail: String,
@@ -250,14 +251,23 @@ pub struct UserAttributes {
 #[serde(rename_all = "snake_case")]
 pub enum UserRelation {
     Scrobbles,
+    Connections,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UserInclude {
     #[serde(rename = "scrobbles")]
     Scrobbles,
-    #[serde(rename = "scrobbles.tracks")]
+    #[serde(rename = "scrobbles.track")]
     ScrobblesTracks,
+    #[serde(rename = "scrobbles.track.artists")]
+    ScrobblesTracksArtists,
+    #[serde(rename = "scrobbles.track.medium")]
+    ScrobblesTracksMedium,
+    #[serde(rename = "scrobbles.track.medium.release")]
+    ScrobblesTracksMediumRelease,
+    #[serde(rename = "scrobbles.track.medium.release.artists")]
+    ScrobblesTracksMediumReleaseArtists,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -287,4 +297,26 @@ pub enum ScrobbleInclude {
     TrackMediumRelease,
     #[serde(rename = "track.medium.release.artists")]
     TrackMediumReleaseArtists,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionFlow {
+    Redirect,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConnectionAttributes {
+    pub homepage: Url,
+    pub flow: ConnectionFlow,
+}
+
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionRelation {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConnectionMetaAttributes {
+    pub username: String,
+    pub profile_url: Url,
 }

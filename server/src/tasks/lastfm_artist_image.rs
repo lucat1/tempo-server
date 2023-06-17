@@ -10,7 +10,7 @@ use strfmt::strfmt;
 use tag::PictureType;
 use uuid::Uuid;
 
-use crate::fetch::musicbrainz::send_request;
+use crate::fetch::lastfm::send_request;
 use base::setting::get_settings;
 use base::util::{mkdirp, path_to_str};
 use base::ImageFormat;

@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image: ghcr.io/rust-cross/rust-musl-cross:${IMAGE}
+    image: "ghcr.io/rust-cross/rust-musl-cross:${IMAGE}"
     commands:
       - cargo build --package server --release --target=${PLATFORM}
       - musl-strip target/${PLATFORM}/release/server

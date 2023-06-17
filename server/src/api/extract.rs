@@ -1,14 +1,20 @@
 use super::jsonapi::Error;
 use axum::{
     async_trait,
+    http::header::{self, HeaderValue},
     body::HttpBody,
-    extract::{FromRequest, FromRequestParts, Json as AxumJson, TypedHeader as AxumTypedHeader},
+    extract::{
+        FromRequest, FromRequestParts, Json as AxumJson, Path as AxumPath,
+        TypedHeader as AxumTypedHeader,
+    },
     headers::Header,
     http::{request::Parts, Request, StatusCode},
     response::{IntoResponse, Response},
     BoxError,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+static HEADER_VALUE: &str = "application/vnd.api+json";
 
 pub struct Json<T>(AxumJson<T>);
 
@@ -52,7 +58,7 @@ where
     T: Serialize,
 {
     fn into_response(self) -> Response {
-        self.0.into_response()
+        ([(header::CONTENT_TYPE, HeaderValue::from_static(HEADER_VALUE))], self.0.into_response()).into_response()
     }
 }
 
@@ -79,6 +85,34 @@ where
             .map_err(|e| Error {
                 status: StatusCode::BAD_REQUEST,
                 title: format!("Invalid header: {}", T::name()),
+                detail: Some(e.into()),
+            })
+    }
+}
+
+pub struct Path<T>(AxumPath<T>);
+
+impl<T> Path<T> {
+    pub fn inner(self) -> T {
+        self.0 .0
+    }
+}
+
+#[async_trait]
+impl<T, S> FromRequestParts<S> for Path<T>
+where
+    T: DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        AxumPath::<T>::from_request_parts(parts, state)
+            .await
+            .map(|val| Path(val))
+            .map_err(|e| Error {
+                status: StatusCode::NOT_FOUND,
+                title: "Invalid URL path".to_string(),
                 detail: Some(e.into()),
             })
     }

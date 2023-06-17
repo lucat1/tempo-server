@@ -8,7 +8,7 @@ use serde_enum_str::Deserialize_enum_str;
 use url::Url;
 use uuid::Uuid;
 
-use crate::fetch::musicbrainz::{send_request, MB_BASE_URL};
+use crate::fetch::musicbrainz::{send_request, MB_BASE_STRURL};
 
 pub type Data = Uuid;
 
@@ -116,7 +116,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
     tracing::trace!(%data, "Fetching artist urls");
     let req = Request::new(
         Method::GET,
-        format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_URL, data,).parse()?,
+        format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_STRURL, data,).parse()?,
     );
     let res = send_request(req).await?;
     if !res.status().is_success() {

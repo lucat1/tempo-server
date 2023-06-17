@@ -46,11 +46,19 @@ impl From<AuthProvider> for AuthMethod {
 pub enum Relation {
     #[sea_orm(has_many = "super::scrobble::Entity")]
     Scrobble,
+    #[sea_orm(has_many = "super::user_connection::Entity")]
+    Connection,
 }
 
 impl Related<super::scrobble::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Scrobble.def()
+    }
+}
+
+impl Related<super::user_connection::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Connection.def()
     }
 }
 

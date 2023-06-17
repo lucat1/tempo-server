@@ -21,14 +21,22 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let backend = manager.get_database_backend();
         let conn = manager.get_connection();
-        let maybe_dates = conn
+        let has_dates = conn
             .query_all(Statement::from_string(
                 backend,
-                "SELECT id, date, original_date FROM release".to_string(),
+                "SELECT column_name FROM information_schema.columns WHERE table_name='release' and column_name='original_date'".to_string(),
             ))
-            .await;
-        let mut map: HashMap<Uuid, (Option<Date>, Option<Date>)> = HashMap::new();
-        if let Ok(dates) = maybe_dates {
+            .await?;
+        // If we do have the original_date column then we need to migrate data,
+        // otherwise the DB has already been migrated with the new structure.
+        if has_dates.is_empty() {
+            let dates = conn
+                .query_all(Statement::from_string(
+                    backend,
+                    "SELECT id, date, original_date FROM release".to_string(),
+                ))
+                .await?;
+            let mut map: HashMap<Uuid, (Option<Date>, Option<Date>)> = HashMap::new();
             for result in dates.iter() {
                 let id: Uuid = result.try_get_by_index(0)?;
                 let date: Option<Date> = result.try_get_by_index(1)?;
@@ -102,8 +110,6 @@ impl MigrationTrait for Migration {
                 }
             }
         }
-        // Migration is not needed as this is a new instance with no old release entries
-        // the query would error as no columns named `date` and `original_date` exist.
         Ok(())
     }
 }

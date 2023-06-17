@@ -22,10 +22,12 @@ lazy_static! {
 
 static DEFAULT_DB_FILE: &str = "lib.db";
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
     pub db: String,
+    #[serde(default = "default_url")]
+    pub url: url::Url,
     #[serde(default)]
     pub library: Library,
     #[serde(default)]
@@ -37,10 +39,29 @@ pub struct Settings {
     pub tasks: Tasks,
 
     #[serde(default)]
-    pub keys: Keys,
+    pub connections: Connections,
 
     #[serde(default)]
     pub auth: Auth,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            db: String::new(),
+            url: default_url(),
+            library: Library::default(),
+            downloads: PathBuf::default(),
+            search_index: PathBuf::default(),
+            tasks: Tasks::default(),
+            connections: Connections::default(),
+            auth: Auth::default(),
+        }
+    }
+}
+
+fn default_url() -> url::Url {
+    url::Url::parse("http://localhost:3000").unwrap()
 }
 
 fn default_library_name() -> String {
@@ -329,12 +350,6 @@ fn default_recurring() -> HashMap<TaskType, String> {
     .into()
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Keys {
-    pub lastfm_apikey: String,
-    pub lastfm_shared_secret: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum AuthMethod {
     Local,
@@ -456,6 +471,18 @@ pub struct User {
     pub password: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub struct Connections {
+    pub lastfm: Option<LastFMConnection>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LastFMConnection {
+    pub apikey: String,
+    pub shared_secret: String,
 }
 
 pub fn get_settings() -> Result<&'static Settings> {

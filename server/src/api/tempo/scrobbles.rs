@@ -53,6 +53,10 @@ pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     }
 }
 
+pub fn entity_to_included(entity: &entity::Scrobble) -> Included {
+    Included::Scrobble(entity_to_resource(entity))
+}
+
 fn map_to_tracks_include(include: &[ScrobbleInclude]) -> Vec<TrackInclude> {
     include
         .iter()
@@ -255,7 +259,7 @@ pub async fn scrobble(
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch all tracks".to_string(),
+            title: "Could not fetch all scrobbles".to_string(),
             detail: Some(e.into()),
         })?
         .ok_or(Error {

@@ -4,8 +4,7 @@ use base::setting::get_settings;
 use eyre::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
