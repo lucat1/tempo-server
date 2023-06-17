@@ -4255,7 +4255,6 @@ dependencies = [
  "fs_extra",
  "futures",
  "governor",
- "hex",
  "image",
  "indicatif",
  "infer 0.13.0",

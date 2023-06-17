@@ -1,5 +1,4 @@
 use governor::{clock::*, middleware::*, state::*, Quota, RateLimiter};
-use hex::ToHex;
 use lazy_static::lazy_static;
 use md5::compute as md5;
 use nonzero_ext::*;
@@ -40,8 +39,7 @@ where T: Into<String>, I: Iterator<Item = (T, T)>
         .iter()
         .fold(String::new(), |concat, (key, value)| concat + key + value)
         + secret;
-    let bytes: [u8; 16] = md5(concat.as_bytes()).into();
-    let hex = bytes.encode_hex::<String>();
+    let hex = format!("{:x}", md5(concat.as_bytes()));
     tracing::debug!(signature = ?concat, md5 = ?hex, "LastFM signature");
     hex
 }
