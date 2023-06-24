@@ -27,11 +27,12 @@ pub async fn send_request(mut req: Request) -> Result<Response, Error> {
 }
 
 pub fn signature<I, T>(pairs: I, secret: &str) -> String
-
-where T: Into<String>, I: Iterator<Item = (T, T)>
+where
+    T: Into<String>,
+    I: Iterator<Item = (T, T)>,
 {
     let mut sorted_pairs: Vec<(String, String)> = pairs
-        .map(|(k,v)| (k.into(), v.into()))
+        .map(|(k, v)| (k.into(), v.into()))
         .filter(|(k, _)| k != "format")
         .collect();
     sorted_pairs.sort_by_key(|(k, _)| k.to_owned());

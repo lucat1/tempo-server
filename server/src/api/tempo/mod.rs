@@ -49,7 +49,10 @@ pub fn router() -> Router<AppState> {
         .route("/search", get(search::search))
         .layer(from_fn(auth::auth_middleware))
         .route("/server", get(server))
-        .route("/auth", get(auth::auth).post(auth::login))
+        .route(
+            "/auth",
+            get(auth::auth).post(auth::login).patch(auth::refresh),
+        )
         .route(
             "/connections/:provider/callback",
             get(connections::callback),

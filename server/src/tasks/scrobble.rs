@@ -1,6 +1,6 @@
 use eyre::{eyre, Result};
 use sea_orm::{DbConn, EntityTrait};
-use serde::{Deserialize};
+use serde::Deserialize;
 
 use crate::fetch::lastfm;
 use base::setting::get_settings;
@@ -60,14 +60,20 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
             let mut body: Vec<(String, String)> = vec![
                 ("artist".to_string(), full_track.get_joined_artists()?),
                 ("track".to_string(), data.track.title),
-                ("timestamp".to_string(), data.time.unix_timestamp().to_string()),
+                (
+                    "timestamp".to_string(),
+                    data.time.unix_timestamp().to_string(),
+                ),
                 ("mbid".to_string(), data.track.id.to_string()),
-
                 ("method".to_string(), "track.scrobble".to_string()),
                 ("format".to_string(), "json".to_string()),
                 ("api_key".to_string(), lastfm.apikey.to_owned()),
-                ("sk".to_string(), connection_data.token)];
-            let signature = lastfm::signature(body.iter().map(|(k,v)| (k, v)), lastfm.shared_secret.as_str());
+                ("sk".to_string(), connection_data.token),
+            ];
+            let signature = lastfm::signature(
+                body.iter().map(|(k, v)| (k, v)),
+                lastfm.shared_secret.as_str(),
+            );
             body.push(("api_sig".to_string(), signature));
             tracing::trace! {?body,"Scrobbling to last.fm"};
 
@@ -77,9 +83,7 @@ pub async fn run(db: &DbConn, data: Data) -> Result<()> {
             tracing::trace! {?raw_data, "Last.fm scrobble response"}
 
             match raw_data {
-                LastFMScrobbleResponse::Success(_) => {
-                    Ok(())
-                }
+                LastFMScrobbleResponse::Success(_) => Ok(()),
                 LastFMScrobbleResponse::Error(e) => Err(eyre!(
                     "Last.fm returned an error while scrobbling (code: {}): {}",
                     e.code,

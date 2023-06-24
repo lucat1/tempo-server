@@ -224,13 +224,16 @@ pub async fn insert_scrobbles(
         DocumentData::Single(r) => vec![r],
     };
     for scrobble in scrobbles.iter() {
-        if let Some(Relationship { data: Relation::Single(Related::String(data)) }) = scrobble.relationships.get(&ScrobbleRelation::User) {
+        if let Some(Relationship {
+            data: Relation::Single(Related::String(data)),
+        }) = scrobble.relationships.get(&ScrobbleRelation::User)
+        {
             if data.id != claims.username {
-                return Err(Error{
-        status: StatusCode::BAD_REQUEST,
-        title: "You cannot insert a scrobble for another user".to_string(),
-        detail: None
-                })
+                return Err(Error {
+                    status: StatusCode::BAD_REQUEST,
+                    title: "You cannot insert a scrobble for another user".to_string(),
+                    detail: None,
+                });
             }
         }
     }
@@ -271,9 +274,10 @@ pub async fn insert_scrobbles(
             .iter()
             .map(|e| (e.track.clone().into_value(), e.at.clone().into_value()))
             .filter_map(|i| match i {
-                (Some(Value::Uuid(Some(id))), Some(Value::TimeDateTimeWithTimeZone(Some(time)))) => {
-                    Some((*id, *time))
-                }
+                (
+                    Some(Value::Uuid(Some(id))),
+                    Some(Value::TimeDateTimeWithTimeZone(Some(time))),
+                ) => Some((*id, *time)),
                 _ => None,
             }),
     )
