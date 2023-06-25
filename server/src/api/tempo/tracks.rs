@@ -14,7 +14,8 @@ use super::{artists, mediums};
 use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
-        ArtistCreditAttributes, RecordingAttributes, TrackAttributes, TrackInclude, TrackRelation,
+        ArtistCreditAttributes, IntoColumn, RecordingAttributes, TrackAttributes, TrackFilter,
+        TrackInclude, TrackRelation,
     },
     extract::Json,
     jsonapi::{
@@ -256,7 +257,7 @@ where
 
 pub async fn tracks(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::TrackColumn, TrackInclude, uuid::Uuid>,
+    Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<TrackResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
@@ -266,11 +267,13 @@ pub async fn tracks(
     })?;
 
     let mut tracks_query = entity::TrackEntity::find();
+    for (filter_key, filter_value) in opts.filter.iter() {
+        if let Some(k) = filter_key.column() {
+            tracks_query = tracks_query.filter(ColumnTrait::eq(&k, filter_value.to_owned()));
+        }
+    }
     for (sort_key, sort_order) in opts.sort.iter() {
         tracks_query = tracks_query.order_by(sort_key.to_owned(), sort_order.to_owned());
-    }
-    for (filter_key, filter_value) in opts.filter.iter() {
-        tracks_query = tracks_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
     let mut _tracks_cursor = tracks_query.cursor_by(entity::TrackColumn::Id);
     let tracks_cursor = make_cursor(&mut _tracks_cursor, &opts.page);
@@ -305,7 +308,7 @@ pub async fn tracks(
 pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::TrackColumn, TrackInclude, uuid::Uuid>,
+    Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
 ) -> Result<Json<Document<TrackResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,

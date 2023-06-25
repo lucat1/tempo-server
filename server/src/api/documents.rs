@@ -1,3 +1,4 @@
+use sea_orm::ColumnTrait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
@@ -5,6 +6,13 @@ use url::Url;
 use uuid::Uuid;
 
 use entity::{ArtistTrackRelationType, ArtistUrlType};
+
+pub trait IntoColumn<T>
+where
+    T: ColumnTrait,
+{
+    fn column(&self) -> Option<T>;
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct ServerAttributes {
@@ -73,7 +81,7 @@ pub enum ArtistRelation {
     Tracks,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ArtistInclude {
     #[serde(rename = "images")]
     Images,
@@ -83,6 +91,33 @@ pub enum ArtistInclude {
     Releases,
     #[serde(rename = "releases.artists")]
     ReleasesArtists,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum ArtistFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "name")]
+    Name,
+    #[serde(rename = "sort_name")]
+    SortName,
+    #[serde(rename = "description")]
+    Description,
+
+    Include(ArtistInclude),
+}
+
+impl IntoColumn<entity::ArtistColumn> for ArtistFilter {
+    fn column(&self) -> Option<entity::ArtistColumn> {
+        match self {
+            ArtistFilter::Id => Some(entity::ArtistColumn::Id),
+            ArtistFilter::Name => Some(entity::ArtistColumn::Name),
+            ArtistFilter::SortName => Some(entity::ArtistColumn::SortName),
+            ArtistFilter::Description => Some(entity::ArtistColumn::Description),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -126,7 +161,7 @@ pub enum ReleaseRelation {
     Artists,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ReleaseInclude {
     #[serde(rename = "image")]
     Image,
@@ -138,6 +173,61 @@ pub enum ReleaseInclude {
     MediumsTracks,
     #[serde(rename = "mediums.tracks.artists")]
     MediumsTracksArtists,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum ReleaseFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "title")]
+    Title,
+    #[serde(rename = "Disctotal")]
+    Disctotal,
+    #[serde(rename = "tracktotal")]
+    Tracktotal,
+    #[serde(rename = "genres")]
+    Genres,
+    #[serde(rename = "year")]
+    Year,
+    #[serde(rename = "month")]
+    Month,
+    #[serde(rename = "day")]
+    Day,
+    #[serde(rename = "original_year")]
+    OriginalYear,
+    #[serde(rename = "original_month")]
+    OriginalMonth,
+    #[serde(rename = "original_day")]
+    OriginalDay,
+    #[serde(rename = "release_type")]
+    ReleaseType,
+    #[serde(rename = "release_mbid")]
+    ReleaseMbid,
+    #[serde(rename = "release_group_mbid")]
+    ReleaseGroupMbid,
+
+    Include(ReleaseInclude),
+}
+
+impl IntoColumn<entity::ReleaseColumn> for ReleaseFilter {
+    fn column(&self) -> Option<entity::ReleaseColumn> {
+        match self {
+            ReleaseFilter::Id => Some(entity::ReleaseColumn::Id),
+            ReleaseFilter::Title => Some(entity::ReleaseColumn::Title),
+            ReleaseFilter::Genres => Some(entity::ReleaseColumn::Genres),
+            ReleaseFilter::Year => Some(entity::ReleaseColumn::Year),
+            ReleaseFilter::Month => Some(entity::ReleaseColumn::Month),
+            ReleaseFilter::Day => Some(entity::ReleaseColumn::Day),
+            ReleaseFilter::OriginalYear => Some(entity::ReleaseColumn::OriginalYear),
+            ReleaseFilter::OriginalMonth => Some(entity::ReleaseColumn::OriginalMonth),
+            ReleaseFilter::OriginalDay => Some(entity::ReleaseColumn::OriginalDay),
+            ReleaseFilter::ReleaseType => Some(entity::ReleaseColumn::ReleaseType),
+            ReleaseFilter::ReleaseMbid => Some(entity::ReleaseColumn::Id),
+            ReleaseFilter::ReleaseGroupMbid => Some(entity::ReleaseColumn::ReleaseGroupId),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -156,7 +246,7 @@ pub enum MediumRelation {
     Tracks,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum MediumInclude {
     #[serde(rename = "release")]
     Release,
@@ -166,6 +256,36 @@ pub enum MediumInclude {
     Tracks,
     #[serde(rename = "tracks.artists")]
     TracksArtists,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum MediumFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "position")]
+    Position,
+    #[serde(rename = "tracks")]
+    Tracks,
+    #[serde(rename = "track_offset")]
+    TrackOffset,
+    #[serde(rename = "format")]
+    Format,
+
+    Include(MediumInclude),
+}
+
+impl IntoColumn<entity::MediumColumn> for MediumFilter {
+    fn column(&self) -> Option<entity::MediumColumn> {
+        match self {
+            MediumFilter::Id => Some(entity::MediumColumn::Id),
+            MediumFilter::Position => Some(entity::MediumColumn::Position),
+            MediumFilter::Tracks => Some(entity::MediumColumn::Tracks),
+            MediumFilter::TrackOffset => Some(entity::MediumColumn::TrackOffset),
+            MediumFilter::Format => Some(entity::MediumColumn::Format),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -207,7 +327,7 @@ pub enum TrackRelation {
     Recorders,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum TrackInclude {
     #[serde(rename = "artists")]
     Artists,
@@ -219,6 +339,65 @@ pub enum TrackInclude {
     MediumReleaseArtists,
     #[serde(rename = "recorders")]
     Recorders,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum TrackFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "title")]
+    Title,
+    #[serde(rename = "track")]
+    Track,
+    #[serde(rename = "disc")]
+    Disc,
+    #[serde(rename = "genres")]
+    Genres,
+    #[serde(rename = "bpm")]
+    Bpm,
+
+    #[serde(rename = "recording_mbid")]
+    RecordingMbid,
+    #[serde(rename = "track_mbid")]
+    TrackMbid,
+    #[serde(rename = "comments")]
+    Comments,
+
+    #[serde(rename = "mimetype")]
+    Mimetype,
+    #[serde(rename = "duration")]
+    Duration,
+    #[serde(rename = "framerate")]
+    Framerate,
+    #[serde(rename = "framecount")]
+    Framecount,
+    #[serde(rename = "channels")]
+    Channels,
+    #[serde(rename = "birate")]
+    Bitrate,
+    #[serde(rename = "bitdepth")]
+    Bitdepth,
+    #[serde(rename = "size")]
+    Size,
+
+    Include(TrackInclude),
+}
+
+impl IntoColumn<entity::TrackColumn> for TrackFilter {
+    fn column(&self) -> Option<entity::TrackColumn> {
+        match self {
+            TrackFilter::Id => Some(entity::TrackColumn::Id),
+            TrackFilter::Title => Some(entity::TrackColumn::Title),
+            TrackFilter::Track => Some(entity::TrackColumn::Number),
+            TrackFilter::Genres => Some(entity::TrackColumn::Genres),
+            TrackFilter::RecordingMbid => Some(entity::TrackColumn::RecordingId),
+            TrackFilter::TrackMbid => Some(entity::TrackColumn::Id),
+            TrackFilter::Mimetype => Some(entity::TrackColumn::Format),
+            TrackFilter::Duration => Some(entity::TrackColumn::Length),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -254,7 +433,7 @@ pub enum UserRelation {
     Connections,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum UserInclude {
     #[serde(rename = "scrobbles")]
     Scrobbles,
@@ -270,6 +449,30 @@ pub enum UserInclude {
     ScrobblesTracksMediumReleaseArtists,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum UserFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "first_name")]
+    FirstName,
+    #[serde(rename = "last_name")]
+    LastName,
+
+    Include(UserInclude),
+}
+
+impl IntoColumn<entity::UserColumn> for UserFilter {
+    fn column(&self) -> Option<entity::UserColumn> {
+        match self {
+            UserFilter::Id => Some(entity::UserColumn::Username),
+            UserFilter::FirstName => Some(entity::UserColumn::FirstName),
+            UserFilter::LastName => Some(entity::UserColumn::LastName),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ScrobbleAttributes {
     #[serde(with = "time::serde::iso8601")]
@@ -283,7 +486,7 @@ pub enum ScrobbleRelation {
     Track,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ScrobbleInclude {
     #[serde(rename = "user")]
     User,
@@ -297,6 +500,27 @@ pub enum ScrobbleInclude {
     TrackMediumRelease,
     #[serde(rename = "track.medium.release.artists")]
     TrackMediumReleaseArtists,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum ScrobbleFilter {
+    #[serde(rename = "id")]
+    Id,
+    #[serde(rename = "at")]
+    At,
+
+    Include(ScrobbleInclude),
+}
+
+impl IntoColumn<entity::ScrobbleColumn> for ScrobbleFilter {
+    fn column(&self) -> Option<entity::ScrobbleColumn> {
+        match self {
+            ScrobbleFilter::Id => Some(entity::ScrobbleColumn::Id),
+            ScrobbleFilter::At => Some(entity::ScrobbleColumn::At),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

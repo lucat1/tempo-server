@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use crate::api::{
     auth::Claims,
-    documents::{ScrobbleInclude, UserAttributes, UserInclude, UserRelation},
+    documents::{ScrobbleInclude, UserAttributes, UserFilter, UserInclude, UserRelation},
     extract::Json,
     jsonapi::{
         dedup, Document, DocumentData, Error, Included, InsertManyRelation, Query, Related,
@@ -198,7 +198,7 @@ where
 
 pub async fn user(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::UserColumn, UserInclude, String>,
+    Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path(username): Path<String>,
 ) -> Result<Json<Document<UserResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
@@ -216,7 +216,7 @@ pub async fn user(
 
 pub async fn relation(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::UserColumn, UserInclude, String>,
+    Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path((username, relation)): Path<(String, UserRelation)>,
 ) -> Result<Json<Document<Related>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {

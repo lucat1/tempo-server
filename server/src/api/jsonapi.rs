@@ -231,33 +231,38 @@ fn default_page<Id: Default>() -> Page<Id> {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct RawQueryOptions<Id: Default> {
+pub struct RawQueryOptions<F: Eq + Hash, Id: Default> {
     include: Option<String>,
-    filter: Option<HashMap<String, String>>,
+    filter: Option<HashMap<F, String>>,
     sort: Option<String>,
     page: Option<Page<Id>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct QueryOptions<
+    F: Eq + Hash,
     C: Eq + Hash,
     I: for<'a> Deserialize<'a>,
     Id: for<'a> Deserialize<'a> + Default,
 > {
     pub include: Vec<I>,
-    pub filter: HashMap<C, String>,
+    pub filter: HashMap<F, String>,
     pub sort: HashMap<C, Order>,
     pub page: Page<Id>,
 }
 
-pub struct Query<C: Eq + Hash, I: for<'a> Deserialize<'a>, Id: for<'a> Deserialize<'a> + Default>(
-    pub QueryOptions<C, I, Id>,
-);
+pub struct Query<
+    F: Eq + Hash,
+    C: Eq + Hash,
+    I: for<'a> Deserialize<'a>,
+    Id: for<'a> Deserialize<'a> + Default,
+>(pub QueryOptions<F, C, I, Id>);
 
 #[async_trait]
-impl<S, C, I, Id> FromRequestParts<S> for Query<C, I, Id>
+impl<S, F, C, I, Id> FromRequestParts<S> for Query<F, C, I, Id>
 where
     S: Send + Sync,
+    F: Eq + Hash + for<'a> Deserialize<'a>,
     C: Eq + Hash + ColumnTrait,
     I: for<'a> Deserialize<'a>,
     Id: for<'a> Deserialize<'a> + Default,
@@ -268,7 +273,7 @@ where
         let query = parts.uri.query();
         match query {
             Some(qs) => {
-                let raw_opts: RawQueryOptions<Id> = serde_qs::from_str(qs)
+                let raw_opts: RawQueryOptions<F, Id> = serde_qs::from_str(qs)
                     .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
 
                 let parse_key = |k: &str| -> Option<C> { C::from_str(k).ok() };
@@ -284,14 +289,7 @@ where
                         })
                         .unwrap_or(Ok(Vec::new()))
                         .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?,
-                    filter: raw_opts
-                        .filter
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|(k, v)| -> Option<(C, String)> {
-                            Some((parse_key(k.as_str())?, v))
-                        })
-                        .collect(),
+                    filter: raw_opts.filter.unwrap_or_default(),
                     sort: raw_opts
                         .sort
                         .map(|s| {
@@ -323,13 +321,14 @@ where
     }
 }
 
-impl<C, I, Id> From<QueryOptions<C, I, Id>> for RawQueryOptions<Id>
+impl<F, C, I, Id> From<QueryOptions<F, C, I, Id>> for RawQueryOptions<F, Id>
 where
+    F: Eq + Hash + for<'a> Deserialize<'a> + Serialize,
     C: Eq + Hash + ColumnTrait,
     I: for<'a> Deserialize<'a> + Serialize,
     Id: for<'a> Deserialize<'a> + Default,
 {
-    fn from(value: QueryOptions<C, I, Id>) -> Self {
+    fn from(value: QueryOptions<F, C, I, Id>) -> Self {
         RawQueryOptions {
             include: if !value.include.is_empty() {
                 Some(
@@ -346,13 +345,11 @@ where
             } else {
                 None
             },
-            filter: Some(
-                value
-                    .filter
-                    .into_iter()
-                    .map(|(k, v)| (k.into_iden().to_string(), v))
-                    .collect(),
-            ),
+            filter: if value.filter.is_empty() {
+                None
+            } else {
+                Some(value.filter)
+            },
             sort: Some(
                 value
                     .sort
@@ -424,14 +421,15 @@ where
     cursor
 }
 
-pub fn links_from_resource<I, T, R: Eq + Hash, C, Inc>(
+pub fn links_from_resource<I, T, R: Eq + Hash, C, F, Inc>(
     data: &[Resource<I, T, R>],
-    opts: QueryOptions<C, Inc, I>,
+    opts: QueryOptions<F, C, Inc, I>,
     uri: &Uri,
 ) -> HashMap<LinkKey, String>
 where
     I: for<'a> Deserialize<'a> + Serialize + Default + ToString + Clone,
-    C: Eq + Hash + ColumnTrait,
+    F: Eq + Hash + for<'a> Deserialize<'a> + Serialize + Clone,
+    C: Eq + Hash + Clone + ColumnTrait,
     Inc: for<'a> Deserialize<'a> + Serialize + Clone,
 {
     // TODO: a good way to find out if there is a page before
@@ -442,7 +440,7 @@ where
         res.insert(LinkKey::First, first.id.to_string());
         if data.len() == opts.page.size as usize {
             let opts_clone = opts.clone();
-            let prev_opts: RawQueryOptions<I> = QueryOptions {
+            let prev_opts: RawQueryOptions<F, I> = QueryOptions {
                 page: Page {
                     before: Some(first.id.clone()),
                     after: None,
@@ -459,7 +457,7 @@ where
     if let Some(last) = data.last() {
         res.insert(LinkKey::Last, last.id.to_string());
         if data.len() == opts.page.size as usize {
-            let next_opts: RawQueryOptions<I> = QueryOptions {
+            let next_opts: RawQueryOptions<F, I> = QueryOptions {
                 page: Page {
                     before: None,
                     after: Some(last.id.clone()),

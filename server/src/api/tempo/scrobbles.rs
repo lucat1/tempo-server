@@ -11,7 +11,9 @@ use uuid::Uuid;
 use super::{tracks, users};
 use crate::api::{
     auth::Claims,
-    documents::{ScrobbleAttributes, ScrobbleInclude, ScrobbleRelation, TrackInclude},
+    documents::{
+        ScrobbleAttributes, ScrobbleFilter, ScrobbleInclude, ScrobbleRelation, TrackInclude,
+    },
     extract::Json,
     jsonapi::{
         dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
@@ -304,7 +306,7 @@ pub async fn insert_scrobbles(
 
 pub async fn scrobbles(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ScrobbleColumn, ScrobbleInclude, i64>,
+    Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     OriginalUri(uri): OriginalUri,
     claims: Claims,
 ) -> Result<Json<Document<ScrobbleResource>>, Error> {
@@ -323,7 +325,7 @@ pub async fn scrobbles(
 
 pub async fn scrobble(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ScrobbleColumn, ScrobbleInclude, i64>,
+    Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     Path(id): Path<i64>,
 ) -> Result<Json<Document<ScrobbleResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {

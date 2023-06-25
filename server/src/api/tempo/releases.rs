@@ -11,7 +11,8 @@ use uuid::Uuid;
 use super::{artists, images, mediums};
 use crate::api::{
     documents::{
-        ArtistCreditAttributes, MediumInclude, ReleaseAttributes, ReleaseInclude, ReleaseRelation,
+        ArtistCreditAttributes, IntoColumn, MediumInclude, ReleaseAttributes, ReleaseFilter,
+        ReleaseInclude, ReleaseRelation,
     },
     extract::Json,
     jsonapi::{
@@ -215,7 +216,7 @@ where
 
 pub async fn releases(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
+    Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ReleaseResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
@@ -225,12 +226,13 @@ pub async fn releases(
     })?;
 
     let mut releases_query = entity::ReleaseEntity::find();
+    for (filter_key, filter_value) in opts.filter.iter() {
+        if let Some(k) = filter_key.column() {
+            releases_query = releases_query.filter(ColumnTrait::eq(&k, filter_value.to_owned()));
+        }
+    }
     for (sort_key, sort_order) in opts.sort.iter() {
         releases_query = releases_query.order_by(sort_key.to_owned(), sort_order.to_owned());
-    }
-    for (filter_key, filter_value) in opts.filter.iter() {
-        releases_query =
-            releases_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
     let mut _releases_cursor = releases_query.cursor_by(entity::ReleaseColumn::Id);
     let releases_cursor = make_cursor(&mut _releases_cursor, &opts.page);
@@ -265,7 +267,7 @@ pub async fn releases(
 pub async fn release(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
+    Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,

@@ -11,8 +11,8 @@ use uuid::Uuid;
 use super::{images, releases, tracks};
 use crate::api::{
     documents::{
-        ArtistAttributes, ArtistCreditAttributes, ArtistInclude, ArtistRelation,
-        RecordingAttributes, ReleaseInclude,
+        ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude, ArtistRelation,
+        IntoColumn, RecordingAttributes, ReleaseInclude,
     },
     extract::Json,
     jsonapi::{
@@ -270,10 +270,9 @@ pub fn entity_to_included(entity: &entity::Artist, related: &ArtistRelated) -> I
 
 pub async fn artists(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
+    Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
-    tracing::info!(?opts, "Fetching users");
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -281,11 +280,13 @@ pub async fn artists(
     })?;
 
     let mut artists_query = entity::ArtistEntity::find();
+    for (filter_key, filter_value) in opts.filter.iter() {
+        if let Some(k) = filter_key.column() {
+            artists_query = artists_query.filter(ColumnTrait::eq(&k, filter_value));
+        }
+    }
     for (sort_key, sort_order) in opts.sort.iter() {
         artists_query = artists_query.order_by(sort_key.to_owned(), sort_order.to_owned());
-    }
-    for (filter_key, filter_value) in opts.filter.iter() {
-        artists_query = artists_query.filter(ColumnTrait::eq(filter_key, filter_value));
     }
     let mut _artists_cursor = artists_query.cursor_by(entity::ArtistColumn::Id);
     let artists_cursor = make_cursor(&mut _artists_cursor, &opts.page);
@@ -321,7 +322,7 @@ pub async fn artists(
 pub async fn artist(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
+    Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,

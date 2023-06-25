@@ -12,7 +12,9 @@ use super::{releases, tracks};
 use crate::api::documents::ReleaseInclude;
 use crate::api::AppState;
 use crate::api::{
-    documents::{MediumAttributes, MediumInclude, MediumRelation, TrackInclude},
+    documents::{
+        IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation, TrackInclude,
+    },
     extract::Json,
     jsonapi::{
         dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
@@ -163,7 +165,7 @@ where
 
 pub async fn mediums(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
+    Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
@@ -173,11 +175,13 @@ pub async fn mediums(
     })?;
 
     let mut mediums_query = entity::MediumEntity::find();
+    for (filter_key, filter_value) in opts.filter.iter() {
+        if let Some(k) = filter_key.column() {
+            mediums_query = mediums_query.filter(ColumnTrait::eq(&k, filter_value.to_owned()));
+        }
+    }
     for (sort_key, sort_order) in opts.sort.iter() {
         mediums_query = mediums_query.order_by(sort_key.to_owned(), sort_order.to_owned());
-    }
-    for (filter_key, filter_value) in opts.filter.iter() {
-        mediums_query = mediums_query.filter(ColumnTrait::eq(filter_key, filter_value.to_owned()));
     }
     let mut _mediums_cursor = mediums_query.cursor_by(entity::MediumColumn::Id);
     let mediums_cursor = make_cursor(&mut _mediums_cursor, &opts.page);
@@ -212,7 +216,7 @@ pub async fn mediums(
 pub async fn medium(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(opts): Query<entity::MediumColumn, MediumInclude, uuid::Uuid>,
+    Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
