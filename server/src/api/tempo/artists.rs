@@ -4,8 +4,9 @@ use axum::extract::{OriginalUri, Path, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    QueryOrder, QuerySelect, RelationTrait, TransactionTrait,
 };
+use sea_query::JoinType;
 use uuid::Uuid;
 
 use super::{images, releases, tracks};
@@ -279,10 +280,31 @@ pub async fn artists(
         detail: Some(e.into()),
     })?;
 
-    let mut artists_query = entity::ArtistEntity::find();
+    let mut artists_query = entity::ArtistEntity::find().left_join(entity::ArtistCreditEntity);
     for (filter_key, filter_value) in opts.filter.iter() {
         if let Some(k) = filter_key.column() {
             artists_query = artists_query.filter(ColumnTrait::eq(&k, filter_value));
+        } else if let ArtistFilter::Include(incl) = filter_key {
+            match (incl, filter_value.as_str()) {
+                (ArtistInclude::Releases, "true") => {
+                    artists_query = artists_query.distinct().join(
+                        JoinType::RightJoin,
+                        entity::ArtistCreditReleaseRelation::ArtistCredit
+                            .def()
+                            .rev(),
+                    )
+                }
+                (ArtistInclude::Images, "true") => {
+                    artists_query = artists_query.right_join(entity::ImageEntity)
+                }
+                (ArtistInclude::Tracks, "true") => {
+                    artists_query = artists_query.distinct().join(
+                        JoinType::RightJoin,
+                        entity::ArtistCreditTrackRelation::ArtistCredit.def().rev(),
+                    )
+                }
+                _ => (),
+            };
         }
     }
     for (sort_key, sort_order) in opts.sort.iter() {

@@ -4279,6 +4279,7 @@ dependencies = [
  "scrypt",
  "sea-orm",
  "sea-orm-migration",
+ "sea-query",
  "serde",
  "serde-enum-str",
  "serde_derive",
