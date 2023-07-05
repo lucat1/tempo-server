@@ -151,7 +151,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             track_mbid: entity.id,
             comments: None,
 
-            mimetype: entity.format.unwrap().mime().to_string(),
+            mimetype: entity.format.map(|mime| mime.mime().to_string()),
             duration: entity.length,
             framerate: None,
             framecount: None,

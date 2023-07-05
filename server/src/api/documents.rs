@@ -303,7 +303,7 @@ pub struct TrackAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comments: Option<String>,
 
-    pub mimetype: String,
+    pub mimetype: Option<String>,
     pub duration: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub framerate: Option<i32>,
