@@ -197,7 +197,7 @@ where
 
         // TODO: use user's setting to determine the subset of connections he wants
         // to scrobble to.
-        let data = tasks::scrobble::Data {
+        let data = tasks::scrobble::Task {
             provider: entity::ConnectionProvider::LastFM,
             username: username.to_owned(),
             time: times[i],
@@ -205,7 +205,7 @@ where
             artist_credits: artist_credits.to_owned(),
             artists,
         };
-        tasks::get_queue().push(tasks::Task::Scrobble(data));
+        tasks::push_queue(data);
     }
     Ok(())
 }

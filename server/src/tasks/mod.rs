@@ -9,24 +9,27 @@ use deadqueue::unlimited::Queue;
 use eyre::Result;
 use lazy_static::lazy_static;
 use sea_orm::DbConn;
+use std::fmt::Debug;
 use std::sync::Arc;
 
-lazy_static! {
-    pub static ref QUEUE: Arc<Queue<Task>> = Arc::new(Queue::new());
+#[async_trait::async_trait]
+pub trait Task: Debug {
+    async fn run(&self, db: &DbConn) -> Result<()>;
 }
 
-pub fn get_queue() -> Arc<Queue<Task>> {
+lazy_static! {
+    pub static ref QUEUE: Arc<Queue<Box<dyn Task + Send + Sync>>> = Arc::new(Queue::new());
+}
+
+pub fn get_queue() -> Arc<Queue<Box<dyn Task + Send + Sync>>> {
     QUEUE.clone()
 }
 
-#[derive(Debug, Clone)]
-pub enum Task {
-    ArtistDescription(artist_description::Data),
-    ArtistUrl(artist_url::Data),
-    LastfmArtistImage(lastfm_artist_image::Data),
-    IndexSearch(index_search::Data),
-
-    Scrobble(scrobble::Data),
+pub fn push_queue<T>(task: T)
+where
+    T: Task + Send + Sync + 'static,
+{
+    QUEUE.push(Box::new(task));
 }
 
 pub fn queue_loop() -> Result<()> {
@@ -39,7 +42,7 @@ pub fn queue_loop() -> Result<()> {
             loop {
                 let task = queue.pop().await;
                 tracing::trace!(%worker, ?task, "Executing task");
-                match run_task(db, task.clone()).await {
+                match task.run(db).await {
                     Ok(_) => tracing::info!(%worker, ?task, "Task completed"),
                     Err(error) => tracing::warn!(%worker, ?task, %error, "Task failed with error"),
                 }
@@ -47,14 +50,4 @@ pub fn queue_loop() -> Result<()> {
         });
     }
     Ok(())
-}
-
-async fn run_task(db: &DbConn, task: Task) -> Result<()> {
-    match task {
-        Task::ArtistDescription(data) => artist_description::run(db, data).await,
-        Task::ArtistUrl(data) => artist_url::run(db, data).await,
-        Task::LastfmArtistImage(data) => lastfm_artist_image::run(db, data).await,
-        Task::IndexSearch(data) => index_search::run(db, data).await,
-        Task::Scrobble(data) => scrobble::run(db, data).await,
-    }
 }

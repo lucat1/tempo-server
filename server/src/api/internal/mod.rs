@@ -12,6 +12,7 @@ use super::{auth, AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        // .route("/tasks", get(tasks::list))
         .route("/downloads", get(downloads::list))
         .route("/downloads/:id", get(downloads::list))
         .route("/import", put(import::begin))

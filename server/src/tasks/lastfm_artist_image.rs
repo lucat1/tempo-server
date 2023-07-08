@@ -26,15 +26,15 @@ lazy_static! {
 static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
 #[derive(Debug, Clone)]
-pub struct Data(Uuid, String);
+pub struct Task(Uuid, String);
 
-pub async fn all_data(db: &DbConn) -> Result<Vec<Data>> {
+pub async fn all_data(db: &DbConn) -> Result<Vec<Task>> {
     Ok(entity::ArtistUrlEntity::find()
         .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Data(a.artist_id, a.url))
+        .map(|a| Task(a.artist_id, a.url))
         .collect())
 }
 
@@ -165,35 +165,39 @@ async fn download(
     Ok(None)
 }
 
-pub async fn run(db: &DbConn, Data(artist_id, url): Data) -> Result<()> {
-    tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
-    let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
-    let text = get_html(url.to_owned()).await?;
+#[async_trait::async_trait]
+impl super::Task for Task {
+    async fn run(&self, db: &DbConn) -> Result<()> {
+        let Task(artist_id, url) = self;
+        tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
+        let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
+        let text = get_html(url.to_owned()).await?;
 
-    // TODO: paginate over lastfm, setting limit
-    let urls = get_urls(&mut url, text.as_str(), artist_id)?;
-    for url_data in urls.into_iter() {
-        let new_image = download(db, artist_id, url_data).await?;
-        if let Some(image) = new_image {
-            let id = image.id.to_owned();
-            tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
-            entity::ImageEntity::insert(image.into_active_model())
-                .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
-                .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
-                .exec(db)
-                .await
-                .ignore_none()?;
+        // TODO: paginate over lastfm, setting limit
+        let urls = get_urls(&mut url, text.as_str(), *artist_id)?;
+        for url_data in urls.into_iter() {
+            let new_image = download(db, *artist_id, url_data).await?;
+            if let Some(image) = new_image {
+                let id = image.id.to_owned();
+                tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
+                entity::ImageEntity::insert(image.into_active_model())
+                    .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
+                    .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
+                    .exec(db)
+                    .await
+                    .ignore_none()?;
 
-            let artist_image = entity::ImageArtist {
-                image_id: id,
-                artist_id,
-            };
-            entity::ImageArtistEntity::insert(artist_image.into_active_model())
-                .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
-                .exec(db)
-                .await
-                .ignore_none()?;
+                let artist_image = entity::ImageArtist {
+                    image_id: id,
+                    artist_id: *artist_id,
+                };
+                entity::ImageArtistEntity::insert(artist_image.into_active_model())
+                    .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
+                    .exec(db)
+                    .await
+                    .ignore_none()?;
+            }
         }
+        Ok(())
     }
-    Ok(())
 }

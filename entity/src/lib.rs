@@ -19,6 +19,8 @@ mod scrobble;
 mod user;
 pub mod user_connection;
 
+mod task;
+
 pub mod conflict;
 pub mod full;
 
@@ -112,6 +114,12 @@ pub use user_connection::ConnectionProvider;
 pub use user_connection::Entity as UserConnectionEntity;
 pub use user_connection::Model as UserConnection;
 pub use user_connection::Relation as UserConnectionRelation;
+
+pub use task::ActiveModel as TaskActive;
+pub use task::Column as TaskColumn;
+pub use task::Entity as TaskEntity;
+pub use task::Model as Task;
+pub use task::Relation as TaskRelation;
 
 pub trait IgnoreNone {
     fn ignore_none(self) -> Result<(), DbErr>;
