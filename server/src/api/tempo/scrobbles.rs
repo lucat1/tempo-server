@@ -12,13 +12,13 @@ use super::{tracks, users};
 use crate::api::{
     auth::Claims,
     documents::{
-        ScrobbleAttributes, ScrobbleFilter, ScrobbleInclude, ScrobbleRelation, TrackInclude,
+        dedup, Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
+        ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
     extract::Json,
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
-        InsertDocument, InsertScrobbleResource, Page, Query, Related, Relation, Relationship,
-        ResourceIdentifier, ResourceType, ScrobbleResource,
+        links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Page,
+        Query, Related, Relation, Relationship, ResourceIdentifier,
     },
     AppState,
 };
@@ -52,7 +52,7 @@ pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
         id: entity.id,
         attributes: ScrobbleAttributes { at: entity.at },
         relationships,
-        meta: HashMap::new(),
+        meta: None,
     }
 }
 
@@ -214,7 +214,7 @@ pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     json_scrobbles: Json<InsertDocument<InsertScrobbleResource>>,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -309,7 +309,7 @@ pub async fn scrobbles(
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     OriginalUri(uri): OriginalUri,
     claims: Claims,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -327,7 +327,7 @@ pub async fn scrobble(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     Path(id): Path<i64>,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

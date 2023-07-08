@@ -14,13 +14,13 @@ use super::{artists, mediums};
 use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
-        ArtistCreditAttributes, IntoColumn, RecordingAttributes, TrackAttributes, TrackFilter,
-        TrackInclude, TrackRelation,
+        dedup, ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes,
+        ResourceType, TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
     },
     extract::Json,
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta,
-        Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType, TrackResource,
+        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        Relationship, ResourceIdentifier,
     },
     AppState,
 };
@@ -161,7 +161,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             size: None, // TODO
         },
         relationships,
-        meta: HashMap::new(),
+        meta: None,
     }
 }
 
@@ -259,7 +259,7 @@ pub async fn tracks(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<TrackResource>>, Error> {
+) -> Result<Json<Document<TrackResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -309,7 +309,7 @@ pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
-) -> Result<Json<Document<TrackResource>>, Error> {
+) -> Result<Json<Document<TrackResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

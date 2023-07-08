@@ -13,12 +13,13 @@ use crate::api::documents::ReleaseInclude;
 use crate::api::AppState;
 use crate::api::{
     documents::{
-        IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation, TrackInclude,
+        dedup, Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
+        MediumResource, ResourceType, TrackInclude,
     },
     extract::Json,
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
-        MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
+        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        Relationship, ResourceIdentifier,
     },
 };
 
@@ -97,7 +98,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
             track_offset: entity.track_offset,
             format: entity.format.to_owned(),
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships,
     }
 }
@@ -167,7 +168,7 @@ pub async fn mediums(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<MediumResource>>, Error> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -217,7 +218,7 @@ pub async fn medium(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
-) -> Result<Json<Document<MediumResource>>, Error> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

@@ -13,9 +13,9 @@ use std::collections::HashMap;
 
 use super::{
     auth,
-    documents::ServerAttributes,
+    documents::{Included, ResourceType, ServerAttributes, ServerResource},
     extract::Json,
-    jsonapi::{Document, DocumentData, ResourceType, ServerResource},
+    jsonapi::{Document, DocumentData},
     AppState,
 };
 
@@ -59,7 +59,7 @@ pub fn router() -> Router<AppState> {
         )
 }
 
-async fn server() -> Json<Document<ServerResource>> {
+async fn server() -> Json<Document<ServerResource, Included>> {
     Json::new(Document {
         data: DocumentData::Single(ServerResource {
             r#type: ResourceType::Server,
@@ -83,7 +83,7 @@ async fn server() -> Json<Document<ServerResource>> {
                 .collect(),
             },
             relationships: HashMap::new(),
-            meta: HashMap::new(),
+            meta: None,
         }),
         included: Vec::new(),
         links: HashMap::new(),

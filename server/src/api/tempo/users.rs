@@ -10,11 +10,14 @@ use std::collections::HashMap;
 
 use crate::api::{
     auth::Claims,
-    documents::{ScrobbleInclude, UserAttributes, UserFilter, UserInclude, UserRelation},
+    documents::{
+        dedup, Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter,
+        UserInclude, UserRelation, UserResource,
+    },
     extract::Json,
     jsonapi::{
-        dedup, Document, DocumentData, Error, Included, InsertManyRelation, Query, Related,
-        Relation, Relationship, ResourceIdentifier, ResourceType, UserResource,
+        Document, DocumentData, Error, InsertManyRelation, Query, Related, Relation, Relationship,
+        ResourceIdentifier,
     },
     tempo::{connections::ProviderImpl, scrobbles},
     AppState,
@@ -102,7 +105,7 @@ pub fn entity_to_resource(entity: &entity::User, related: &UserRelated) -> UserR
             first_name: entity.first_name.to_owned(),
             last_name: entity.last_name.to_owned(),
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships,
     }
 }
@@ -200,7 +203,7 @@ pub async fn user(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path(username): Path<String>,
-) -> Result<Json<Document<UserResource>>, Error> {
+) -> Result<Json<Document<UserResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -218,7 +221,7 @@ pub async fn relation(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path((username, relation)): Path<(String, UserRelation)>,
-) -> Result<Json<Document<Related>>, Error> {
+) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -253,7 +256,11 @@ pub async fn post_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     Path((username, relation)): Path<(String, UserRelation)>,
-    body: Json<InsertExactlyOneRelation<ResourceIdentifier<entity::ConnectionProvider>>>,
+    body: Json<
+        InsertExactlyOneRelation<
+            ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
+        >,
+    >,
 ) -> Result<(StatusCode, TypedHeader<Location>), Error> {
     if claims.username != username {
         return Err(Error {
@@ -320,7 +327,9 @@ pub async fn delete_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     Path((username, relation)): Path<(String, UserRelation)>,
-    body: Json<InsertManyRelation<ResourceIdentifier<entity::ConnectionProvider>>>,
+    body: Json<
+        InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
+    >,
 ) -> Result<StatusCode, Error> {
     if claims.username != username {
         return Err(Error {

@@ -12,11 +12,12 @@ use uuid::Uuid;
 
 use super::{artists, releases, tracks};
 use crate::api::{
-    extract::Json,
-    jsonapi::{
-        dedup, ArtistResource, Document, DocumentData, Error, ReleaseResource, ResourceMetaKey,
+    documents::{
+        dedup, ArtistResource, Included, Meta, ReleaseResource, SearchResultAttributes,
         TrackResource,
     },
+    extract::Json,
+    jsonapi::{Document, DocumentData, Error},
     AppState,
 };
 use crate::search::{
@@ -144,9 +145,9 @@ where
             let related_to_artists = artists::related(db, &artists, false).await?;
             for (i, artist) in artists.iter().enumerate() {
                 let mut entity = artists::entity_to_resource(artist, &related_to_artists[i]);
-                entity
-                    .meta
-                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                entity.meta = Some(Meta::SearchResult(SearchResultAttributes {
+                    score: ids[i].0,
+                }));
                 data.push(SearchResult::Artist(entity));
             }
         }
@@ -160,9 +161,9 @@ where
             let related_to_releases = releases::related(db, &releases, false).await?;
             for (i, release) in releases.iter().enumerate() {
                 let mut entity = releases::entity_to_resource(release, &related_to_releases[i]);
-                entity
-                    .meta
-                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                entity.meta = Some(Meta::SearchResult(SearchResultAttributes {
+                    score: ids[i].0,
+                }));
                 data.push(SearchResult::Release(entity));
             }
         }
@@ -176,9 +177,9 @@ where
             let related_to_tracks = tracks::related(db, &tracks, false).await?;
             for (i, track) in tracks.iter().enumerate() {
                 let mut entity = tracks::entity_to_resource(track, &related_to_tracks[i]);
-                entity
-                    .meta
-                    .insert(ResourceMetaKey::Score, ids[i].0.to_string());
+                entity.meta = Some(Meta::SearchResult(SearchResultAttributes {
+                    score: ids[i].0,
+                }));
                 data.push(SearchResult::Track(entity));
             }
         }
@@ -191,7 +192,7 @@ where
 pub async fn search(
     State(AppState(db)): State<AppState>,
     Query(search): Query<SearchQuery>,
-) -> Result<Json<Document<SearchResult>>, Error> {
+) -> Result<Json<Document<SearchResult, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

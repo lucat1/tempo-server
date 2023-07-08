@@ -17,14 +17,16 @@ use std::{collections::HashMap, ops::Add};
 use time::{Duration, OffsetDateTime};
 
 use crate::api::{
-    documents::{AuthAttributes, AuthRelation, Token},
+    documents::{AuthAttributes, AuthRelation, AuthResource, ResourceType, Token},
     extract::{Json, TypedHeader},
     jsonapi::{
-        AuthResource, Document, DocumentData, Error, Related, Relation, Relationship, Resource,
-        ResourceIdentifier, ResourceType,
+        Document, DocumentData, Error, Related, Relation, Relationship, Resource,
+        ResourceIdentifier,
     },
 };
 use base::setting::{get_settings, Settings};
+
+use super::documents::Included;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ClaimsSubject {
@@ -113,13 +115,13 @@ fn auth_resource(token: Token, refresh: Option<Token>, username: String) -> Auth
             },
         )]
         .into(),
-        meta: HashMap::new(),
+        meta: None,
     }
 }
 
 pub async fn auth(
     auth_header: TypedHeader<Authorization<Bearer>>,
-) -> Result<Json<Document<AuthResource>>, Error> {
+) -> Result<Json<Document<AuthResource, Included>>, Error> {
     let auth = auth_header.inner();
     let token_data = check_token::<Claims>(auth.token())?;
     Ok(Json::new(Document {
@@ -180,7 +182,7 @@ fn token_pair(settings: &Settings, username: &str) -> Result<(Token, Token)> {
 
 pub async fn login(
     json_login_data: Json<LoginData>,
-) -> Result<Json<Document<AuthResource>>, Error> {
+) -> Result<Json<Document<AuthResource, Included>>, Error> {
     let login_data = json_login_data.inner();
     let settings = get_settings().map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -210,7 +212,7 @@ pub async fn login(
 
 pub async fn refresh(
     auth_header: TypedHeader<Authorization<Bearer>>,
-) -> Result<Json<Document<AuthResource>>, Error> {
+) -> Result<Json<Document<AuthResource, Included>>, Error> {
     let auth = auth_header.inner();
     let token_data = check_token::<Claims>(auth.token())?;
     if token_data.claims.sub != ClaimsSubject::Refresh {

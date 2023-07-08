@@ -5,7 +5,106 @@ use time::OffsetDateTime;
 use url::Url;
 use uuid::Uuid;
 
-use entity::{ArtistTrackRelationType, ArtistUrlType};
+use crate::api::jsonapi::{InsertResource, Resource};
+use entity::{ArtistTrackRelationType, ArtistUrlType, ConnectionProvider};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceType {
+    Server,
+    Auth,
+    User,
+    Scrobble,
+    Connection,
+
+    Image,
+    Artist,
+    Track,
+    Medium,
+    Release,
+}
+
+pub type ServerResource = Resource<ResourceType, String, ServerAttributes, ServerRelation, Meta>;
+pub type AuthResource = Resource<ResourceType, String, AuthAttributes, AuthRelation, Meta>;
+pub type UserResource = Resource<ResourceType, String, UserAttributes, UserRelation, Meta>;
+pub type ScrobbleResource = Resource<ResourceType, i64, ScrobbleAttributes, ScrobbleRelation, Meta>;
+pub type ConnectionResource =
+    Resource<ResourceType, ConnectionProvider, ConnectionAttributes, ConnectionRelation, Meta>;
+pub type ImageResource = Resource<ResourceType, String, ImageAttributes, ImageRelation, Meta>;
+pub type ArtistResource = Resource<ResourceType, Uuid, ArtistAttributes, ArtistRelation, Meta>;
+pub type TrackResource = Resource<ResourceType, Uuid, TrackAttributes, TrackRelation, Meta>;
+pub type MediumResource = Resource<ResourceType, Uuid, MediumAttributes, MediumRelation, Meta>;
+pub type ReleaseResource = Resource<ResourceType, Uuid, ReleaseAttributes, ReleaseRelation, Meta>;
+
+// pub type InsertServerResource = InsertResource<ServerAttributes, ServerRelation>;
+// pub type InsertAuthResource = InsertResource<AuthAttributes, AuthRelation>;
+// pub type InsertUserResource = InsertResource<UserAttributes, UserRelation>;
+pub type InsertScrobbleResource =
+    InsertResource<ResourceType, ScrobbleAttributes, ScrobbleRelation, Meta>;
+// pub type InsertImageResource = InsertResource<ImageAttributes, ImageRelation>;
+// pub type InsertArtistResource = InsertResource<ArtistAttributes, ArtistRelation>;
+// pub type InsertTrackResource = InsertResource<TrackAttributes, TrackRelation>;
+// pub type InsertMediumResource = InsertResource<MediumAttributes, MediumRelation>;
+// pub type InsertReleaseResource = InsertResource<ReleaseAttributes, ReleaseRelation>;
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Included {
+    User(UserResource),
+    Scrobble(ScrobbleResource),
+    Image(ImageResource),
+    Artist(ArtistResource),
+    Track(TrackResource),
+    Medium(MediumResource),
+    Release(ReleaseResource),
+}
+
+#[derive(PartialEq)]
+enum Identifier {
+    Image(String),
+    User(String),
+    Scrobble(i64),
+    Artist(Uuid),
+    Track(Uuid),
+    Medium(Uuid),
+    Release(Uuid),
+}
+
+pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
+    included.sort_unstable_by(|_a, _b| match (_a, _b) {
+        (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
+        (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
+        (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
+        (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
+        (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
+        (_, _) => std::cmp::Ordering::Less,
+    });
+    included.dedup_by_key(|e| match e {
+        Included::Image(e) => Identifier::Image(e.id.to_owned()),
+        Included::User(e) => Identifier::User(e.id.to_owned()),
+        Included::Scrobble(e) => Identifier::Scrobble(e.id.to_owned()),
+        Included::Artist(e) => Identifier::Artist(e.id),
+        Included::Track(e) => Identifier::Track(e.id),
+        Included::Medium(e) => Identifier::Medium(e.id),
+        Included::Release(e) => Identifier::Release(e.id),
+    });
+    included
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum Meta {
+    ArtistCredit(ArtistCreditAttributes),
+    Recording(RecordingAttributes),
+    Connection(ConnectionMetaAttributes),
+
+    SearchResult(SearchResultAttributes),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SearchResultAttributes {
+    pub score: f32,
+}
 
 pub trait IntoColumn<T>
 where
@@ -24,7 +123,7 @@ pub struct ServerAttributes {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ServerRelation {}
+pub enum ServerRelation {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ArtistCreditAttributes {
@@ -51,9 +150,7 @@ pub struct ImageAttributes {
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageRelation {
-    #[serde(rename = "artists")]
     Artist,
-    #[serde(rename = "releases")]
     Release,
     // TODO: tracks?
 }
@@ -71,13 +168,9 @@ pub struct ArtistAttributes {
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtistRelation {
-    #[serde(rename = "recordings")]
     Recordings,
-    #[serde(rename = "images")]
     Images,
-    #[serde(rename = "releases")]
     Releases,
-    #[serde(rename = "tracks")]
     Tracks,
 }
 
@@ -151,13 +244,9 @@ pub struct ReleaseAttributes {
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum ReleaseRelation {
-    #[serde(rename = "image")]
     Image,
-    #[serde(rename = "mediums")]
     Mediums,
-    #[serde(rename = "artists")]
     Artists,
 }
 

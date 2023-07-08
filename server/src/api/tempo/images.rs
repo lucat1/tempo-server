@@ -8,9 +8,9 @@ use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
 use crate::api::{
-    documents::ImageAttributes,
+    documents::{ImageAttributes, ImageResource, Included, ResourceType},
     extract::Json,
-    jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType},
+    jsonapi::{Document, DocumentData, Error},
     AppState,
 };
 
@@ -26,7 +26,7 @@ pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
             height: image.height,
             size: image.size,
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships: HashMap::new(),
     }
 }
@@ -38,7 +38,7 @@ pub fn entity_to_included(image: &entity::Image) -> Included {
 pub async fn image(
     State(AppState(db)): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Json<Document<ImageResource>>, Error> {
+) -> Result<Json<Document<ImageResource, Included>>, Error> {
     let image = entity::ImageEntity::find_by_id(id)
         .one(&db)
         .await

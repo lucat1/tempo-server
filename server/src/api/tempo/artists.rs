@@ -12,13 +12,14 @@ use uuid::Uuid;
 use super::{images, releases, tracks};
 use crate::api::{
     documents::{
-        ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude, ArtistRelation,
-        IntoColumn, RecordingAttributes, ReleaseInclude,
+        dedup, ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude,
+        ArtistRelation, ArtistResource, Included, IntoColumn, Meta, RecordingAttributes,
+        ReleaseInclude, ResourceType,
     },
     extract::Json,
     jsonapi::{
-        dedup, links_from_resource, make_cursor, ArtistResource, Document, DocumentData, Error,
-        Included, Meta, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
+        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        Relationship, ResourceIdentifier,
     },
     AppState,
 };
@@ -260,7 +261,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
                 .map(|rel| (rel.r#type, rel.url.to_owned()))
                 .collect(),
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships,
     }
 }
@@ -273,7 +274,7 @@ pub async fn artists(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<ArtistResource>>, Error> {
+) -> Result<Json<Document<ArtistResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -345,7 +346,7 @@ pub async fn artist(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
-) -> Result<Json<Document<ArtistResource>>, Error> {
+) -> Result<Json<Document<ArtistResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
