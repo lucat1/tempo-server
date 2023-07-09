@@ -1,20 +1,19 @@
 use eyre::{eyre, Result};
-use sea_orm::{DbConn, EntityTrait};
-use serde::Deserialize;
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::fetch::lastfm;
 use base::setting::get_settings;
 use entity::{full::ArtistInfo, user_connection::Named};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub provider: entity::ConnectionProvider,
     pub username: String,
     pub time: time::OffsetDateTime,
 
-    pub track: entity::Track,
-    pub artist_credits: Vec<entity::ArtistCredit>,
-    pub artists: Vec<entity::Artist>,
+    pub track_id: Uuid,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,13 +30,33 @@ struct LastFMScrobbleResponseError {
 }
 
 #[async_trait::async_trait]
-impl super::Task for Task {
-    async fn run(&self, db: &DbConn) -> Result<()> {
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
         let settings = get_settings()?;
+        let track = entity::TrackEntity::find_by_id(self.track_id)
+            .one(db)
+            .await?
+            .ok_or(eyre!(
+                "Track to be scrobbled doesn't exist: {}",
+                self.track_id
+            ))?;
+        let artist_credits = track
+            .find_related(entity::ArtistCreditEntity)
+            .all(db)
+            .await?;
+        let artists: Vec<_> = artist_credits
+            .load_one(entity::ArtistEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect();
         let full_track = entity::full::FullTrack {
-            track: self.track.clone(),
-            artist_credit: self.artist_credits.clone(),
-            artist: self.artists.clone(),
+            track,
+            artist_credit: artist_credits,
+            artist: artists,
             artist_credit_track: Vec::new(),
             artist_track_relation: Vec::new(),
         };
@@ -63,12 +82,12 @@ impl super::Task for Task {
                 let url = lastfm::LASTFM_BASE_URL.clone();
                 let mut body: Vec<(String, String)> = vec![
                     ("artist".to_string(), full_track.get_joined_artists()?),
-                    ("track".to_string(), self.track.title.to_owned()),
+                    ("track".to_string(), full_track.track.title.to_owned()),
                     (
                         "timestamp".to_string(),
                         self.time.unix_timestamp().to_string(),
                     ),
-                    ("mbid".to_string(), self.track.id.to_string()),
+                    ("mbid".to_string(), self.track_id.to_string()),
                     ("method".to_string(), "track.scrobble".to_string()),
                     ("format".to_string(), "json".to_string()),
                     ("api_key".to_string(), lastfm.apikey.to_owned()),

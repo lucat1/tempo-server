@@ -1,22 +1,29 @@
 use eyre::{eyre, Result};
-use sea_orm::{DbConn, EntityTrait, LoaderTrait};
+use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait};
+use serde::{Deserialize, Serialize};
 
 use crate::search::{documents, INDEX_WRITERS};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Task {
     Artists,
     Tracks,
     Releases,
 }
 
-pub async fn all_data(_db: &DbConn) -> Result<Vec<Task>> {
+pub async fn all_data<C>(_: &C) -> Result<Vec<Task>>
+where
+    C: ConnectionTrait,
+{
     Ok(vec![Task::Artists, Task::Tracks, Task::Releases])
 }
 
 #[async_trait::async_trait]
-impl super::Task for Task {
-    async fn run(&self, db: &DbConn) -> Result<()> {
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
         let mut writers_cell = INDEX_WRITERS.lock().await;
         let writer = writers_cell
             .get_mut()

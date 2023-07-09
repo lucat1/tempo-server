@@ -1,15 +1,20 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
-use sea_orm::{ActiveModelTrait, ActiveValue, DbConn, EntityTrait, IntoActiveModel};
-use serde::Deserialize;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ConnectionTrait, DbConn, EntityTrait, IntoActiveModel,
+};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz::send_request;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Task(Uuid);
 
-pub async fn all_data(db: &DbConn) -> Result<Vec<Task>> {
+pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+where
+    C: ConnectionTrait,
+{
     Ok(entity::ArtistEntity::find()
         .all(db)
         .await?
@@ -30,8 +35,11 @@ struct WikipediExtract {
 }
 
 #[async_trait::async_trait]
-impl super::Task for Task {
-    async fn run(&self, db: &DbConn) -> Result<()> {
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
         let Task(data) = self;
         tracing::trace!(%data, "Fetching the description for artist");
         let req = Request::new(

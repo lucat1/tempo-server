@@ -1,50 +1,16 @@
 use axum::http::StatusCode;
 use eyre::Result;
 use fs_extra::dir::get_size;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::read_dir, hash::Hash, path::PathBuf};
+use std::{collections::HashMap, fs::read_dir, path::PathBuf};
 
 use crate::api::{
     extract::{Json, Path},
-    jsonapi::{
-        Document, DocumentData, Error, Related, Relation, Relationship, Resource,
-        ResourceIdentifier,
+    internal::documents::{
+        DirectoryAttributes, DirectoryRelation, DirectoryResource, FileEntry, ResourceType,
     },
+    jsonapi::{Document, DocumentData, Error, Related, Relation, Relationship, ResourceIdentifier},
 };
 use base::setting::get_settings;
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum ResourceType {
-    Directory,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct FileEntry {
-    name: String,
-    path: PathBuf,
-    size: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DirectoryAttributes {
-    pub name: String,
-    pub path: PathBuf,
-    pub files: Vec<FileEntry>,
-}
-
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum DirectoryRelation {
-    Directories,
-}
-
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum DirectoryMeta {}
-
-pub type DirectoryResource =
-    Resource<ResourceType, String, DirectoryAttributes, DirectoryRelation, DirectoryMeta>;
 
 enum Entry {
     Directory(DirectoryResource),

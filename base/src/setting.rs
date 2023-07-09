@@ -329,22 +329,22 @@ pub struct Tasks {
     pub workers: usize,
 
     #[serde(default = "default_recurring")]
-    pub recurring: HashMap<TaskType, String>,
+    pub recurring: HashMap<JobType, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum TaskType {
+pub enum JobType {
     ArtistUrl,
     ArtistDescription,
     LastfmArtistImage,
     IndexSearch,
 }
 
-fn default_recurring() -> HashMap<TaskType, String> {
+fn default_recurring() -> HashMap<JobType, String> {
     [
-        (TaskType::ArtistUrl, "0 0 3 * * * *".to_string()),
-        (TaskType::ArtistDescription, "0 0 4 * * * *".to_string()),
+        (JobType::ArtistUrl, "0 0 3 * * * *".to_string()),
+        (JobType::ArtistDescription, "0 0 4 * * * *".to_string()),
         // (TaskType::ArtistImagesLastfm, "0 0 4 * * * *".to_string()),
     ]
     .into()

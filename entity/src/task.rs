@@ -11,7 +11,7 @@ pub struct Model {
     pub description: Option<String>,
 
     pub scheduled_at: time::OffsetDateTime,
-    pub started_at: time::OffsetDateTime,
+    pub started_at: Option<time::OffsetDateTime>,
     pub ended_at: Option<time::OffsetDateTime>,
 
     pub job: i64,

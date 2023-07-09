@@ -2,18 +2,21 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{DbConn, EntityTrait, IntoActiveModel};
-use serde::Deserialize;
+use sea_orm::{ConnectionTrait, DbConn, EntityTrait, IntoActiveModel};
+use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
 use url::Url;
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz::{send_request, MB_BASE_STRURL};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Task(Uuid);
 
-pub async fn all_data(db: &DbConn) -> Result<Vec<Task>> {
+pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+where
+    C: ConnectionTrait,
+{
     Ok(entity::ArtistEntity::find()
         .all(db)
         .await?
@@ -114,8 +117,11 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
 }
 
 #[async_trait::async_trait]
-impl super::Task for Task {
-    async fn run(&self, db: &DbConn) -> Result<()> {
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
         let Task(data) = self;
         tracing::trace!(%data, "Fetching artist urls");
         let req = Request::new(
