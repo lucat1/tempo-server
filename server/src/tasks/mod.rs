@@ -33,6 +33,7 @@ pub struct Task {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum TaskData {
     Scrobble(tasks::scrobble::Task),
     ArtistUrl(tasks::artist_url::Task),

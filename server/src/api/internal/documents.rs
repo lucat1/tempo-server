@@ -66,3 +66,28 @@ pub enum JobMeta {}
 pub type JobResource = Resource<ResourceType, i64, JobAttributes, JobRelation, JobMeta>;
 pub type InsertJobResource =
     InsertResource<ResourceType, InsertJobAttributes, JobRelation, JobMeta>;
+
+#[derive(Serialize, Deserialize)]
+pub struct TaskAttributes {
+    pub data: serde_json::Value,
+    pub description: Option<String>,
+
+    #[serde(with = "time::serde::iso8601")]
+    pub scheduled_at: OffsetDateTime,
+    #[serde(with = "time::serde::iso8601::option")]
+    pub started_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::iso8601::option")]
+    pub ended_at: Option<OffsetDateTime>,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskRelation {
+    Job,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskMeta {}
+
+pub type TaskResource = Resource<ResourceType, i64, TaskAttributes, TaskRelation, TaskMeta>;

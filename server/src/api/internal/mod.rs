@@ -1,6 +1,7 @@
 mod downloads;
 mod import;
 mod jobs;
+mod tasks;
 
 mod documents;
 

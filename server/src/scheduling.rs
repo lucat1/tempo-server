@@ -82,45 +82,45 @@ pub async fn trigger_job(
     };
     let job = job_active.insert(&db).await?;
 
-    let mut db_tasks = Vec::new();
     let mut tasks = Vec::new();
     match task {
         JobType::ArtistUrl => {
             let data = tasks::artist_url::all_data(&db).await?;
             for task in data.into_iter() {
-                db_tasks.push(serde_json::to_value(task)?);
                 tasks.push(TaskData::ArtistUrl(task));
             }
         }
         JobType::ArtistDescription => {
             let data = tasks::artist_description::all_data(&db).await?;
             for task in data.into_iter() {
-                db_tasks.push(serde_json::to_value(task)?);
                 tasks.push(TaskData::ArtistDescription(task));
             }
         }
         JobType::LastfmArtistImage => {
             let data = tasks::lastfm_artist_image::all_data(&db).await?;
             for task in data.into_iter() {
-                db_tasks.push(serde_json::to_value(task.clone())?);
                 tasks.push(TaskData::LastFMArtistImage(task));
             }
         }
         JobType::IndexSearch => {
             let data = tasks::index_search::all_data(&db).await?;
             for task in data.into_iter() {
-                db_tasks.push(serde_json::to_value(task)?);
                 tasks.push(TaskData::IndexSearch(task));
             }
         }
     };
-    let db_tasks = db_tasks.into_iter().map(|data| entity::TaskActive {
-        data: ActiveValue::Set(data),
+    let db_tasks = tasks
+        .iter()
+        .map(|task| -> Result<entity::TaskActive> {
+            Ok(entity::TaskActive {
+                data: ActiveValue::Set(serde_json::to_value(task)?),
 
-        scheduled_at: ActiveValue::Set(OffsetDateTime::now_utc()),
-        job: ActiveValue::Set(job.id),
-        ..Default::default()
-    });
+                scheduled_at: ActiveValue::Set(OffsetDateTime::now_utc()),
+                job: ActiveValue::Set(job.id),
+                ..Default::default()
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let res = entity::TaskEntity::insert_many(db_tasks).exec(&db).await?;
     db.commit().await?;
     tracing::info!(last_id = res.last_insert_id, "Inserted all tasks");
