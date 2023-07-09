@@ -1,6 +1,12 @@
-use axum::{extract::State, http::StatusCode};
+use axum::{
+    extract::{OriginalUri, State},
+    http::StatusCode,
+};
 use eyre::Result;
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, CursorTrait, EntityTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
+};
 use std::collections::HashMap;
 
 use crate::{
@@ -8,11 +14,12 @@ use crate::{
         documents::Meta,
         extract::{Json, Path},
         internal::documents::{
-            InsertJobResource, JobAttributes, JobMeta, JobRelation, JobResource, ResourceType,
+            InsertJobResource, JobAttributes, JobFilter, JobInclude, JobMeta, JobRelation,
+            JobResource, ResourceType,
         },
         jsonapi::{
-            Document, DocumentData, Error, InsertDocument, Related, Relation, Relationship,
-            ResourceIdentifier,
+            make_cursor, Document, DocumentData, Error, InsertDocument, Query, Related, Relation,
+            Relationship, ResourceIdentifier,
         },
         AppState,
     },
@@ -21,8 +28,8 @@ use crate::{
 
 use super::documents::TaskResource;
 
-pub async fn list() -> Result<(), StatusCode> {
-    Ok(())
+struct JobRelated {
+    tasks: Vec<entity::Task>,
 }
 
 pub fn entity_to_resource(entity: &entity::Job, tasks: &[entity::Task]) -> JobResource {
@@ -56,6 +63,17 @@ pub fn entity_to_resource(entity: &entity::Job, tasks: &[entity::Task]) -> JobRe
     }
 }
 
+pub async fn related<C>(
+    db: &C,
+    entities: &Vec<entity::Job>,
+    light: bool,
+) -> Result<Vec<JobRelated>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    // TODO:
+}
+
 pub async fn schedule(
     State(AppState(db)): State<AppState>,
     json_jobs: Json<InsertDocument<InsertJobResource>>,
@@ -83,6 +101,7 @@ pub async fn schedule(
         for id in ids.into_iter() {
             cond = cond.add(entity::TaskColumn::Id.eq(id));
         }
+        queued_jobs.push((job, tasks));
         let tasks = entity::TaskEntity::find()
             .filter(cond)
             .all(&db)
@@ -92,7 +111,6 @@ pub async fn schedule(
                 title: "Couldn't fetch the assiociated tasks".to_string(),
                 detail: Some(e.into()),
             })?;
-        queued_jobs.push((job, tasks));
     }
 
     Ok(Json::new(Document {
@@ -113,4 +131,28 @@ pub async fn schedule(
             .collect(),
         links: HashMap::new(),
     }))
+}
+
+pub async fn list(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<JobFilter, entity::JobColumn, JobInclude, i64>,
+    OriginalUri(uri): OriginalUri,
+) -> Result<Json<Document<JobResource, TaskResource>>, Error> {
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let mut jobs_query = entity::JobEntity::find();
+    for (sort_key, sort_order) in opts.sort.iter() {
+        jobs_query = jobs_query.order_by(sort_key.to_owned(), sort_order.to_owned());
+    }
+    let mut _jobs_cursor = jobs_query.cursor_by(entity::ArtistColumn::Id);
+    let jobs_cursor = make_cursor(&mut _jobs_cursor, &opts.page);
+    let jobs = jobs_cursor.all(&db).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch jobs page".to_string(),
+        detail: Some(e.into()),
+    })?;
+    Ok(())
 }

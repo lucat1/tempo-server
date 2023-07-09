@@ -61,7 +61,17 @@ pub enum JobRelation {
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum JobInclude {
+    Tasks,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum JobMeta {}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum JobFilter {}
 
 pub type JobResource = Resource<ResourceType, i64, JobAttributes, JobRelation, JobMeta>;
 pub type InsertJobResource =
