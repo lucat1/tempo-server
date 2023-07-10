@@ -1,5 +1,7 @@
 [workspace]
 members = ["entity", "tag", "base", "common", "migration", "server"]
+# use 'current' workspace resolver
+resolver = "1"
 
 [profile.release]
 opt-level = "z"     # Optimize for size.
