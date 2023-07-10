@@ -68,10 +68,7 @@ impl From<JobType> for TaskDescription {
     }
 }
 
-pub async fn trigger_job(
-    db: DatabaseTransaction,
-    task: &JobType,
-) -> Result<(entity::Job, Vec<i64>)> {
+pub async fn trigger_job(db: DatabaseTransaction, task: &JobType) -> Result<entity::Job> {
     let TaskDescription { title, description } = (*task).into();
 
     let job_active = entity::JobActive {
@@ -126,17 +123,15 @@ pub async fn trigger_job(
     tracing::info!(last_id = res.last_insert_id, "Inserted all tasks");
 
     let len = tasks.len();
-    let mut ids = Vec::new();
     for (i, task) in tasks.into_iter().rev().enumerate() {
         let id = res.last_insert_id - (len - i - 1) as i64;
-        ids.push(id);
         push_queue(Task {
             id: Some(id),
             data: task,
         });
     }
 
-    Ok((job, ids))
+    Ok(job)
 }
 
 pub async fn start(scheduler: &mut JobScheduler) -> Result<()> {

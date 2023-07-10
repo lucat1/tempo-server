@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::{Request, StatusCode};
 use axum::{body::Body, response::IntoResponse};
 use sea_orm::{
@@ -17,7 +17,7 @@ use crate::api::{
         dedup, ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes,
         ResourceType, TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
         Relationship, ResourceIdentifier,
@@ -34,7 +34,7 @@ pub struct TrackRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Track>,
+    entities: &[entity::Track],
     light: bool,
 ) -> Result<Vec<TrackRelated>, DbErr>
 where
@@ -199,7 +199,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let artists_related = artists::related(db, &artists, true).await?;
         for (i, artist) in artists.into_iter().enumerate() {
             included.push(artists::entity_to_included(&artist, &artists_related[i]));
@@ -227,7 +227,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let artists_related = artists::related(db, &artists, true).await?;
         for (i, artist) in artists.into_iter().enumerate() {
             included.push(artists::entity_to_included(&artist, &artists_related[i]));
@@ -307,9 +307,10 @@ pub async fn tracks(
 
 pub async fn track(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    track_path: Path<Uuid>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
 ) -> Result<Json<Document<TrackResource, Included>>, Error> {
+    let id = track_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -343,10 +344,10 @@ pub async fn track(
 
 pub async fn audio(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    track_path: Path<Uuid>,
     request: Request<Body>,
 ) -> Result<impl IntoResponse, Error> {
-    let track = find_track_by_id(&db, id).await?;
+    let track = find_track_by_id(&db, track_path.inner()).await?;
     let path = track.path.ok_or(Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Track does not have an associated path".to_string(),

@@ -4,35 +4,34 @@ use axum::{
 };
 use eyre::Result;
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, CursorTrait, EntityTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryOrder, TransactionTrait,
 };
 use std::collections::HashMap;
 
 use crate::{
     api::{
-        documents::Meta,
         extract::{Json, Path},
         internal::documents::{
-            InsertJobResource, JobAttributes, JobFilter, JobInclude, JobMeta, JobRelation,
+            dedup, Included, InsertJobResource, JobAttributes, JobFilter, JobInclude, JobRelation,
             JobResource, ResourceType,
         },
         jsonapi::{
-            make_cursor, Document, DocumentData, Error, InsertDocument, Query, Related, Relation,
-            Relationship, ResourceIdentifier,
+            links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Query,
+            Related, Relation, Relationship, ResourceIdentifier,
         },
         AppState,
     },
     scheduling,
 };
 
-use super::documents::TaskResource;
+use super::tasks;
 
-struct JobRelated {
+#[derive(Default)]
+pub struct JobRelated {
     tasks: Vec<entity::Task>,
 }
 
-pub fn entity_to_resource(entity: &entity::Job, tasks: &[entity::Task]) -> JobResource {
+pub fn entity_to_resource(entity: &entity::Job, related: &JobRelated) -> JobResource {
     JobResource {
         id: entity.id,
         r#type: ResourceType::Job,
@@ -42,10 +41,11 @@ pub fn entity_to_resource(entity: &entity::Job, tasks: &[entity::Task]) -> JobRe
             scheduled_at: entity.scheduled_at,
         },
         relationships: [(
-            JobRelation::Task,
+            JobRelation::Tasks,
             Relationship {
                 data: Relation::Multi(
-                    tasks
+                    related
+                        .tasks
                         .iter()
                         .map(|t| {
                             Related::Int(ResourceIdentifier {
@@ -65,19 +65,50 @@ pub fn entity_to_resource(entity: &entity::Job, tasks: &[entity::Task]) -> JobRe
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Job>,
-    light: bool,
+    entities: &[entity::Job],
+    _light: bool,
 ) -> Result<Vec<JobRelated>, DbErr>
 where
     C: ConnectionTrait,
 {
-    // TODO:
+    let mut result = Vec::new();
+    let tasks = entities.load_many(entity::TaskEntity, db).await?;
+    for i in 0..tasks.len() {
+        result.push(JobRelated {
+            tasks: tasks[i].to_owned(),
+        })
+    }
+    Ok(result)
+}
+
+pub async fn included<C>(
+    _db: &C,
+    related: Vec<JobRelated>,
+    include: &[JobInclude],
+) -> Result<Vec<Included>, DbErr>
+where
+    C: ConnectionTrait,
+{
+    let mut result = Vec::new();
+    if include.contains(&JobInclude::Tasks) {
+        let mut tasks = related
+            .iter()
+            .flat_map(|rel| {
+                rel.tasks
+                    .iter()
+                    .map(tasks::entity_to_resource)
+                    .map(Included::Task)
+            })
+            .collect::<Vec<_>>();
+        result.append(&mut tasks);
+    }
+    Ok(result)
 }
 
 pub async fn schedule(
     State(AppState(db)): State<AppState>,
     json_jobs: Json<InsertDocument<InsertJobResource>>,
-) -> Result<Json<Document<JobResource, TaskResource>>, Error> {
+) -> Result<Json<Document<JobResource, Included>>, Error> {
     let document_jobs = json_jobs.inner();
     let jobs = match document_jobs.data {
         DocumentData::Single(r) => vec![r],
@@ -90,45 +121,34 @@ pub async fn schedule(
             title: "Couldn't begin database transaction".to_string(),
             detail: Some(e.into()),
         })?;
-        let (job, ids) = scheduling::trigger_job(tx, &job.attributes.r#type)
+        let job = scheduling::trigger_job(tx, &job.attributes.r#type)
             .await
             .map_err(|e| Error {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
                 title: "Could not schedule job".to_string(),
                 detail: Some(e.into()),
             })?;
-        let mut cond = Condition::any();
-        for id in ids.into_iter() {
-            cond = cond.add(entity::TaskColumn::Id.eq(id));
-        }
-        queued_jobs.push((job, tasks));
-        let tasks = entity::TaskEntity::find()
-            .filter(cond)
-            .all(&db)
-            .await
-            .map_err(|e| Error {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                title: "Couldn't fetch the assiociated tasks".to_string(),
-                detail: Some(e.into()),
-            })?;
+        queued_jobs.push(job);
     }
-
+    let related_to_jobs = related(&db, &queued_jobs, false).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch the related tasks".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let mut data = Vec::new();
+    for (i, job) in queued_jobs.iter().enumerate() {
+        data.push(entity_to_resource(job, &related_to_jobs[i]));
+    }
+    let included = included(&db, related_to_jobs, &[JobInclude::Tasks])
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
     Ok(Json::new(Document {
-        data: DocumentData::Multi(
-            queued_jobs
-                .iter()
-                .map(|(job, tasks)| entity_to_resource(job, tasks))
-                .collect(),
-        ),
-        included: queued_jobs
-            .iter()
-            .flat_map(|(job, tasks)| {
-                tasks
-                    .into_iter()
-                    .map(|t| super::tasks::entity_to_resource(t, job))
-                    .collect::<Vec<_>>()
-            })
-            .collect(),
+        data: DocumentData::Multi(data),
+        included: dedup(included),
         links: HashMap::new(),
     }))
 }
@@ -137,7 +157,7 @@ pub async fn list(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<JobFilter, entity::JobColumn, JobInclude, i64>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<JobResource, TaskResource>>, Error> {
+) -> Result<Json<Document<JobResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -149,10 +169,78 @@ pub async fn list(
     }
     let mut _jobs_cursor = jobs_query.cursor_by(entity::ArtistColumn::Id);
     let jobs_cursor = make_cursor(&mut _jobs_cursor, &opts.page);
-    let jobs = jobs_cursor.all(&db).await.map_err(|e| Error {
+    let jobs = jobs_cursor.all(&tx).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not fetch jobs page".to_string(),
         detail: Some(e.into()),
     })?;
-    Ok(())
+    let related_to_jobs = related(&tx, &jobs, false).await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not fetch the related tasks".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let mut data = Vec::new();
+    for (i, job) in jobs.iter().enumerate() {
+        data.push(entity_to_resource(job, &related_to_jobs[i]));
+    }
+    let included = included(&tx, related_to_jobs, &opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json::new(Document {
+        links: links_from_resource(&data, opts, &uri),
+        data: DocumentData::Multi(data),
+        included: dedup(included),
+    }))
+}
+
+pub async fn job(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<JobFilter, entity::JobColumn, JobInclude, i64>,
+    job_path: Path<i64>,
+) -> Result<Json<Document<JobResource, Included>>, Error> {
+    let id = job_path.inner();
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let job = entity::JobEntity::find_by_id(id)
+        .one(&tx)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the requried job".to_string(),
+            detail: Some(e.into()),
+        })?
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Job not found".to_string(),
+            detail: None,
+        })?;
+    let related_to_jobs = related(&tx, &[job.clone()], false)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the related tasks".to_string(),
+            detail: Some(e.into()),
+        })?;
+    let empty_relationship = JobRelated::default();
+    let related = related_to_jobs.first().unwrap_or(&empty_relationship);
+    let data = entity_to_resource(&job, related);
+    let included = included(&tx, related_to_jobs, &opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json::new(Document {
+        data: DocumentData::Single(data),
+        included: dedup(included),
+        links: HashMap::new(),
+    }))
 }

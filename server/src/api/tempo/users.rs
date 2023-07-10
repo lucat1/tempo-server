@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::State,
     headers::{Header, HeaderValue, Location},
     http::StatusCode,
     TypedHeader,
@@ -14,7 +14,7 @@ use crate::api::{
         dedup, Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter,
         UserInclude, UserRelation, UserResource,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         Document, DocumentData, Error, InsertManyRelation, Query, Related, Relation, Relationship,
         ResourceIdentifier,
@@ -32,7 +32,7 @@ pub struct UserRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::User>,
+    entities: &[entity::User],
     _light: bool,
 ) -> Result<Vec<UserRelated>, DbErr>
 where
@@ -202,8 +202,9 @@ where
 pub async fn user(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
-    Path(username): Path<String>,
+    username_path: Path<String>,
 ) -> Result<Json<Document<UserResource, Included>>, Error> {
+    let username = username_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -220,8 +221,9 @@ pub async fn user(
 pub async fn relation(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
-    Path((username, relation)): Path<(String, UserRelation)>,
+    user_rel_path: Path<(String, UserRelation)>,
 ) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, Error> {
+    let (username, relation) = user_rel_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -255,13 +257,14 @@ pub struct InsertExactlyOneRelation<R> {
 pub async fn post_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    Path((username, relation)): Path<(String, UserRelation)>,
+    user_rel_path: Path<(String, UserRelation)>,
     body: Json<
         InsertExactlyOneRelation<
             ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
         >,
     >,
 ) -> Result<(StatusCode, TypedHeader<Location>), Error> {
+    let (username, relation) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,
@@ -326,11 +329,12 @@ pub async fn post_relation(
 pub async fn delete_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    Path((username, relation)): Path<(String, UserRelation)>,
+    user_rel_path: Path<(String, UserRelation)>,
     body: Json<
         InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
     >,
 ) -> Result<StatusCode, Error> {
+    let (username, relation) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,

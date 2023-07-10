@@ -1,4 +1,4 @@
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use eyre::{eyre, Result};
 use sea_orm::{
@@ -15,7 +15,7 @@ use crate::api::{
         dedup, Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
         ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Page,
         Query, Related, Relation, Relationship, ResourceIdentifier,
@@ -88,7 +88,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let users_related = users::related(db, &users, true).await?;
         for (i, user) in users.into_iter().enumerate() {
             included.push(users::entity_to_included(&user, &users_related[i]));
@@ -100,7 +100,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let tracks_related = tracks::related(db, &tracks, true).await?;
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
@@ -295,8 +295,9 @@ pub async fn scrobbles(
 pub async fn scrobble(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
-    Path(id): Path<i64>,
+    scrobble_path: Path<i64>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
+    let id = scrobble_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

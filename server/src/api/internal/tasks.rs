@@ -16,7 +16,7 @@ use crate::{
     scheduling,
 };
 
-pub fn entity_to_resource(entity: &entity::Task, job: &entity::Job) -> TaskResource {
+pub fn entity_to_resource(entity: &entity::Task) -> TaskResource {
     TaskResource {
         id: entity.id,
         r#type: ResourceType::Task,
@@ -33,7 +33,7 @@ pub fn entity_to_resource(entity: &entity::Task, job: &entity::Job) -> TaskResou
             Relationship {
                 data: Relation::Single(Related::Int(ResourceIdentifier {
                     r#type: ResourceType::Job,
-                    id: job.id,
+                    id: entity.job,
                     meta: None,
                 })),
             },

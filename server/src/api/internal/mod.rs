@@ -15,9 +15,10 @@ use super::{auth, AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/jobs", get(jobs::list).put(jobs::schedule))
         .route("/downloads", get(downloads::list))
         .route("/downloads/:id", get(downloads::list))
+        .route("/jobs", get(jobs::list).put(jobs::schedule))
+        .route("/jobs/:id", get(jobs::job))
         .route("/import", put(import::begin))
         .route("/import/:job", get(import::get))
         .route("/import/:job", patch(import::edit))

@@ -56,20 +56,20 @@ pub struct InsertJobAttributes {
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobRelation {
-    Task,
+    Tasks,
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobInclude {
     Tasks,
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobMeta {}
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum JobFilter {}
 
@@ -101,3 +101,25 @@ pub enum TaskRelation {
 pub enum TaskMeta {}
 
 pub type TaskResource = Resource<ResourceType, i64, TaskAttributes, TaskRelation, TaskMeta>;
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Included {
+    Task(TaskResource),
+}
+
+#[derive(PartialEq)]
+enum Identifier {
+    Task(i64),
+}
+
+pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
+    included.sort_unstable_by(|_a, _b| match (_a, _b) {
+        (Included::Task(a), Included::Task(b)) => a.id.cmp(&b.id),
+        // (_, _) => std::cmp::Ordering::Less,
+    });
+    included.dedup_by_key(|e| match e {
+        Included::Task(e) => Identifier::Task(e.id),
+    });
+    included
+}

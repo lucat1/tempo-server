@@ -1,5 +1,5 @@
 use async_recursion::async_recursion;
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
@@ -16,7 +16,7 @@ use crate::api::{
         dedup, Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
         MediumResource, ResourceType, TrackInclude,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
         Relationship, ResourceIdentifier,
@@ -31,7 +31,7 @@ pub struct MediumRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Medium>,
+    entities: &[entity::Medium],
     _light: bool,
 ) -> Result<Vec<MediumRelated>, DbErr>
 where
@@ -216,9 +216,10 @@ pub async fn mediums(
 
 pub async fn medium(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    medium_path: Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource, Included>>, Error> {
+    let id = medium_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

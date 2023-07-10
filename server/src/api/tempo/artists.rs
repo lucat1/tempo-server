@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
@@ -16,7 +16,7 @@ use crate::api::{
         ArtistRelation, ArtistResource, Included, IntoColumn, Meta, RecordingAttributes,
         ReleaseInclude, ResourceType,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
         Relationship, ResourceIdentifier,
@@ -36,7 +36,7 @@ pub struct ArtistRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Artist>,
+    entities: &[entity::Artist],
     light: bool,
 ) -> Result<Vec<ArtistRelated>, DbErr>
 where
@@ -344,9 +344,10 @@ pub async fn artists(
 
 pub async fn artist(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    artist_path: Path<Uuid>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource, Included>>, Error> {
+    let id = artist_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
@@ -15,7 +15,7 @@ use crate::api::{
         ReleaseAttributes, ReleaseFilter, ReleaseInclude, ReleaseRelation, ReleaseResource,
         ResourceType,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
         Relationship, ResourceIdentifier,
@@ -32,7 +32,7 @@ pub struct ReleaseRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Release>,
+    entities: &[entity::Release],
     _light: bool,
 ) -> Result<Vec<ReleaseRelated>, DbErr>
 where
@@ -267,9 +267,10 @@ pub async fn releases(
 
 pub async fn release(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    release_path: Path<Uuid>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
+    let id = release_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
