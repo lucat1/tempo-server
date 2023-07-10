@@ -77,9 +77,9 @@ where
 {
     let mut result = Vec::new();
     let tasks = entities.load_many(entity::TaskEntity, db).await?;
-    for i in 0..tasks.len() {
+    for task in tasks.iter() {
         result.push(JobRelated {
-            tasks: tasks[i].to_owned(),
+            tasks: task.to_owned(),
         })
     }
     Ok(result)

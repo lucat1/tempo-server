@@ -290,7 +290,7 @@ pub async fn release(
             title: "Release not found".to_string(),
             detail: None,
         })?;
-    let related_to_releases = related(&tx, &vec![release.clone()], false)
+    let related_to_releases = related(&tx, &[release.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

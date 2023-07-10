@@ -318,7 +318,7 @@ pub async fn track(
     })?;
 
     let track = find_track_by_id(&tx, id).await?;
-    let related_to_tracks = related(&tx, &vec![track.clone()], false)
+    let related_to_tracks = related(&tx, &[track.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

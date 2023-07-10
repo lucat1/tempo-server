@@ -367,7 +367,7 @@ pub async fn artist(
             title: "Artist not found".to_string(),
             detail: None,
         })?;
-    let related_to_artists = related(&tx, &vec![artist.clone()], false)
+    let related_to_artists = related(&tx, &[artist.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

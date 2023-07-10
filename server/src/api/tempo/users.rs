@@ -178,7 +178,7 @@ where
             title: "Not found".to_string(),
             detail: Some("Not found".into()),
         })?;
-    let related = related(db, &vec![user.to_owned()], false)
+    let related = related(db, &[user.to_owned()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

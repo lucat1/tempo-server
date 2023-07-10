@@ -239,7 +239,7 @@ pub async fn medium(
             title: "Medium not found".to_string(),
             detail: None,
         })?;
-    let related_to_mediums = related(&tx, &vec![medium.clone()], false)
+    let related_to_mediums = related(&tx, &[medium.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

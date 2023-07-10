@@ -177,7 +177,7 @@ where
         let data = tasks::scrobble::Task {
             provider: entity::ConnectionProvider::LastFM,
             username: username.to_owned(),
-            time: time,
+            time,
             track_id,
         };
         tasks::push_queue(tasks::Task {
