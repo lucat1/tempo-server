@@ -2,7 +2,7 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{ConnectionTrait, DbConn, EntityTrait, IntoActiveModel};
+use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
 use url::Url;

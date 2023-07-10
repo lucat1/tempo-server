@@ -1,8 +1,6 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, DbConn, EntityTrait, IntoActiveModel,
-};
+use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

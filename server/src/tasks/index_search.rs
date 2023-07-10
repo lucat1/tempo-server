@@ -1,5 +1,5 @@
 use eyre::{eyre, Result};
-use sea_orm::{ConnectionTrait, DbConn, EntityTrait, LoaderTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait};
 use serde::{Deserialize, Serialize};
 
 use crate::search::{documents, INDEX_WRITERS};

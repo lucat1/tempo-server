@@ -1,8 +1,5 @@
 use eyre::Result;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    PaginatorTrait, TransactionTrait,
-};
+use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseTransaction, EntityTrait, TransactionTrait};
 use time::OffsetDateTime;
 use tokio_cron_scheduler::{Job, JobScheduler};
 

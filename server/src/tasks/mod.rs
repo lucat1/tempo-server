@@ -9,8 +9,7 @@ use deadqueue::unlimited::Queue;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, DbConn, EntityTrait, IntoActiveModel,
-    TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

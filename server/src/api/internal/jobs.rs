@@ -63,6 +63,10 @@ pub fn entity_to_resource(entity: &entity::Job, related: &JobRelated) -> JobReso
     }
 }
 
+pub fn entity_to_included(entity: &entity::Job, related: &JobRelated) -> Included {
+    Included::Job(entity_to_resource(entity, related))
+}
+
 pub async fn related<C>(
     db: &C,
     entities: &[entity::Job],
@@ -82,27 +86,25 @@ where
 }
 
 pub async fn included<C>(
-    _db: &C,
+    db: &C,
     related: Vec<JobRelated>,
     include: &[JobInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
 {
-    let mut result = Vec::new();
+    let mut included = Vec::new();
     if include.contains(&JobInclude::Tasks) {
-        let mut tasks = related
+        let tasks = related
             .iter()
-            .flat_map(|rel| {
-                rel.tasks
-                    .iter()
-                    .map(tasks::entity_to_resource)
-                    .map(Included::Task)
-            })
+            .flat_map(|rel| rel.tasks.to_owned())
             .collect::<Vec<_>>();
-        result.append(&mut tasks);
+        let tasks_related = tasks::related(db, &tasks, true).await?;
+        for (i, task) in tasks.iter().enumerate() {
+            included.push(tasks::entity_to_included(task, &tasks_related[i]))
+        }
     }
-    Ok(result)
+    Ok(included)
 }
 
 pub async fn schedule(
@@ -132,7 +134,7 @@ pub async fn schedule(
     }
     let related_to_jobs = related(&db, &queued_jobs, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch the related tasks".to_string(),
+        title: "Could not fetch the related jobs".to_string(),
         detail: Some(e.into()),
     })?;
     let mut data = Vec::new();
@@ -153,7 +155,7 @@ pub async fn schedule(
     }))
 }
 
-pub async fn list(
+pub async fn jobs(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<JobFilter, entity::JobColumn, JobInclude, i64>,
     OriginalUri(uri): OriginalUri,
@@ -176,7 +178,7 @@ pub async fn list(
     })?;
     let related_to_jobs = related(&tx, &jobs, false).await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch the related tasks".to_string(),
+        title: "Could not fetch the related jobs".to_string(),
         detail: Some(e.into()),
     })?;
     let mut data = Vec::new();
@@ -225,7 +227,7 @@ pub async fn job(
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the related tasks".to_string(),
+            title: "Could not fetch the related jobs".to_string(),
             detail: Some(e.into()),
         })?;
     let empty_relationship = JobRelated::default();

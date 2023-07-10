@@ -3,7 +3,7 @@ use image::io::Reader as ImageReader;
 use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
-use sea_orm::{ColumnTrait, ConnectionTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{io::Cursor, path::PathBuf};
