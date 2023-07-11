@@ -2,22 +2,26 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{DbConn, EntityTrait, IntoActiveModel};
-use serde::Deserialize;
+use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel};
+use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
 use url::Url;
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz::{send_request, MB_BASE_STRURL};
 
-pub type Data = Uuid;
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Task(Uuid);
 
-pub async fn all_data(db: &DbConn) -> Result<Vec<Data>> {
+pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+where
+    C: ConnectionTrait,
+{
     Ok(entity::ArtistEntity::find()
         .all(db)
         .await?
         .into_iter()
-        .map(|a| a.id as Data)
+        .map(|a| Task(a.id))
         .collect())
 }
 
@@ -112,53 +116,61 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
     }.map(|r| (url.to_string(), r))
 }
 
-pub async fn run(db: &DbConn, data: Data) -> Result<()> {
-    tracing::trace!(%data, "Fetching artist urls");
-    let req = Request::new(
-        Method::GET,
-        format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_STRURL, data,).parse()?,
-    );
-    let res = send_request(req).await?;
-    if !res.status().is_success() {
-        bail!(
-            "MusicBrainz request returned non-success error code: {} {}",
-            res.status(),
-            res.text().await?
+#[async_trait::async_trait]
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
+        let Task(data) = self;
+        tracing::trace!(%data, "Fetching artist urls");
+        let req = Request::new(
+            Method::GET,
+            format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_STRURL, data).parse()?,
         );
-    }
-    let text = res
-        .text()
-        .await
-        .wrap_err(eyre!("Could not read response as text"))?;
-
-    let document: Document =
-        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(text.as_str()))
-            .map_err(|e| {
-                eyre!(
-                    "Error wihle decoding: {} at path {}",
-                    e,
-                    e.path().to_string()
-                )
-            })?;
-    let urls = document
-        .relations
-        .into_iter()
-        .filter_map(|r| r.url.and_then(|url| parse(url.resource, r.r#type)))
-        .map(|(url, t)| entity::ArtistUrl {
-            artist_id: data,
-            r#type: t,
-            url,
-        })
-        .sorted_by_key(|relation| (relation.r#type, relation.artist_id))
-        .unique_by(|relation| (relation.r#type, relation.artist_id))
-        .map(|r| r.into_active_model())
-        .collect::<Vec<_>>();
-    if !urls.is_empty() {
-        entity::ArtistUrlEntity::insert_many(urls)
-            .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
-            .exec(db)
+        let res = send_request(req).await?;
+        if !res.status().is_success() {
+            bail!(
+                "MusicBrainz request returned non-success error code: {} {}",
+                res.status(),
+                res.text().await?
+            );
+        }
+        let text = res
+            .text()
             .await
-            .ignore_none()?;
+            .wrap_err(eyre!("Could not read response as text"))?;
+
+        let document: Document = serde_path_to_error::deserialize(
+            &mut serde_json::Deserializer::from_str(text.as_str()),
+        )
+        .map_err(|e| {
+            eyre!(
+                "Error wihle decoding: {} at path {}",
+                e,
+                e.path().to_string()
+            )
+        })?;
+        let urls = document
+            .relations
+            .into_iter()
+            .filter_map(|r| r.url.and_then(|url| parse(url.resource, r.r#type)))
+            .map(|(url, t)| entity::ArtistUrl {
+                artist_id: *data,
+                r#type: t,
+                url,
+            })
+            .sorted_by_key(|relation| (relation.r#type, relation.artist_id))
+            .unique_by(|relation| (relation.r#type, relation.artist_id))
+            .map(|r| r.into_active_model())
+            .collect::<Vec<_>>();
+        if !urls.is_empty() {
+            entity::ArtistUrlEntity::insert_many(urls)
+                .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
+                .exec(db)
+                .await
+                .ignore_none()?;
+        }
+        Ok(())
     }
-    Ok(())
 }

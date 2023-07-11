@@ -1,9 +1,9 @@
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use eyre::{eyre, Result};
 use sea_orm::{
-    ActiveValue, ColumnTrait, Condition, ConnectionTrait, CursorTrait, DbErr, EntityTrait,
-    LoaderTrait, PaginatorTrait, QueryFilter, TransactionTrait, Value,
+    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait,
+    PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -12,13 +12,13 @@ use super::{tracks, users};
 use crate::api::{
     auth::Claims,
     documents::{
-        ScrobbleAttributes, ScrobbleFilter, ScrobbleInclude, ScrobbleRelation, TrackInclude,
+        dedup, Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
+        ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
-        InsertDocument, InsertScrobbleResource, Page, Query, Related, Relation, Relationship,
-        ResourceIdentifier, ResourceType, ScrobbleResource,
+        links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Page,
+        Query, Related, Relation, Relationship, ResourceIdentifier,
     },
     AppState,
 };
@@ -52,7 +52,7 @@ pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
         id: entity.id,
         attributes: ScrobbleAttributes { at: entity.at },
         relationships,
-        meta: HashMap::new(),
+        meta: None,
     }
 }
 
@@ -88,7 +88,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let users_related = users::related(db, &users, true).await?;
         for (i, user) in users.into_iter().enumerate() {
             included.push(users::entity_to_included(&user, &users_related[i]));
@@ -100,7 +100,7 @@ where
             .await?
             .into_iter()
             .flatten()
-            .collect();
+            .collect::<Vec<_>>();
         let tracks_related = tracks::related(db, &tracks, true).await?;
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
@@ -167,54 +167,31 @@ where
     Ok((data, included))
 }
 
-pub async fn schedule_scrobble_tasks<C, I>(db: &C, username: &str, tracks: I) -> Result<()>
+pub fn schedule_scrobble_tasks<I>(username: &str, tracks: I)
 where
-    C: ConnectionTrait,
     I: Iterator<Item = (Uuid, time::OffsetDateTime)>,
 {
-    let mut times = Vec::new();
-    let mut cond = Condition::any();
-    for (id, at) in tracks {
-        cond = cond.add(ColumnTrait::eq(&entity::TrackColumn::Id, id.to_owned()));
-        times.push(at);
-    }
-    let tracks = entity::TrackEntity::find().filter(cond).all(db).await?;
-    let artist_credits = tracks
-        .load_many_to_many(
-            entity::ArtistCreditEntity,
-            entity::ArtistCreditTrackEntity,
-            db,
-        )
-        .await?;
-    for (i, track) in tracks.into_iter().enumerate() {
-        let artist_credits = &artist_credits[i];
-        let artists: Vec<_> = artist_credits
-            .load_one(entity::ArtistEntity, db)
-            .await?
-            .into_iter()
-            .flatten()
-            .collect();
-
+    for (track_id, time) in tracks.into_iter() {
         // TODO: use user's setting to determine the subset of connections he wants
         // to scrobble to.
-        let data = tasks::scrobble::Data {
+        let data = tasks::scrobble::Task {
             provider: entity::ConnectionProvider::LastFM,
             username: username.to_owned(),
-            time: times[i],
-            track: track.to_owned(),
-            artist_credits: artist_credits.to_owned(),
-            artists,
+            time,
+            track_id,
         };
-        tasks::get_queue().push(tasks::Task::Scrobble(data));
+        tasks::push_queue(tasks::Task {
+            id: None,
+            data: tasks::TaskData::Scrobble(data),
+        });
     }
-    Ok(())
 }
 
 pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     json_scrobbles: Json<InsertDocument<InsertScrobbleResource>>,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -270,7 +247,6 @@ pub async fn insert_scrobbles(
     })?;
 
     schedule_scrobble_tasks(
-        &tx,
         claims.username.as_str(),
         entities
             .iter()
@@ -282,14 +258,7 @@ pub async fn insert_scrobbles(
                 ) => Some((*id, *time)),
                 _ => None,
             }),
-    )
-    .await
-    .map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while scheduling the scrobbling of tracks to the various connections"
-            .to_string(),
-        detail: Some(e.into()),
-    })?;
+    );
 
     let page = Page {
         size: u32::MAX,
@@ -309,7 +278,7 @@ pub async fn scrobbles(
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     OriginalUri(uri): OriginalUri,
     claims: Claims,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -326,8 +295,9 @@ pub async fn scrobbles(
 pub async fn scrobble(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
-    Path(id): Path<i64>,
-) -> Result<Json<Document<ScrobbleResource>>, Error> {
+    scrobble_path: Path<i64>,
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
+    let id = scrobble_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

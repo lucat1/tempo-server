@@ -1,5 +1,5 @@
 use async_recursion::async_recursion;
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
@@ -13,12 +13,13 @@ use crate::api::documents::ReleaseInclude;
 use crate::api::AppState;
 use crate::api::{
     documents::{
-        IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation, TrackInclude,
+        dedup, Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
+        MediumResource, ResourceType, TrackInclude,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included,
-        MediumResource, Query, Related, Relation, Relationship, ResourceIdentifier, ResourceType,
+        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        Relationship, ResourceIdentifier,
     },
 };
 
@@ -30,7 +31,7 @@ pub struct MediumRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Medium>,
+    entities: &[entity::Medium],
     _light: bool,
 ) -> Result<Vec<MediumRelated>, DbErr>
 where
@@ -97,7 +98,7 @@ pub fn entity_to_resource(entity: &entity::Medium, related: &MediumRelated) -> M
             track_offset: entity.track_offset,
             format: entity.format.to_owned(),
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships,
     }
 }
@@ -167,7 +168,7 @@ pub async fn mediums(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<MediumResource>>, Error> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -215,9 +216,10 @@ pub async fn mediums(
 
 pub async fn medium(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    medium_path: Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
-) -> Result<Json<Document<MediumResource>>, Error> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
+    let id = medium_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -237,7 +239,7 @@ pub async fn medium(
             title: "Medium not found".to_string(),
             detail: None,
         })?;
-    let related_to_mediums = related(&tx, &vec![medium.clone()], false)
+    let related_to_mediums = related(&tx, &[medium.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

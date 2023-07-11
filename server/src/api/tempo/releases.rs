@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use axum::extract::{OriginalUri, Path, State};
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
@@ -11,13 +11,14 @@ use uuid::Uuid;
 use super::{artists, images, mediums};
 use crate::api::{
     documents::{
-        ArtistCreditAttributes, IntoColumn, MediumInclude, ReleaseAttributes, ReleaseFilter,
-        ReleaseInclude, ReleaseRelation,
+        dedup, ArtistCreditAttributes, Included, IntoColumn, MediumInclude, Meta,
+        ReleaseAttributes, ReleaseFilter, ReleaseInclude, ReleaseRelation, ReleaseResource,
+        ResourceType,
     },
-    extract::Json,
+    extract::{Json, Path},
     jsonapi::{
-        dedup, links_from_resource, make_cursor, Document, DocumentData, Error, Included, Meta,
-        Query, Related, Relation, Relationship, ReleaseResource, ResourceIdentifier, ResourceType,
+        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        Relationship, ResourceIdentifier,
     },
     AppState,
 };
@@ -31,7 +32,7 @@ pub struct ReleaseRelated {
 
 pub async fn related<C>(
     db: &C,
-    entities: &Vec<entity::Release>,
+    entities: &[entity::Release],
     _light: bool,
 ) -> Result<Vec<ReleaseRelated>, DbErr>
 where
@@ -141,7 +142,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             release_mbid: entity.id,
             release_group_mbid: entity.release_group_id,
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships,
     }
 }
@@ -218,7 +219,7 @@ pub async fn releases(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<ReleaseResource>>, Error> {
+) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -266,9 +267,10 @@ pub async fn releases(
 
 pub async fn release(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<Uuid>,
+    release_path: Path<Uuid>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
-) -> Result<Json<Document<ReleaseResource>>, Error> {
+) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
+    let id = release_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -288,7 +290,7 @@ pub async fn release(
             title: "Release not found".to_string(),
             detail: None,
         })?;
-    let related_to_releases = related(&tx, &vec![release.clone()], false)
+    let related_to_releases = related(&tx, &[release.clone()], false)
         .await
         .map_err(|e| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

@@ -8,6 +8,7 @@ mod m20230525_000001_user;
 mod m20230602_000001_scrobble;
 mod m20230602_000002_release_date;
 mod m20230607_000001_connection;
+mod m20230708_000001_jobs;
 
 pub struct Migrator;
 
@@ -23,6 +24,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230602_000001_scrobble::Migration),
             Box::new(m20230602_000002_release_date::Migration),
             Box::new(m20230607_000001_connection::Migration),
+            Box::new(m20230708_000001_jobs::Migration),
         ]
     }
 }

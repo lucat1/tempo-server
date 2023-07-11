@@ -3,7 +3,8 @@ use image::io::Reader as ImageReader;
 use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
-use sea_orm::{ColumnTrait, DbConn, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{io::Cursor, path::PathBuf};
 use strfmt::strfmt;
@@ -25,16 +26,19 @@ lazy_static! {
 }
 static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
-#[derive(Debug, Clone)]
-pub struct Data(Uuid, String);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Task(Uuid, String);
 
-pub async fn all_data(db: &DbConn) -> Result<Vec<Data>> {
+pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+where
+    C: ConnectionTrait,
+{
     Ok(entity::ArtistUrlEntity::find()
         .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Data(a.artist_id, a.url))
+        .map(|a| Task(a.artist_id, a.url))
         .collect())
 }
 
@@ -101,15 +105,18 @@ fn get_urls(url: &mut url::Url, html: &str, artist_id: Uuid) -> Result<Vec<UrlDa
     Ok(urls)
 }
 
-async fn download(
-    db: &DbConn,
+async fn download<D>(
+    db: &D,
     artist_id: Uuid,
     UrlData {
         image_page,
         image_url,
         image_id,
     }: UrlData,
-) -> Result<Option<entity::Image>> {
+) -> Result<Option<entity::Image>>
+where
+    D: ConnectionTrait,
+{
     let library = &get_settings()?.library;
     let artist = entity::ArtistEntity::find_by_id(artist_id)
         .one(db)
@@ -165,35 +172,42 @@ async fn download(
     Ok(None)
 }
 
-pub async fn run(db: &DbConn, Data(artist_id, url): Data) -> Result<()> {
-    tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
-    let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
-    let text = get_html(url.to_owned()).await?;
+#[async_trait::async_trait]
+impl super::TaskTrait for Task {
+    async fn run<D>(&self, db: &D) -> Result<()>
+    where
+        D: ConnectionTrait,
+    {
+        let Task(artist_id, url) = self;
+        tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
+        let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
+        let text = get_html(url.to_owned()).await?;
 
-    // TODO: paginate over lastfm, setting limit
-    let urls = get_urls(&mut url, text.as_str(), artist_id)?;
-    for url_data in urls.into_iter() {
-        let new_image = download(db, artist_id, url_data).await?;
-        if let Some(image) = new_image {
-            let id = image.id.to_owned();
-            tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
-            entity::ImageEntity::insert(image.into_active_model())
-                .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
-                .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
-                .exec(db)
-                .await
-                .ignore_none()?;
+        // TODO: paginate over lastfm, setting limit
+        let urls = get_urls(&mut url, text.as_str(), *artist_id)?;
+        for url_data in urls.into_iter() {
+            let new_image = download(db, *artist_id, url_data).await?;
+            if let Some(image) = new_image {
+                let id = image.id.to_owned();
+                tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
+                entity::ImageEntity::insert(image.into_active_model())
+                    .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
+                    .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
+                    .exec(db)
+                    .await
+                    .ignore_none()?;
 
-            let artist_image = entity::ImageArtist {
-                image_id: id,
-                artist_id,
-            };
-            entity::ImageArtistEntity::insert(artist_image.into_active_model())
-                .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
-                .exec(db)
-                .await
-                .ignore_none()?;
+                let artist_image = entity::ImageArtist {
+                    image_id: id,
+                    artist_id: *artist_id,
+                };
+                entity::ImageArtistEntity::insert(artist_image.into_active_model())
+                    .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
+                    .exec(db)
+                    .await
+                    .ignore_none()?;
+            }
         }
+        Ok(())
     }
-    Ok(())
 }

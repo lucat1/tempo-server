@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
 use axum::body::Body;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
 use sea_orm::EntityTrait;
 use tower::util::ServiceExt;
 
 use crate::api::{
-    documents::ImageAttributes,
-    extract::Json,
-    jsonapi::{Document, DocumentData, Error, ImageResource, Included, ResourceType},
+    documents::{ImageAttributes, ImageResource, Included, ResourceType},
+    extract::{Json, Path},
+    jsonapi::{Document, DocumentData, Error},
     AppState,
 };
 
@@ -26,7 +26,7 @@ pub fn entity_to_resource(image: &entity::Image) -> ImageResource {
             height: image.height,
             size: image.size,
         },
-        meta: HashMap::new(),
+        meta: None,
         relationships: HashMap::new(),
     }
 }
@@ -37,8 +37,9 @@ pub fn entity_to_included(image: &entity::Image) -> Included {
 
 pub async fn image(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<Document<ImageResource>>, Error> {
+    image_path: Path<String>,
+) -> Result<Json<Document<ImageResource, Included>>, Error> {
+    let id = image_path.inner();
     let image = entity::ImageEntity::find_by_id(id)
         .one(&db)
         .await
@@ -61,9 +62,10 @@ pub async fn image(
 
 pub async fn file(
     State(AppState(db)): State<AppState>,
-    Path(id): Path<String>,
+    image_path: Path<String>,
     request: Request<Body>,
 ) -> Result<impl IntoResponse, Error> {
+    let id = image_path.inner();
     let image = entity::ImageEntity::find_by_id(id)
         .one(&db)
         .await

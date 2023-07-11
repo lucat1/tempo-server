@@ -15,9 +15,12 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::api::{
-    documents::{ConnectionAttributes, ConnectionFlow, ConnectionMetaAttributes},
+    documents::{
+        ConnectionAttributes, ConnectionFlow, ConnectionMetaAttributes, ConnectionResource,
+        Included, Meta, ResourceType,
+    },
     extract::{Json, Path},
-    jsonapi::{ConnectionResource, Document, DocumentData, Error, Meta, ResourceType},
+    jsonapi::{Document, DocumentData, Error},
     AppState,
 };
 use crate::fetch::lastfm;
@@ -172,7 +175,7 @@ impl ProviderImpl for entity::ConnectionProvider {
     }
 }
 
-pub async fn connections() -> Result<Json<Document<ConnectionResource>>, Error> {
+pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, Error> {
     Ok(Json::new(Document {
         data: DocumentData::Multi(
             PROVIDERS
@@ -181,7 +184,7 @@ pub async fn connections() -> Result<Json<Document<ConnectionResource>>, Error> 
                     id: id.to_owned(),
                     r#type: ResourceType::Connection,
                     attributes: attrs.to_owned(),
-                    meta: HashMap::new(),
+                    meta: None,
                     relationships: HashMap::new(),
                 })
                 .collect(),
@@ -193,7 +196,7 @@ pub async fn connections() -> Result<Json<Document<ConnectionResource>>, Error> 
 
 pub async fn connection(
     path_provider: Path<entity::ConnectionProvider>,
-) -> Result<Json<Document<ConnectionResource>>, Error> {
+) -> Result<Json<Document<ConnectionResource, Included>>, Error> {
     let provider = path_provider.inner();
     let (id, attrs) = PROVIDERS
         .iter()
@@ -209,7 +212,7 @@ pub async fn connection(
             id: id.to_owned(),
             r#type: ResourceType::Connection,
             attributes: attrs.to_owned(),
-            meta: HashMap::new(),
+            meta: None,
             relationships: HashMap::new(),
         }),
         included: vec![],

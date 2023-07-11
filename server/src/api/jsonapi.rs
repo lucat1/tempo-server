@@ -5,7 +5,6 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use entity::ConnectionProvider;
 use itertools::Itertools;
 use sea_orm::{
     sea_query::{IntoIden, IntoValueTuple},
@@ -16,65 +15,9 @@ use serde_valid::Validate;
 use std::{cmp::Eq, collections::HashMap, default::Default, error::Error as StdError, hash::Hash};
 use uuid::Uuid;
 
-use super::documents::{
-    ArtistAttributes, ArtistCreditAttributes, ArtistRelation, AuthAttributes, AuthRelation,
-    ConnectionAttributes, ConnectionMetaAttributes, ConnectionRelation, ImageAttributes,
-    ImageRelation, MediumAttributes, MediumRelation, RecordingAttributes, ReleaseAttributes,
-    ReleaseRelation, ScrobbleAttributes, ScrobbleRelation, ServerAttributes, ServerRelation,
-    TrackAttributes, TrackRelation, UserAttributes, UserRelation,
-};
+use entity::ConnectionProvider;
 
 pub static DEFAULT_PAGE_SIZE: u32 = 10;
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum ResourceType {
-    Server,
-    Auth,
-    User,
-    Scrobble,
-    Connection,
-
-    Image,
-    Artist,
-    Track,
-    Medium,
-    Release,
-}
-
-pub type ServerResource = Resource<String, ServerAttributes, ServerRelation>;
-pub type AuthResource = Resource<String, AuthAttributes, AuthRelation>;
-pub type UserResource = Resource<String, UserAttributes, UserRelation>;
-pub type ScrobbleResource = Resource<i64, ScrobbleAttributes, ScrobbleRelation>;
-pub type ConnectionResource =
-    Resource<ConnectionProvider, ConnectionAttributes, ConnectionRelation>;
-pub type ImageResource = Resource<String, ImageAttributes, ImageRelation>;
-pub type ArtistResource = Resource<Uuid, ArtistAttributes, ArtistRelation>;
-pub type TrackResource = Resource<Uuid, TrackAttributes, TrackRelation>;
-pub type MediumResource = Resource<Uuid, MediumAttributes, MediumRelation>;
-pub type ReleaseResource = Resource<Uuid, ReleaseAttributes, ReleaseRelation>;
-
-// pub type InsertServerResource = InsertResource<ServerAttributes, ServerRelation>;
-// pub type InsertAuthResource = InsertResource<AuthAttributes, AuthRelation>;
-// pub type InsertUserResource = InsertResource<UserAttributes, UserRelation>;
-pub type InsertScrobbleResource = InsertResource<ScrobbleAttributes, ScrobbleRelation>;
-// pub type InsertImageResource = InsertResource<ImageAttributes, ImageRelation>;
-// pub type InsertArtistResource = InsertResource<ArtistAttributes, ArtistRelation>;
-// pub type InsertTrackResource = InsertResource<TrackAttributes, TrackRelation>;
-// pub type InsertMediumResource = InsertResource<MediumAttributes, MediumRelation>;
-// pub type InsertReleaseResource = InsertResource<ReleaseAttributes, ReleaseRelation>;
-
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Included {
-    User(UserResource),
-    Scrobble(ScrobbleResource),
-    Image(ImageResource),
-    Artist(ArtistResource),
-    Track(TrackResource),
-    Medium(MediumResource),
-    Release(ReleaseResource),
-}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
@@ -86,10 +29,10 @@ pub enum LinkKey {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Document<R> {
+pub struct Document<R, I> {
     pub data: DocumentData<R>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub included: Vec<Included>,
+    pub included: Vec<I>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub links: HashMap<LinkKey, String>,
 }
@@ -116,73 +59,56 @@ pub enum DocumentData<R> {
     Multi(Vec<R>),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-pub enum ResourceMetaKey {
-    Score,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Resource<I, T, R: Eq + Hash> {
-    pub r#type: ResourceType,
+pub struct Resource<RT, I, T, R: Eq + Hash, M> {
+    pub r#type: RT,
     pub id: I,
     pub attributes: T,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default = "HashMap::new")]
-    pub relationships: HashMap<R, Relationship>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    #[serde(default = "HashMap::new")]
-    pub meta: HashMap<ResourceMetaKey, String>,
+    pub relationships: HashMap<R, Relationship<RT, M>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<M>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct InsertResource<T, R: Eq + Hash> {
-    pub r#type: ResourceType,
+pub struct InsertResource<RT, T, R: Eq + Hash, M> {
+    pub r#type: RT,
     pub attributes: T,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default = "HashMap::new")]
-    pub relationships: HashMap<R, Relationship>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    #[serde(default = "HashMap::new")]
-    pub meta: HashMap<ResourceMetaKey, String>,
+    pub relationships: HashMap<R, Relationship<RT, M>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<M>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Relationship {
-    pub data: Relation,
+pub struct Relationship<RT, M> {
+    pub data: Relation<RT, M>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum Relation {
-    Single(Related),
-    Multi(Vec<Related>),
+pub enum Relation<RT, M> {
+    Single(Related<RT, M>),
+    Multi(Vec<Related<RT, M>>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum Related {
-    Uuid(ResourceIdentifier<Uuid>),
-    String(ResourceIdentifier<String>),
-    Int(ResourceIdentifier<i64>),
-    ConnectionProvider(ResourceIdentifier<ConnectionProvider>),
+pub enum Related<RT, M> {
+    Uuid(ResourceIdentifier<RT, Uuid, M>),
+    String(ResourceIdentifier<RT, String, M>),
+    Int(ResourceIdentifier<RT, i64, M>),
+    ConnectionProvider(ResourceIdentifier<RT, ConnectionProvider, M>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum Meta {
-    ArtistCredit(ArtistCreditAttributes),
-    Recording(RecordingAttributes),
-    Connection(ConnectionMetaAttributes),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ResourceIdentifier<I> {
-    pub r#type: ResourceType,
+pub struct ResourceIdentifier<RT, I, M> {
+    pub r#type: RT,
     pub id: I,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub meta: Option<Meta>,
+    pub meta: Option<M>,
 }
 
 pub struct Error {
@@ -370,38 +296,6 @@ where
     }
 }
 
-#[derive(PartialEq)]
-enum Identifier {
-    Image(String),
-    User(String),
-    Scrobble(i64),
-    Artist(Uuid),
-    Track(Uuid),
-    Medium(Uuid),
-    Release(Uuid),
-}
-
-pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
-    included.sort_unstable_by(|_a, _b| match (_a, _b) {
-        (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
-        (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
-        (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
-        (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
-        (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
-        (_, _) => std::cmp::Ordering::Less,
-    });
-    included.dedup_by_key(|e| match e {
-        Included::Image(e) => Identifier::Image(e.id.to_owned()),
-        Included::User(e) => Identifier::User(e.id.to_owned()),
-        Included::Scrobble(e) => Identifier::Scrobble(e.id.to_owned()),
-        Included::Artist(e) => Identifier::Artist(e.id),
-        Included::Track(e) => Identifier::Track(e.id),
-        Included::Medium(e) => Identifier::Medium(e.id),
-        Included::Release(e) => Identifier::Release(e.id),
-    });
-    included
-}
-
 pub fn make_cursor<'a, S, Id>(mut cursor: &'a mut Cursor<S>, page: &Page<Id>) -> &'a mut Cursor<S>
 where
     S: SelectorTrait,
@@ -421,8 +315,8 @@ where
     cursor
 }
 
-pub fn links_from_resource<I, T, R: Eq + Hash, C, F, Inc>(
-    data: &[Resource<I, T, R>],
+pub fn links_from_resource<RT, I, T, R: Eq + Hash, M, C, F, Inc>(
+    data: &[Resource<RT, I, T, R, M>],
     opts: QueryOptions<F, C, Inc, I>,
     uri: &Uri,
 ) -> HashMap<LinkKey, String>
