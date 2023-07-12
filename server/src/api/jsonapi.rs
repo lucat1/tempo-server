@@ -43,6 +43,11 @@ pub struct InsertDocument<R> {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct InsertOneDocument<R> {
+    pub data: R,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct InsertOneRelation<R> {
     pub data: R,
 }

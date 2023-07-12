@@ -1,6 +1,77 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::{hash::Hash, path::PathBuf};
 use uuid::Uuid;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InternalTrack {
+    pub title: String,
+    pub artists: Vec<String>,
+    pub length: Option<i32>,
+    pub disc: Option<i32>,
+    pub number: Option<i32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct InternalRelease {
+    pub title: String,
+    pub artists: Vec<String>,
+    pub media: Option<String>,
+    pub discs: Option<i32>,
+    pub tracks: Option<i32>,
+    pub country: Option<String>,
+    pub label: Option<String>,
+    pub release_type: Option<String>,
+    pub year: Option<i32>,
+    pub month: Option<u8>,
+    pub day: Option<u8>,
+    pub original_year: Option<i32>,
+    pub original_month: Option<u8>,
+    pub original_day: Option<u8>,
+}
+
+impl From<crate::full::FullRelease> for InternalRelease {
+    fn from(full_release: crate::full::FullRelease) -> Self {
+        let crate::full::FullRelease {
+            release,
+            medium,
+            artist,
+            ..
+        } = full_release;
+        InternalRelease {
+            title: release.title,
+            artists: artist.into_iter().map(|a| a.name).collect(),
+            discs: Some(medium.len() as i32),
+            media: medium.first().as_ref().and_then(|m| m.format.clone()),
+            tracks: None, // TODO: consider adding a track count in the media structure
+            country: release.country,
+            label: release.label,
+            release_type: release.release_type,
+            year: release.year,
+            month: release.month.map(|m| m as u8),
+            day: release.day.map(|d| d as u8),
+            original_year: release.original_year,
+            original_month: release.original_month.map(|m| m as u8),
+            original_day: release.original_day.map(|d| d as u8),
+        }
+    }
+}
+
+impl From<crate::full::FullTrack> for InternalTrack {
+    fn from(full_track: crate::full::FullTrack) -> Self {
+        let crate::full::FullTrack { track, artist, .. } = full_track;
+        InternalTrack {
+            title: track.title,
+            artists: artist.into_iter().map(|a| a.name).collect(),
+            length: Some(track.length),
+            disc: None, // TODO: see above
+            number: Some(track.number),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct InternalTracks(pub Vec<InternalTrack>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Artists(pub Vec<super::Artist>);
@@ -28,6 +99,9 @@ pub struct ArtistCreditsTracks(pub Vec<super::ArtistCreditTrack>);
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    pub directory: String,
+    pub source_release: InternalRelease,
+    pub source_tracks: InternalTracks,
 
     pub artsits: Artists,
     pub artist_credits: ArtistCredits,
@@ -36,6 +110,9 @@ pub struct Model {
     pub tracks: Tracks,
     pub artist_credits_releases: ArtistCreditsReleases,
     pub artist_credits_tracks: ArtistCreditsTracks,
+
+    pub started_at: time::OffsetDateTime,
+    pub ended_at: Option<time::OffsetDateTime>,
 
     pub job: i64,
 }
@@ -57,3 +134,30 @@ impl Related<super::job::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl Hash for Column {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state)
+    }
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string().eq(&other.to_string())
+    }
+}
+
+impl Eq for Column {}
+
+impl TryFrom<String> for Column {
+    type Error = String;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "id" => Ok(Column::Id),
+            "started_at" => Ok(Column::StartedAt),
+            "ended_at" => Ok(Column::EndedAt),
+            "job" => Ok(Column::Job),
+            &_ => Err("Invalid column name".to_owned()),
+        }
+    }
+}

@@ -19,7 +19,7 @@ mod scrobble;
 mod user;
 pub mod user_connection;
 
-mod import;
+pub mod import;
 mod job;
 mod task;
 mod task_dep_task;
@@ -121,6 +121,9 @@ pub use user_connection::Relation as UserConnectionRelation;
 pub use import::ActiveModel as ImportActive;
 pub use import::Column as ImportColumn;
 pub use import::Entity as ImportEntity;
+pub use import::InternalRelease;
+pub use import::InternalTrack;
+pub use import::InternalTracks;
 pub use import::Model as Import;
 pub use import::Relation as ImportRelation;
 pub use job::ActiveModel as JobActive;

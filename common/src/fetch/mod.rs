@@ -7,7 +7,6 @@ pub mod cover;
 pub use cover::Cover;
 pub use music_brainz::ReleaseSearch;
 
-use crate::internal::{Release, UNKNOWN_ARTIST};
 use const_format::formatcp;
 use eyre::{bail, eyre, Context, Result};
 use lazy_static::lazy_static;
@@ -16,6 +15,8 @@ use serde::Serialize;
 use std::time::Instant;
 
 use self::music_brainz::TrackWithMediumId;
+use crate::internal::UNKNOWN_ARTIST;
+use entity::InternalRelease;
 
 static COUNT: u32 = 8;
 pub static MB_USER_AGENT: &str =
@@ -51,7 +52,7 @@ fn release_to_result(r: music_brainz::Release) -> Result<SearchResult> {
     Ok(SearchResult(release, tracks))
 }
 
-pub async fn search(release: &Release) -> Result<Vec<SearchResult>> {
+pub async fn search(release: &InternalRelease) -> Result<Vec<SearchResult>> {
     let start = Instant::now();
     let raw_artists = release.artists.join(", ");
     let artists = match raw_artists.as_str() {

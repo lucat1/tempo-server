@@ -5,6 +5,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::api::jsonapi::{InsertResource, Resource};
+use entity::{InternalRelease, InternalTrack};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -116,7 +117,8 @@ pub type TaskResource = Resource<ResourceType, i64, TaskAttributes, TaskRelation
 
 #[derive(Serialize, Deserialize)]
 pub struct ImportAttributes {
-    pub title: String,
+    pub source_release: InternalRelease,
+    pub source_tracks: Vec<InternalTrack>,
 
     #[serde(with = "time::serde::iso8601")]
     pub started_at: OffsetDateTime,
@@ -132,13 +134,16 @@ pub struct InsertImportAttributes {
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ImportRelation {
-    Tasks,
+    Directory,
+    Job,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum ImportInclude {
-    Directory,
+    #[serde(rename = "job")]
+    Job,
+    #[serde(rename = "job.tasks")]
+    JobTasks,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
@@ -160,6 +165,7 @@ pub enum Included {
     Directory(DirectoryResource),
     Job(JobResource),
     Task(TaskResource),
+    Import(ImportResource),
 }
 
 #[derive(PartialEq)]
@@ -167,6 +173,7 @@ enum Identifier {
     Directory(String),
     Task(i64),
     Job(i64),
+    Import(Uuid),
 }
 
 pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
@@ -174,12 +181,14 @@ pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
         (Included::Directory(a), Included::Directory(b)) => a.id.cmp(&b.id),
         (Included::Job(a), Included::Job(b)) => a.id.cmp(&b.id),
         (Included::Task(a), Included::Task(b)) => a.id.cmp(&b.id),
+        (Included::Import(a), Included::Import(b)) => a.id.cmp(&b.id),
         (_, _) => std::cmp::Ordering::Less,
     });
     included.dedup_by_key(|e| match e {
         Included::Directory(e) => Identifier::Directory(e.id.to_owned()),
         Included::Job(e) => Identifier::Job(e.id),
         Included::Task(e) => Identifier::Task(e.id),
+        Included::Import(e) => Identifier::Import(e.id),
     });
     included
 }

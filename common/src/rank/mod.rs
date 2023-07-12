@@ -3,20 +3,20 @@ mod diff;
 
 pub use cover::{rank_covers, CoverRating};
 pub use diff::Diff;
-
-use crate::fetch::SearchResult;
-use crate::internal::{Release, Track};
-use crate::track::TrackFile;
-
 use pathfinding::kuhn_munkres::kuhn_munkres_min;
 use pathfinding::matrix::Matrix;
 
+use crate::fetch::SearchResult;
+use entity::{InternalRelease, InternalTrack};
+
 pub struct Rating(pub i64, pub Vec<usize>);
 
-pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating {
+pub fn rate_and_match(
+    (release, tracks): (InternalRelease, Vec<InternalTrack>),
+    result: &SearchResult,
+) -> Rating {
     let SearchResult(full_release, full_tracks) = result;
-    let release: Release = tracks.clone().into();
-    let candidate_release: Release = full_release.clone().into();
+    let candidate_release: InternalRelease = full_release.clone().into();
 
     let rows = tracks.len();
     let mut columns = full_tracks.len();
@@ -24,8 +24,7 @@ pub fn rate_and_match(tracks: &Vec<TrackFile>, result: &SearchResult) -> Rating 
 
     for original_track in tracks.iter() {
         for candidate_track in full_tracks.iter() {
-            let track: Track = original_track.clone().into();
-            matrix_vec.push(track.diff(&candidate_track.clone().into()));
+            matrix_vec.push(original_track.diff(&candidate_track.clone().into()));
         }
     }
     if matrix_vec.is_empty() {

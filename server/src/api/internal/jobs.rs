@@ -76,11 +76,9 @@ where
     C: ConnectionTrait,
 {
     let mut result = Vec::new();
-    let tasks = entities.load_many(entity::TaskEntity, db).await?;
-    for task in tasks.iter() {
-        result.push(JobRelated {
-            tasks: task.to_owned(),
-        })
+    let jobs_tasks = entities.load_many(entity::TaskEntity, db).await?;
+    for tasks in jobs_tasks.into_iter() {
+        result.push(JobRelated { tasks })
     }
     Ok(result)
 }

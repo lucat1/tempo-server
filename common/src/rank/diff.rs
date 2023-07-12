@@ -1,6 +1,7 @@
-use crate::rank::{Release, Track};
 use levenshtein::levenshtein;
 use std::ops::Sub;
+
+use entity::{InternalRelease, InternalTrack};
 
 static TRACK_TITLE_FACTOR: usize = 5000;
 static TRACK_LENGTH_FACTOR: u32 = 300;
@@ -34,7 +35,7 @@ fn if_both<T, R>(a: Option<T>, b: Option<T>, then: impl Fn(T, T) -> R) -> Option
     None
 }
 
-impl Diff for Track {
+impl Diff for InternalTrack {
     fn diff(&self, other: &Self) -> i64 {
         // TODO: diff artists
         ((levenshtein(self.title.as_str(), other.title.as_str()) * TRACK_TITLE_FACTOR) as i64)
@@ -53,7 +54,7 @@ impl Diff for Track {
     }
 }
 
-impl Diff for Release {
+impl Diff for InternalRelease {
     fn diff(&self, other: &Self) -> i64 {
         // TODO: diff artists
         ((levenshtein(self.title.as_str(), other.title.as_str()) * RELEASE_TITLE_FACTOR) as i64)

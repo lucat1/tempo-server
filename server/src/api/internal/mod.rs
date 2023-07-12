@@ -5,11 +5,7 @@ mod tasks;
 
 mod documents;
 
-use axum::{
-    middleware::from_fn,
-    routing::{delete, get, patch, post, put},
-    Router,
-};
+use axum::{middleware::from_fn, routing::get, Router};
 
 use super::{auth, AppState};
 
@@ -21,10 +17,10 @@ pub fn router() -> Router<AppState> {
         .route("/jobs/:id", get(jobs::job))
         .route("/tasks", get(tasks::tasks))
         .route("/tasks/:id", get(tasks::task))
-        .route("/imports", put(import::begin))
-        .route("/import/:job", get(import::get))
-        .route("/import/:job", patch(import::edit))
-        .route("/import/:job", post(import::run))
-        .route("/import/:job", delete(import::delete))
+        .route("/imports", get(import::imports).put(import::begin))
+        .route("/imports/:job", get(import::import))
+        // .route("/import/:job", patch(import::edit))
+        // .route("/import/:job", post(import::run))
+        // .route("/import/:job", delete(import::delete))
         .layer(from_fn(auth::auth_middleware))
 }

@@ -27,7 +27,7 @@ impl IsFile for Entry {
     }
 }
 
-pub fn abs_path(settings: &Settings, path: &Option<PathBuf>) -> Result<PathBuf, Error> {
+pub fn abs_path(settings: &Settings, path: Option<PathBuf>) -> Result<PathBuf, Error> {
     let downloads = settings.downloads.clone();
     let abs_path = match path {
         None => Ok(downloads.to_owned()),
@@ -55,7 +55,7 @@ pub async fn list(
         title: "Could not read settings".to_string(),
         detail: Some(err.into()),
     })?;
-    let abs_path = abs_path(settings, &path)?;
+    let abs_path = abs_path(settings, path)?;
     tracing::info!(path = ?abs_path, "Probing download directory");
 
     let raw_files = read_dir(&abs_path).map_err(|err| Error {
