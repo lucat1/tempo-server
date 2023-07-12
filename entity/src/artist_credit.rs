@@ -1,8 +1,8 @@
 use sea_orm::entity::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "artists_credit")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

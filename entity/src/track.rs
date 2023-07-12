@@ -2,10 +2,10 @@ use std::hash::Hash;
 
 use super::TrackFormat;
 use sea_orm::entity::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "track")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

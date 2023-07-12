@@ -7,7 +7,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Instruments(Vec<String>);
 
-#[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "artist")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

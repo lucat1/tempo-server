@@ -2,6 +2,7 @@ use base::setting::JobType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 use crate::api::jsonapi::{InsertResource, Resource};
 
@@ -11,6 +12,7 @@ pub enum ResourceType {
     Directory,
     Job,
     Task,
+    Import,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -113,25 +115,69 @@ pub enum TaskFilter {}
 pub type TaskResource = Resource<ResourceType, i64, TaskAttributes, TaskRelation, TaskMeta>;
 
 #[derive(Serialize, Deserialize)]
+pub struct ImportAttributes {
+    pub title: String,
+
+    #[serde(with = "time::serde::iso8601")]
+    pub started_at: OffsetDateTime,
+    #[serde(with = "time::serde::iso8601::option")]
+    pub ended_at: Option<OffsetDateTime>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InsertImportAttributes {
+    pub directory: String,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportRelation {
+    Tasks,
+}
+
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportInclude {
+    Directory,
+}
+
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportMeta {}
+
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportFilter {}
+
+pub type ImportResource =
+    Resource<ResourceType, Uuid, ImportAttributes, ImportRelation, ImportMeta>;
+pub type InsertImportResource =
+    InsertResource<ResourceType, InsertImportAttributes, ImportRelation, ImportMeta>;
+
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Included {
+    Directory(DirectoryResource),
     Job(JobResource),
     Task(TaskResource),
 }
 
 #[derive(PartialEq)]
 enum Identifier {
+    Directory(String),
     Task(i64),
     Job(i64),
 }
 
 pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
     included.sort_unstable_by(|_a, _b| match (_a, _b) {
+        (Included::Directory(a), Included::Directory(b)) => a.id.cmp(&b.id),
         (Included::Job(a), Included::Job(b)) => a.id.cmp(&b.id),
         (Included::Task(a), Included::Task(b)) => a.id.cmp(&b.id),
         (_, _) => std::cmp::Ordering::Less,
     });
     included.dedup_by_key(|e| match e {
+        Included::Directory(e) => Identifier::Directory(e.id.to_owned()),
         Included::Job(e) => Identifier::Job(e.id),
         Included::Task(e) => Identifier::Task(e.id),
     });
