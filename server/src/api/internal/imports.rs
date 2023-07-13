@@ -8,8 +8,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, CursorTrait, DbErr,
     EntityTrait, LoaderTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
-use std::{collections::HashMap, hash::Hash, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use std::{collections::HashMap, path::PathBuf};
 use uuid::Uuid;
 
 use crate::{
@@ -31,9 +30,10 @@ use crate::{
         },
         AppState,
     },
+    import::{all_tracks, IntoInternal},
     scheduling,
+    tasks::{import::ImportFetch, TaskData},
 };
-use common::import;
 
 #[derive(Default)]
 pub struct ImportRelated {
@@ -146,11 +146,25 @@ pub async fn begin(
             detail: Some(err.into()),
         })?;
     let dir = downloads::abs_path(settings, Some(PathBuf::from(decoded_path.to_string())))?;
-    let (release, tracks) = import::begin(&dir).await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin import".to_string(),
-        detail: Some(err.into()),
-    })?;
+    tracing::info! {?dir, library = settings.library.name, "Importing folder"};
+    let tracks = all_tracks(&settings.library, &dir)
+        .await
+        .map_err(|err| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not find all tracks in folder".to_string(),
+            detail: Some(err.into()),
+        })?;
+    if tracks.is_empty() {
+        return Err(Error {
+            status: StatusCode::BAD_REQUEST,
+            title: "Import folder does not contain any valid track files".to_string(),
+            detail: None,
+        });
+    }
+
+    let release: entity::InternalRelease = tracks.clone().into_internal();
+    let tracks: Vec<entity::InternalTrack> =
+        tracks.into_iter().map(|t| t.into_internal()).collect();
 
     // save the import in the db, alongside its job and tasks
     let tx = db.begin().await.map_err(|e| Error {
@@ -181,32 +195,32 @@ pub async fn begin(
         source_release: ActiveValue::Set(release),
         source_tracks: ActiveValue::Set(entity::InternalTracks(tracks)),
 
-        artsits: ActiveValue::Set(entity::import::Artists(Vec::new())),
+        artists: ActiveValue::Set(entity::import::Artists(Vec::new())),
         artist_credits: ActiveValue::Set(entity::import::ArtistCredits(Vec::new())),
         releases: ActiveValue::Set(entity::import::Releases(Vec::new())),
         mediums: ActiveValue::Set(entity::import::Mediums(Vec::new())),
         tracks: ActiveValue::Set(entity::import::Tracks(Vec::new())),
-        artist_credits_releases: ActiveValue::Set(
-            entity::import::ArtistCreditsReleases(Vec::new()),
-        ),
-        artist_credits_tracks: ActiveValue::Set(entity::import::ArtistCreditsTracks(Vec::new())),
+        artist_track_relations: ActiveValue::Set(entity::import::ArtistTrackRelations(Vec::new())),
+        artist_credit_releases: ActiveValue::Set(entity::import::ArtistCreditReleases(Vec::new())),
+        artist_credit_tracks: ActiveValue::Set(entity::import::ArtistCreditTracks(Vec::new())),
 
         started_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
+        ended_at: ActiveValue::NotSet,
         job: ActiveValue::Set(job.id),
-        ..Default::default()
     };
     let import = import.insert(&tx).await.map_err(|err| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't save the import structure".to_string(),
         detail: Some(err.into()),
     })?;
-    // let tasks = vec![];
-    // scheduling::schedule_tasks(tx, job.id, tasks)
-    tx.commit().await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not schedule import tasks".to_string(),
-        detail: Some(err.into()),
-    })?;
+    let tasks = vec![TaskData::ImportFetch(ImportFetch(import.id))];
+    scheduling::schedule_tasks(tx, job.id, tasks)
+        .await
+        .map_err(|err| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not schedule import tasks".to_string(),
+            detail: Some(err.into()),
+        })?;
 
     let related = ImportRelated {
         job: Some(job),

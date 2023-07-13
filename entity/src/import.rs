@@ -1,6 +1,7 @@
+use base::setting::ArtProvider;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{hash::Hash, path::PathBuf};
+use std::{cmp::Ordering, hash::Hash};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -18,7 +19,7 @@ pub struct InternalRelease {
     pub artists: Vec<String>,
     pub media: Option<String>,
     pub discs: Option<i32>,
-    pub tracks: Option<i32>,
+    pub tracks: i32,
     pub country: Option<String>,
     pub label: Option<String>,
     pub release_type: Option<String>,
@@ -43,7 +44,7 @@ impl From<crate::full::FullRelease> for InternalRelease {
             artists: artist.into_iter().map(|a| a.name).collect(),
             discs: Some(medium.len() as i32),
             media: medium.first().as_ref().and_then(|m| m.format.clone()),
-            tracks: None, // TODO: consider adding a track count in the media structure
+            tracks: medium.iter().fold(0, |acc, m| acc + m.tracks),
             country: release.country,
             label: release.label,
             release_type: release.release_type,
@@ -70,6 +71,38 @@ impl From<crate::full::FullTrack> for InternalTrack {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cover {
+    pub provider: ArtProvider,
+    pub url: String,
+    pub width: usize,
+    pub height: usize,
+    pub title: String,
+    pub artist: String,
+}
+
+// Covers are sorted by picture size
+impl Ord for Cover {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s1 = self.width * self.height;
+        let s2 = other.width * other.height;
+        s1.cmp(&s2)
+    }
+}
+
+impl PartialOrd for Cover {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Cover {
+    fn eq(&self, other: &Self) -> bool {
+        self.width * self.height == other.width * other.height
+    }
+}
+impl Eq for Cover {}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct InternalTracks(pub Vec<InternalTrack>);
 
@@ -89,10 +122,13 @@ pub struct Mediums(pub Vec<super::Medium>);
 pub struct Tracks(pub Vec<super::Track>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct ArtistCreditsReleases(pub Vec<super::ArtistCreditRelease>);
+pub struct ArtistTrackRelations(pub Vec<super::ArtistTrackRelation>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct ArtistCreditsTracks(pub Vec<super::ArtistCreditTrack>);
+pub struct ArtistCreditReleases(pub Vec<super::ArtistCreditRelease>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct ArtistCreditTracks(pub Vec<super::ArtistCreditTrack>);
 
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "import")]
@@ -103,13 +139,14 @@ pub struct Model {
     pub source_release: InternalRelease,
     pub source_tracks: InternalTracks,
 
-    pub artsits: Artists,
+    pub artists: Artists,
     pub artist_credits: ArtistCredits,
     pub releases: Releases,
     pub mediums: Mediums,
     pub tracks: Tracks,
-    pub artist_credits_releases: ArtistCreditsReleases,
-    pub artist_credits_tracks: ArtistCreditsTracks,
+    pub artist_track_relations: ArtistTrackRelations,
+    pub artist_credit_releases: ArtistCreditReleases,
+    pub artist_credit_tracks: ArtistCreditTracks,
 
     pub started_at: time::OffsetDateTime,
     pub ended_at: Option<time::OffsetDateTime>,

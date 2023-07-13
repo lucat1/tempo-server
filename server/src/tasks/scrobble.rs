@@ -1,4 +1,8 @@
 use eyre::{eyre, Result};
+use reqwest::{
+    header::{HeaderValue, CONTENT_TYPE},
+    Method, Request,
+};
 use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -100,7 +104,14 @@ impl super::TaskTrait for Task {
                 body.push(("api_sig".to_string(), signature));
                 tracing::trace! {?body,"Scrobbling to last.fm"};
 
-                let req = common::fetch::CLIENT.post(url).form(&body).build()?;
+                // taken from https://docs.rs/reqwest/latest/src/reqwest/async_impl/request.rs.html#406-424
+                let body = serde_urlencoded::to_string(body)?;
+                let mut req = Request::new(Method::POST, url);
+                req.headers_mut().insert(
+                    CONTENT_TYPE,
+                    HeaderValue::from_static("application/x-www-form-urlencoded"),
+                );
+                *req.body_mut() = Some(body.into());
                 let res = lastfm::send_request(req).await?;
                 let raw_self: LastFMScrobbleResponse = res.json().await.map_err(|e| eyre!(e))?;
                 tracing::trace! {?raw_self, "Last.fm scrobble response"}

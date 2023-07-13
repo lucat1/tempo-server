@@ -1,5 +1,5 @@
 mod downloads;
-mod import;
+mod imports;
 mod jobs;
 mod tasks;
 
@@ -17,8 +17,8 @@ pub fn router() -> Router<AppState> {
         .route("/jobs/:id", get(jobs::job))
         .route("/tasks", get(tasks::tasks))
         .route("/tasks/:id", get(tasks::task))
-        .route("/imports", get(import::imports).put(import::begin))
-        .route("/imports/:job", get(import::import))
+        .route("/imports", get(imports::imports).put(imports::begin))
+        .route("/imports/:job", get(imports::import))
         // .route("/import/:job", patch(import::edit))
         // .route("/import/:job", post(import::run))
         // .route("/import/:job", delete(import::delete))

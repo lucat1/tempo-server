@@ -2,7 +2,19 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    EnumIter,
+    DeriveActiveEnum,
+)]
 #[sea_orm(rs_type = "String", db_type = "String(Some(1))")]
 pub enum RelationType {
     #[sea_orm(string_value = "a")]
@@ -67,7 +79,7 @@ impl EntityName for Entity {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, DeriveEntityModel)]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub artist_id: Uuid,
@@ -108,3 +120,39 @@ impl Related<super::track::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl PartialEq for Model {
+    fn eq(&self, other: &Self) -> bool {
+        self.artist_id.eq(&other.artist_id)
+            && self.track_id.eq(&other.track_id)
+            && self.relation_type.eq(&other.relation_type)
+            && self.relation_value.eq(&other.relation_value)
+    }
+}
+impl Eq for Model {}
+
+impl PartialOrd for Model {
+    fn lt(&self, other: &Self) -> bool {
+        self.artist_id.lt(&other.artist_id)
+            && self.track_id.lt(&other.track_id)
+            && self.relation_type.lt(&other.relation_type)
+            && self.relation_value.lt(&other.relation_value)
+    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.artist_id
+            .partial_cmp(&other.artist_id)
+            .and(self.track_id.partial_cmp(&other.track_id))
+            .and(self.relation_type.partial_cmp(&other.relation_type))
+            .and(self.relation_value.partial_cmp(&other.relation_value))
+    }
+}
+
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.eq(&other) {
+            std::cmp::Ordering::Equal
+        } else {
+            self.artist_id.cmp(&other.artist_id)
+        }
+    }
+}

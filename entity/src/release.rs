@@ -3,7 +3,7 @@ use std::hash::Hash;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, DeriveEntityModel)]
 #[sea_orm(table_name = "release")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
@@ -107,5 +107,27 @@ impl TryFrom<String> for Column {
             "script" => Ok(Column::Script),
             &_ => Err("Invalid column name".to_owned()),
         }
+    }
+}
+
+impl PartialEq for Model {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
+}
+impl Eq for Model {}
+
+impl PartialOrd for Model {
+    fn lt(&self, other: &Self) -> bool {
+        self.id.lt(&other.id)
+    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
     }
 }

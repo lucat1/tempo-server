@@ -14,38 +14,6 @@ use std::time::Instant;
 use super::CLIENT;
 use super::{cover_art_archive, deezer, itunes};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Cover {
-    pub provider: ArtProvider,
-    pub url: String,
-    pub width: usize,
-    pub height: usize,
-    pub title: String,
-    pub artist: String,
-}
-
-// Covers are sorted by picture size
-impl Ord for Cover {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let s1 = self.width * self.height;
-        let s2 = other.width * other.height;
-        s1.cmp(&s2)
-    }
-}
-
-impl PartialOrd for Cover {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Cover {
-    fn eq(&self, other: &Self) -> bool {
-        self.width * self.height == other.width * other.height
-    }
-}
-impl Eq for Cover {}
-
 pub async fn probe(url: &str, option_headers: Option<HeaderMap>) -> bool {
     let mut req = CLIENT.head(url);
     if let Some(headers) = option_headers {

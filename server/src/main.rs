@@ -1,5 +1,6 @@
 mod api;
 pub mod fetch;
+pub mod import;
 mod scheduling;
 pub mod search;
 pub mod tasks;

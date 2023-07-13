@@ -1,5 +1,6 @@
 pub mod artist_description;
 pub mod artist_url;
+pub mod import;
 pub mod index_search;
 pub mod lastfm_artist_image;
 pub mod scrobble;
@@ -39,6 +40,8 @@ pub enum TaskData {
     IndexSearch(tasks::index_search::Task),
     ArtistDescription(tasks::artist_description::Task),
     LastFMArtistImage(tasks::lastfm_artist_image::Task),
+
+    ImportFetch(tasks::import::fetch::Task),
 }
 
 impl TaskData {
@@ -52,6 +55,7 @@ impl TaskData {
             TaskData::IndexSearch(task) => task.run(db).await,
             TaskData::ArtistDescription(task) => task.run(db).await,
             TaskData::LastFMArtistImage(task) => task.run(db).await,
+            TaskData::ImportFetch(task) => task.run(db).await,
         }
     }
 }
