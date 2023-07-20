@@ -1,6 +1,8 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -8,6 +10,7 @@ use crate::{
     fetch::musicbrainz::{self, MB_BASE_URL},
     import::SearchResult,
 };
+use base::util::dedup;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Task {
@@ -67,14 +70,44 @@ pub async fn fetch_release(id: Uuid) -> Result<SearchResult> {
 
 #[async_trait::async_trait]
 impl crate::tasks::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
-        let import = entity::ImportEntity::find_by_id(self.import_id)
-            .one(db)
+        let tx = db.begin().await?;
+        let mut import = entity::ImportEntity::find_by_id(self.import_id)
+            .one(&tx)
             .await?
             .ok_or(eyre!("Import not found"))?;
+        let release = fetch_release(self.release_id).await?;
+
+        let mut import_active = import.clone().into_active_model();
+        import.artists.0.extend(release.artists);
+        import_active.artists = ActiveValue::Set(entity::import::Artists(dedup(import.artists.0)));
+        import.artist_credits.0.extend(release.artist_credits);
+        import_active.artist_credits = ActiveValue::Set(entity::import::ArtistCredits(dedup(
+            import.artist_credits.0,
+        )));
+        // import_active.releases =
+        //     ActiveValue::Set(entity::import::Releases(combined_search_results.releases));
+        // import_active.mediums =
+        //     ActiveValue::Set(entity::import::Mediums(combined_search_results.mediums));
+        import.tracks.0.extend(release.tracks);
+        tracing::info!(len = %import.tracks.0.len(), "Tracks len");
+        import_active.tracks = ActiveValue::Set(entity::import::Tracks(dedup(import.tracks.0)));
+        // import_active.artist_track_relations = ActiveValue::Set(
+        //     entity::import::ArtistTrackRelations(combined_search_results.artist_track_relations),
+        // );
+        // import_active.artist_credit_releases = ActiveValue::Set(
+        //     entity::import::ArtistCreditReleases(combined_search_results.artist_credit_releases),
+        // );
+        // import_active.artist_credit_tracks = ActiveValue::Set(entity::import::ArtistCreditTracks(
+        //     combined_search_results.artist_credit_tracks,
+        // ));
+
+        import_active.update(&tx).await?;
+        tx.commit().await?;
+
         Ok(())
     }
 }

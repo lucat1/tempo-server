@@ -3,7 +3,9 @@ use image::io::Reader as ImageReader;
 use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{io::Cursor, path::PathBuf};
@@ -174,10 +176,11 @@ where
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let Task(artist_id, url) = self;
         tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
         let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
@@ -186,14 +189,14 @@ impl super::TaskTrait for Task {
         // TODO: paginate over lastfm, setting limit
         let urls = get_urls(&mut url, text.as_str(), *artist_id)?;
         for url_data in urls.into_iter() {
-            let new_image = download(db, *artist_id, url_data).await?;
+            let new_image = download(&tx, *artist_id, url_data).await?;
             if let Some(image) = new_image {
                 let id = image.id.to_owned();
                 tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
                 entity::ImageEntity::insert(image.into_active_model())
                     .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
                     .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
-                    .exec(db)
+                    .exec(&tx)
                     .await
                     .ignore_none()?;
 
@@ -203,11 +206,12 @@ impl super::TaskTrait for Task {
                 };
                 entity::ImageArtistEntity::insert(artist_image.into_active_model())
                     .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
-                    .exec(db)
+                    .exec(&tx)
                     .await
                     .ignore_none()?;
             }
         }
+        tx.commit().await?;
         Ok(())
     }
 }

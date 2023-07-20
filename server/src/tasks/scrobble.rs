@@ -3,7 +3,7 @@ use reqwest::{
     header::{HeaderValue, CONTENT_TYPE},
     Method, Request,
 };
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -35,13 +35,14 @@ struct LastFMScrobbleResponseError {
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let settings = get_settings()?;
         let track = entity::TrackEntity::find_by_id(self.track_id)
-            .one(db)
+            .one(&tx)
             .await?
             .ok_or(eyre!(
                 "Track to be scrobbled doesn't exist: {}",
@@ -49,10 +50,10 @@ impl super::TaskTrait for Task {
             ))?;
         let artist_credits = track
             .find_related(entity::ArtistCreditEntity)
-            .all(db)
+            .all(&tx)
             .await?;
         let artists: Vec<_> = artist_credits
-            .load_one(entity::ArtistEntity, db)
+            .load_one(entity::ArtistEntity, &tx)
             .await?
             .into_iter()
             .flatten()
@@ -75,7 +76,7 @@ impl super::TaskTrait for Task {
                     self.username.to_owned(),
                     self.provider,
                 ))
-                .one(db)
+                .one(&tx)
                 .await?
                 .ok_or(eyre!(
                     "Scrobbling user is not connected to the required service"

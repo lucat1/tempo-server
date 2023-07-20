@@ -40,7 +40,7 @@ impl Related<Entity> for Entity {
     }
 
     fn via() -> Option<RelationDef> {
-        Some(super::task_dep_task::Relation::ParentTask.def().rev())
+        Some(super::task_dep_task::Relation::ChildTask.def().rev())
     }
 }
 

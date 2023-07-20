@@ -2,7 +2,7 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
 use url::Url;
@@ -118,10 +118,11 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let Task(data) = self;
         tracing::trace!(%data, "Fetching artist urls");
         let req = Request::new(
@@ -167,9 +168,10 @@ impl super::TaskTrait for Task {
         if !urls.is_empty() {
             entity::ArtistUrlEntity::insert_many(urls)
                 .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
-                .exec(db)
+                .exec(&tx)
                 .await
                 .ignore_none()?;
+            tx.commit().await?;
         }
         Ok(())
     }

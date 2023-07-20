@@ -203,6 +203,10 @@ pub async fn begin(
         artist_track_relations: ActiveValue::Set(entity::import::ArtistTrackRelations(Vec::new())),
         artist_credit_releases: ActiveValue::Set(entity::import::ArtistCreditReleases(Vec::new())),
         artist_credit_tracks: ActiveValue::Set(entity::import::ArtistCreditTracks(Vec::new())),
+        covers: ActiveValue::Set(entity::import::Covers(Vec::new())),
+
+        release_matches: ActiveValue::Set(entity::import::ReleaseMatches(HashMap::new())),
+        cover_ratings: ActiveValue::Set(entity::import::CoverRatings(Vec::new())),
 
         started_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
         ended_at: ActiveValue::NotSet,
@@ -214,7 +218,7 @@ pub async fn begin(
         detail: Some(err.into()),
     })?;
     let tasks = vec![TaskData::ImportFetch(ImportFetch(import.id))];
-    scheduling::schedule_tasks(tx, job.id, tasks)
+    scheduling::schedule_tasks(tx, job.id, tasks, &[])
         .await
         .map_err(|err| Error {
             status: StatusCode::INTERNAL_SERVER_ERROR,

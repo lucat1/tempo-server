@@ -1,7 +1,7 @@
 use base::setting::ArtProvider;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, hash::Hash};
+use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -130,6 +130,17 @@ pub struct ArtistCreditReleases(pub Vec<super::ArtistCreditRelease>);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct ArtistCreditTracks(pub Vec<super::ArtistCreditTrack>);
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct Covers(pub Vec<Cover>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct ReleaseRating(pub i64, pub Vec<usize>);
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct ReleaseMatches(pub HashMap<Uuid, ReleaseRating>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct CoverRatings(pub Vec<f32>);
+
 #[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "import")]
 pub struct Model {
@@ -147,6 +158,10 @@ pub struct Model {
     pub artist_track_relations: ArtistTrackRelations,
     pub artist_credit_releases: ArtistCreditReleases,
     pub artist_credit_tracks: ArtistCreditTracks,
+    pub covers: Covers,
+
+    pub release_matches: ReleaseMatches,
+    pub cover_ratings: CoverRatings,
 
     pub started_at: time::OffsetDateTime,
     pub ended_at: Option<time::OffsetDateTime>,

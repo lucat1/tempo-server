@@ -1,6 +1,8 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -34,10 +36,11 @@ struct WikipediExtract {
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let Task(data) = self;
         tracing::trace!(%data, "Fetching the description for artist");
         let req = Request::new(
@@ -70,17 +73,18 @@ impl super::TaskTrait for Task {
         match document.wikipedia_extract {
             Some(extract) => {
                 let mut entity = entity::ArtistEntity::find_by_id(*data)
-                    .one(db)
+                    .one(&tx)
                     .await?
                     .ok_or(eyre!("Could not find a user with id: {}", data))?
                     .into_active_model();
 
                 entity.description = ActiveValue::Set(Some(extract.content));
                 entity
-                    .save(db)
+                    .save(&tx)
                     .await
                     .wrap_err(eyre!("Could not update the description of artist {}", data))?;
 
+                tx.commit().await?;
                 Ok(())
             }
             None => {

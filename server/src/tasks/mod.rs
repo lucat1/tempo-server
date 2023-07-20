@@ -10,20 +10,22 @@ use deadqueue::unlimited::Queue;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
+    JoinType, ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, RelationTrait,
+    TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc, time::Duration};
 use time::OffsetDateTime;
+use tokio::time::sleep;
 
 use crate::tasks;
 
 #[async_trait::async_trait]
 pub trait TaskTrait: Debug {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait;
+        D: ConnectionTrait + TransactionTrait;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -42,20 +44,23 @@ pub enum TaskData {
     LastFMArtistImage(tasks::lastfm_artist_image::Task),
 
     ImportFetch(tasks::import::fetch::Task),
+    ImportFetchRelease(tasks::import::fetch_release::Task),
 }
 
-impl TaskData {
+impl Task {
     async fn run<D>(&self, db: &D) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
-        match self {
-            TaskData::Scrobble(task) => task.run(db).await,
-            TaskData::ArtistUrl(task) => task.run(db).await,
-            TaskData::IndexSearch(task) => task.run(db).await,
-            TaskData::ArtistDescription(task) => task.run(db).await,
-            TaskData::LastFMArtistImage(task) => task.run(db).await,
-            TaskData::ImportFetch(task) => task.run(db).await,
+        match &self.data {
+            TaskData::Scrobble(task) => task.run(db, self.id).await,
+            TaskData::ArtistUrl(task) => task.run(db, self.id).await,
+            TaskData::IndexSearch(task) => task.run(db, self.id).await,
+            TaskData::ArtistDescription(task) => task.run(db, self.id).await,
+            TaskData::LastFMArtistImage(task) => task.run(db, self.id).await,
+
+            TaskData::ImportFetch(task) => task.run(db, self.id).await,
+            TaskData::ImportFetchRelease(task) => task.run(db, self.id).await,
         }
     }
 }
@@ -74,7 +79,7 @@ pub fn push_queue(task: Task) {
 
 async fn run_task<C>(db: &C, task: Task) -> Result<()>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
 {
     let mut task_model: Option<entity::TaskActive> = None;
     if let Some(id) = task.id {
@@ -86,12 +91,36 @@ where
         task.started_at = ActiveValue::Set(Some(OffsetDateTime::now_utc()));
         task_model = Some(task);
     }
-    task.data.run(db).await?;
+    task.run(db).await?;
     if let Some(mut task) = task_model {
         task.ended_at = ActiveValue::Set(Some(OffsetDateTime::now_utc()));
         task.update(db).await?;
     }
     Ok(())
+}
+
+async fn check_task_deps<C>(db: &C, task_id: i64) -> Result<bool>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let non_ended_dependencies = entity::TaskEntity::find()
+        .join(
+            JoinType::InnerJoin,
+            entity::TaskDepTaskRelation::ChildTask.def(),
+        )
+        .count(db)
+        .await?;
+    // let task = entity::TaskEntity::find_by_id(task_id)
+    //     .one(db)
+    //     .await?
+    //     .ok_or(eyre!("Task {} not found", task_id))?;
+    // let non_ended_dependencies = task
+    //     .find_related(entity::TaskEntity)
+    //     .filter(entity::TaskColumn::EndedAt.is_not_null())
+    //     .count(db)
+    //     .await?;
+
+    Ok(non_ended_dependencies == 0)
 }
 
 pub fn queue_loop() -> Result<()> {
@@ -103,29 +132,36 @@ pub fn queue_loop() -> Result<()> {
         tokio::spawn(async move {
             loop {
                 let task = queue.pop().await;
-                match db.begin().await {
-                    Ok(tx) => {
-                        let id = task.id;
-                        tracing::trace!(%worker, ?id, ?task, "Executing task");
-                        match run_task(&tx, task).await {
-                            Ok(_) => tracing::info!(%worker, ?id, "Task completed"),
-                            Err(error) => {
-                                tracing::warn!(%worker, ?id, %error, "Task failed with error")
+                let id = task.id;
+                tracing::trace!(%worker, ?id, ?task, "Executing task");
+
+                let mut should_run = true;
+                if let Some(id) = task.id {
+                    match check_task_deps(db, id).await {
+                        Ok(run) => {
+                            should_run = run;
+                            if run {
+                                tracing::trace!(%worker, ?id, "Task can run")
+                            } else {
+                                tracing::trace!(%worker, ?id, "Task is blocked waiting on another task");
+                                sleep(Duration::from_millis(500)).await;
+                                queue.push(task.clone());
                             }
                         }
-                        match tx.commit().await {
-                            Ok(_) => {
-                                tracing::trace!(%worker, ?id, "Successfully committed transaction")
-                            }
-                            Err(error) => {
-                                tracing::error!(%worker, ?id, %error, "Could not commit transaction for task")
-                            }
+                        Err(error) => {
+                            tracing::warn!(%worker, ?id, %error, "Could not check task dependencies")
                         }
                     }
-                    Err(error) => {
-                        tracing::error!(%worker, ?task, %error, "Could not begin transaction for task")
+                }
+
+                if should_run {
+                    match run_task(db, task).await {
+                        Ok(_) => tracing::info!(%worker, ?id, "Task completed"),
+                        Err(error) => {
+                            tracing::warn!(%worker, ?id, %error, "Task failed with error")
+                        }
                     }
-                };
+                }
             }
         });
     }

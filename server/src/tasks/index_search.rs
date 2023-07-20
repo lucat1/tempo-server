@@ -1,5 +1,5 @@
 use eyre::{eyre, Result};
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
 use crate::search::{documents, INDEX_WRITERS};
@@ -20,17 +20,18 @@ where
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
     where
-        D: ConnectionTrait,
+        D: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let mut writers_cell = INDEX_WRITERS.lock().await;
         let writer = writers_cell
             .get_mut()
             .ok_or(eyre!("Could not get index writers"))?;
         match self {
             Task::Artists => {
-                let artists = entity::ArtistEntity::find().all(db).await?;
+                let artists = entity::ArtistEntity::find().all(&tx).await?;
 
                 for artist in artists.into_iter() {
                     writer
@@ -40,12 +41,12 @@ impl super::TaskTrait for Task {
                 writer.artists.commit()?;
             }
             Task::Tracks => {
-                let tracks = entity::TrackEntity::find().all(db).await?;
+                let tracks = entity::TrackEntity::find().all(&tx).await?;
                 let tracks_artist_credits = tracks
                     .load_many_to_many(
                         entity::ArtistCreditEntity,
                         entity::ArtistCreditTrackEntity,
-                        db,
+                        &tx,
                     )
                     .await?;
                 for (i, track) in tracks.into_iter().enumerate() {
@@ -54,7 +55,7 @@ impl super::TaskTrait for Task {
                         i,
                         track.id
                     ))?;
-                    let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
+                    let artists = artist_credits.load_one(entity::ArtistEntity, &tx).await?;
                     let mut artists_self = Vec::new();
                     for (i, artist_credit) in artist_credits.iter().enumerate() {
                         let artist = artists
@@ -71,12 +72,12 @@ impl super::TaskTrait for Task {
                 writer.tracks.commit()?;
             }
             Task::Releases => {
-                let releases = entity::ReleaseEntity::find().all(db).await?;
+                let releases = entity::ReleaseEntity::find().all(&tx).await?;
                 let tracks_artist_credits = releases
                     .load_many_to_many(
                         entity::ArtistCreditEntity,
                         entity::ArtistCreditReleaseEntity,
-                        db,
+                        &tx,
                     )
                     .await?;
                 for (i, release) in releases.into_iter().enumerate() {
@@ -85,7 +86,7 @@ impl super::TaskTrait for Task {
                         i,
                         release.id
                     ))?;
-                    let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
+                    let artists = artist_credits.load_one(entity::ArtistEntity, &tx).await?;
                     let mut artists_self = Vec::new();
                     for (i, artist_credit) in artist_credits.iter().enumerate() {
                         let artist = artists

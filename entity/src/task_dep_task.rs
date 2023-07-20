@@ -14,22 +14,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::task::Entity",
-        from = "Column::ParentTask",
-        to = "super::task::Column::Id"
-    )]
-    ParentTask,
-    #[sea_orm(
-        belongs_to = "super::task::Entity",
         from = "Column::ChildTask",
         to = "super::task::Column::Id"
     )]
     ChildTask,
-}
-
-impl Related<super::task::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::ParentTask.def()
-    }
 }
 
 impl ActiveModelBehavior for ActiveModel {}
