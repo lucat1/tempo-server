@@ -121,9 +121,9 @@ impl crate::tasks::TaskTrait for Data {
 
         import_active.update(&tx).await?;
         let tasks = push(&fetch_release_tasks).await?;
-        // let rank_id = schedule_tasks(tx, import_job, vec![TaskData::RankRelease], &ids).await?;
+        // let rank_id = push(&[TaskData::RankRelease]).await?;
         // let cover_ids = schedule_tasks(tx, import_job, vec![TaskData::FetchCover], &[rank_id]).await?;
-        //  schedule_tasks(tx, import_job, vec![TaskData::RankCover], &ids).await?;
+        // schedule_tasks(tx, import_job, vec![TaskData::RankCover], &ids).await?;
 
         // for result in compressed_search_results.into_iter() {
         //     search_results.push(fetch::get(result.0.release.id.to_string().as_str()).await?);

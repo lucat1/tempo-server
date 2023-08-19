@@ -4,11 +4,14 @@ use axum::{
 };
 use base::setting::get_settings;
 use eyre::Result;
+use time::Duration;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait, QueryOrder,
     TransactionTrait,
 };
+use serde_json::json;
 use std::{collections::HashMap, path::PathBuf};
+use taskie_client::InsertTask;
 use uuid::Uuid;
 
 use crate::{
@@ -28,6 +31,7 @@ use crate::{
         AppState,
     },
     import::{all_tracks, IntoInternal},
+    tasks::{import, push, TaskName},
 };
 
 #[derive(Default)]
@@ -180,14 +184,23 @@ pub async fn begin(
         title: "Couldn't save the import structure".to_string(),
         detail: Some(err.into()),
     })?;
-    // let tasks = vec![TaskData::ImportFetch(ImportFetch(import.id))];
-    // scheduling::schedule_tasks(tx, job.id, tasks, &[])
-    //     .await
-    //     .map_err(|err| Error {
-    //         status: StatusCode::INTERNAL_SERVER_ERROR,
-    //         title: "Could not schedule import tasks".to_string(),
-    //         detail: Some(err.into()),
-    //     })?;
+    tx.commit().await.map_err(|err| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't commit the transaction".to_string(),
+        detail: Some(err.into()),
+    })?;
+    push(&[InsertTask {
+        name: TaskName::ImportFetch,
+        payload: Some(json!(import::fetch::Data(import.id))),
+        depends_on: Vec::new(),
+        duration: Duration::seconds(60),
+    }])
+        .await
+        .map_err(|err| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not schedule import tasks".to_string(),
+            detail: Some(err.into()),
+        })?;
 
     let related = ImportRelated { directory: dir };
     let resource = entity_to_resource(&import, &related);

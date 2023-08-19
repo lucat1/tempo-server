@@ -26,7 +26,7 @@ static DEFAULT_DB_FILE: &str = "lib.db";
 pub struct Settings {
     #[serde(default)]
     pub db: String,
-    #[serde(default = "default_url")]
+    #[serde(default = "default_taskie_url")]
     pub taskie: url::Url,
     #[serde(default = "default_url")]
     pub url: url::Url,

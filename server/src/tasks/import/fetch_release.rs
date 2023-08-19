@@ -86,26 +86,44 @@ impl crate::tasks::TaskTrait for Data {
         let mut import_active = import.clone().into_active_model();
         import.artists.0.extend(release.artists);
         import_active.artists = ActiveValue::Set(entity::import::Artists(dedup(import.artists.0)));
+
         import.artist_credits.0.extend(release.artist_credits);
         import_active.artist_credits = ActiveValue::Set(entity::import::ArtistCredits(dedup(
             import.artist_credits.0,
         )));
-        // import_active.releases =
-        //     ActiveValue::Set(entity::import::Releases(combined_search_results.releases));
-        // import_active.mediums =
-        //     ActiveValue::Set(entity::import::Mediums(combined_search_results.mediums));
+
+        import.releases.0.push(release.release);
+        import_active.releases = ActiveValue::Set(entity::import::Releases(import.releases.0));
+
+        import.mediums.0.extend(release.mediums);
+        import_active.mediums = ActiveValue::Set(entity::import::Mediums(import.mediums.0));
+
         import.tracks.0.extend(release.tracks);
-        tracing::info!(len = %import.tracks.0.len(), "Tracks len");
         import_active.tracks = ActiveValue::Set(entity::import::Tracks(dedup(import.tracks.0)));
-        // import_active.artist_track_relations = ActiveValue::Set(
-        //     entity::import::ArtistTrackRelations(combined_search_results.artist_track_relations),
-        // );
-        // import_active.artist_credit_releases = ActiveValue::Set(
-        //     entity::import::ArtistCreditReleases(combined_search_results.artist_credit_releases),
-        // );
-        // import_active.artist_credit_tracks = ActiveValue::Set(entity::import::ArtistCreditTracks(
-        //     combined_search_results.artist_credit_tracks,
-        // ));
+
+        import
+            .artist_track_relations
+            .0
+            .extend(release.artist_track_relations);
+        import_active.artist_track_relations = ActiveValue::Set(
+            entity::import::ArtistTrackRelations(import.artist_track_relations.0),
+        );
+
+        import
+            .artist_credit_releases
+            .0
+            .extend(release.artist_credit_releases);
+        import_active.artist_credit_releases = ActiveValue::Set(
+            entity::import::ArtistCreditReleases(import.artist_credit_releases.0),
+        );
+
+        import
+            .artist_credit_tracks
+            .0
+            .extend(release.artist_credit_tracks);
+        import_active.artist_credit_tracks = ActiveValue::Set(entity::import::ArtistCreditTracks(
+            import.artist_credit_tracks.0,
+        ));
 
         import_active.update(&tx).await?;
         tx.commit().await?;

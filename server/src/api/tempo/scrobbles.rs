@@ -170,7 +170,7 @@ where
     Ok((data, included))
 }
 
-pub fn schedule_scrobble_tasks<I>(username: &str, tracks: I)
+pub async fn schedule_scrobble_tasks<I>(username: &str, tracks: I) -> Result<()>
 where
     I: Iterator<Item = (Uuid, time::OffsetDateTime)>,
 {
@@ -188,8 +188,10 @@ where
             payload: Some(json!(data)),
             depends_on: Vec::new(),
             duration: Duration::seconds(60),
-        }]);
+        }])
+        .await?;
     }
+    Ok(())
 }
 
 pub async fn insert_scrobbles(
@@ -263,7 +265,13 @@ pub async fn insert_scrobbles(
                 ) => Some((*id, *time)),
                 _ => None,
             }),
-    );
+    )
+    .await
+    .map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not start scrobble tasks".to_string(),
+        detail: Some(e.into()),
+    })?;
 
     let page = Page {
         size: u32::MAX,

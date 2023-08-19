@@ -98,14 +98,13 @@ impl FromStr for HashPasswordAlgorithm {
 async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
-
-    let subscriber = tracing_subscriber::registry().with(fmt::layer()).with(
-        EnvFilter::builder()
-            .with_default_directive(LevelFilter::TRACE.into())
-            .with_env_var(base::TEMPO_LOGLEVEL)
-            .from_env_lossy(),
-    );
-    tracing::subscriber::set_global_default(subscriber)?;
+    let tracing_builder = tracing_subscriber::registry().with(fmt::layer());
+    if std::env::var(base::TEMPO_LOGLEVEL).is_ok() {
+        tracing_builder.with(EnvFilter::from_env(base::TEMPO_LOGLEVEL))
+    } else {
+        tracing_builder.with(EnvFilter::default().add_directive(LevelFilter::INFO.into()))
+    }
+    .init();
 
     let cli = Cli::parse();
     match cli.command.unwrap_or(Command::Serve) {

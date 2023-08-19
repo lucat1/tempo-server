@@ -112,10 +112,16 @@ pub fn queue_loop() -> Result<()> {
                         tracing::trace!(%worker, ?id, ?task, ?deadline, "Executing task");
 
                         let (sender, mut receiver) = mpsc::channel(1);
-                        let tsender = sender.clone();
-                        let t = tokio::spawn(async move {
-                            let res = run_task(db, task).await;
-                            sender.send(res);
+                        tokio::spawn(async move {
+                            let id = task.id.clone();
+                            match sender.send(run_task(db, task).await).await {
+                                Ok(_) => {
+                                    tracing::trace!(%worker, %id, "Task completed, sent signal")
+                                }
+                                Err(err) => {
+                                    tracing::warn!(%worker, %id, %err, "Could not send task completion signal")
+                                }
+                            };
                         });
                         let duration = deadline.sub(time::OffsetDateTime::now_utc());
                         match timeout(duration.unsigned_abs(), receiver.recv()).await {
