@@ -27,6 +27,8 @@ pub struct Settings {
     #[serde(default)]
     pub db: String,
     #[serde(default = "default_url")]
+    pub taskie: url::Url,
+    #[serde(default = "default_url")]
     pub url: url::Url,
     #[serde(default)]
     pub library: Library,
@@ -49,6 +51,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             db: String::new(),
+            taskie: default_taskie_url(),
             url: default_url(),
             library: Library::default(),
             downloads: PathBuf::default(),
@@ -60,8 +63,12 @@ impl Default for Settings {
     }
 }
 
-fn default_url() -> url::Url {
+fn default_taskie_url() -> url::Url {
     url::Url::parse("http://localhost:3000").unwrap()
+}
+
+fn default_url() -> url::Url {
+    url::Url::parse("http://localhost:4000").unwrap()
 }
 
 fn default_library_name() -> String {

@@ -8,7 +8,7 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 
 use crate::{
     tasks,
-    tasks::{push_queue, Task, TaskData},
+    tasks::{Task, TaskData},
 };
 use base::{database::get_database, setting::JobType};
 

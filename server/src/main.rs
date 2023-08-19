@@ -1,7 +1,7 @@
 mod api;
 pub mod fetch;
 pub mod import;
-mod scheduling;
+// mod scheduling;
 pub mod search;
 pub mod tasks;
 
@@ -29,6 +29,7 @@ use base::{
     setting::{generate_default, get_settings},
     CLI_NAME,
 };
+use tasks::{open_taskie_client, TASKIE_CLIENT};
 
 #[derive(Parser)]
 #[command(name = CLI_NAME,author, version, about, long_about = None)]
@@ -38,7 +39,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    #[arg(short, long, name = "ADDRESS", default_value_t = String::from("127.0.0.1:3000"))]
+    #[arg(short, long, name = "ADDRESS", default_value_t = String::from("127.0.0.1:4000"))]
     listen_address: String,
 
     #[clap(subcommand)]
@@ -137,6 +138,9 @@ async fn main() -> Result<()> {
         Command::Serve => {
             // settings
             SETTINGS.get_or_try_init(async { load(cli.config) }).await?;
+            TASKIE_CLIENT
+                .get_or_try_init(async { open_taskie_client().await })
+                .await?;
 
             // database
             DATABASE
@@ -154,11 +158,11 @@ async fn main() -> Result<()> {
 
             // background tasks
             crate::tasks::queue_loop()?;
-            let mut scheduler = scheduling::new().await?;
-            for (task, schedule) in get_settings()?.tasks.recurring.iter() {
-                scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
-            }
-            scheduling::start(&mut scheduler).await?;
+            // let mut scheduler = scheduling::new().await?;
+            // for (task, schedule) in get_settings()?.tasks.recurring.iter() {
+            //     scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+            // }
+            // scheduling::start(&mut scheduler).await?;
 
             let addr: SocketAddr = cli
                 .listen_address

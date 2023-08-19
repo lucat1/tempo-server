@@ -5,7 +5,10 @@ use sea_orm::{
     ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
+use serde_json::json;
 use std::collections::HashMap;
+use taskie_client::InsertTask;
+use time::Duration;
 use uuid::Uuid;
 
 use super::{tracks, users};
@@ -22,7 +25,7 @@ use crate::api::{
     },
     AppState,
 };
-use crate::tasks;
+use crate::tasks::{self, TaskName};
 
 pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     let mut relationships = HashMap::new();
@@ -174,16 +177,18 @@ where
     for (track_id, time) in tracks.into_iter() {
         // TODO: use user's setting to determine the subset of connections he wants
         // to scrobble to.
-        let data = tasks::scrobble::Task {
+        let data = tasks::scrobble::Data {
             provider: entity::ConnectionProvider::LastFM,
             username: username.to_owned(),
             time,
             track_id,
         };
-        tasks::push_queue(tasks::Task {
-            id: None,
-            data: tasks::TaskData::Scrobble(data),
-        });
+        tasks::push(&[InsertTask {
+            name: TaskName::Scrobble,
+            payload: Some(json!(data)),
+            depends_on: Vec::new(),
+            duration: Duration::seconds(60),
+        }]);
     }
 }
 

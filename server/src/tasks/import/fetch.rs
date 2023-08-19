@@ -4,17 +4,19 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use taskie_client::{InsertTask, Task as TaskieTask, TaskKey};
+use time::Duration;
 use uuid::Uuid;
 
 use crate::{
     fetch::musicbrainz::{self, MB_BASE_URL},
     import::{CombinedSearchResults, UNKNOWN_ARTIST},
-    scheduling::schedule_tasks,
-    tasks::TaskData,
+    tasks::{push, TaskName},
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Task(pub Uuid);
+pub struct Data(pub Uuid);
 
 static COUNT: u32 = 8;
 
@@ -64,12 +66,11 @@ pub async fn search(release: &entity::InternalRelease) -> Result<CombinedSearchR
 }
 
 #[async_trait::async_trait]
-impl crate::tasks::TaskTrait for Task {
-    async fn run<D>(&self, db: &D, id: Option<i64>) -> Result<()>
+impl crate::tasks::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
-        let id = id.ok_or(eyre!("Cannot run import/fetch task without an id"))?;
         let tx = db.begin().await?;
         let import = entity::ImportEntity::find_by_id(self.0)
             .one(db)
@@ -85,13 +86,16 @@ impl crate::tasks::TaskTrait for Task {
         let fetch_release_tasks = combined_search_results
             .releases
             .iter()
-            .map(|rel| {
-                TaskData::ImportFetchRelease(super::fetch_release::Task {
+            .map(|rel| InsertTask {
+                name: TaskName::ImportFetchRelease,
+                payload: Some(json!(super::fetch_release::Data {
                     import_id: self.0,
                     release_id: rel.id,
-                })
+                })),
+                depends_on: Vec::new(),
+                duration: Duration::seconds(60),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let import_job = import.job;
         let mut import_active = import.into_active_model();
@@ -117,7 +121,7 @@ impl crate::tasks::TaskTrait for Task {
         ));
 
         import_active.update(&tx).await?;
-        let ids = schedule_tasks(tx, import_job, fetch_release_tasks, &[id]).await?;
+        let tasks = push(&fetch_release_tasks).await?;
         // let rank_id = schedule_tasks(tx, import_job, vec![TaskData::RankRelease], &ids).await?;
         // let cover_ids = schedule_tasks(tx, import_job, vec![TaskData::FetchCover], &[rank_id]).await?;
         //  schedule_tasks(tx, import_job, vec![TaskData::RankCover], &ids).await?;

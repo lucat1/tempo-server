@@ -8,20 +8,17 @@ use sea_orm::{
 };
 use std::collections::HashMap;
 
-use crate::{
-    api::{
-        extract::{Json, Path},
-        internal::documents::{
-            dedup, Included, InsertJobResource, JobAttributes, JobFilter, JobInclude, JobRelation,
-            JobResource, ResourceType,
-        },
-        jsonapi::{
-            links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Query,
-            Related, Relation, Relationship, ResourceIdentifier,
-        },
-        AppState,
+use crate::api::{
+    extract::{Json, Path},
+    internal::documents::{
+        dedup, Included, InsertJobResource, JobAttributes, JobFilter, JobInclude, JobRelation,
+        JobResource, ResourceType,
     },
-    scheduling,
+    jsonapi::{
+        links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Query,
+        Related, Relation, Relationship, ResourceIdentifier,
+    },
+    AppState,
 };
 
 use super::tasks;
@@ -121,13 +118,13 @@ pub async fn schedule(
             title: "Couldn't begin database transaction".to_string(),
             detail: Some(e.into()),
         })?;
-        let job = scheduling::trigger_job(tx, &job.attributes.r#type)
-            .await
-            .map_err(|e| Error {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                title: "Could not schedule job".to_string(),
-                detail: Some(e.into()),
-            })?;
+        // let job = scheduling::trigger_job(tx, &job.attributes.r#type)
+        //     .await
+        //     .map_err(|e| Error {
+        //         status: StatusCode::INTERNAL_SERVER_ERROR,
+        //         title: "Could not schedule job".to_string(),
+        //         detail: Some(e.into()),
+        //     })?;
         queued_jobs.push(job);
     }
     let related_to_jobs = related(&db, &queued_jobs, false).await.map_err(|e| Error {

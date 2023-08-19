@@ -5,8 +5,8 @@ pub mod index_search;
 pub mod lastfm_artist_image;
 pub mod scrobble;
 
+use async_once_cell::OnceCell;
 use base::{database::get_database, setting::get_settings};
-use deadqueue::unlimited::Queue;
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use sea_orm::{
@@ -15,151 +15,133 @@ use sea_orm::{
     TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc, time::Duration};
-use time::OffsetDateTime;
-use tokio::time::sleep;
-
-use crate::tasks;
+use std::{fmt::Debug, ops::Sub, sync::Arc};
+use taskie_client::{Client, Execution, InsertTask, Task, TaskKey};
+use tokio::{
+    sync::mpsc,
+    time::{sleep, timeout},
+};
 
 #[async_trait::async_trait]
 pub trait TaskTrait: Debug {
-    async fn run<D>(&self, db: &D, id: Option<i64>) -> Result<()>
+    async fn run<C>(&self, db: &C, task: Task<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait;
+        C: ConnectionTrait + TransactionTrait;
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Task {
-    pub id: Option<i64>,
-    pub data: TaskData,
-}
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskName {
+    Scrobble,
+    ArtistUrl,
+    IndexSearch,
+    ArtistDescription,
+    LastFMArtistImage,
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum TaskData {
-    Scrobble(tasks::scrobble::Task),
-    ArtistUrl(tasks::artist_url::Task),
-    IndexSearch(tasks::index_search::Task),
-    ArtistDescription(tasks::artist_description::Task),
-    LastFMArtistImage(tasks::lastfm_artist_image::Task),
-
-    ImportFetch(tasks::import::fetch::Task),
-    ImportFetchRelease(tasks::import::fetch_release::Task),
-}
-
-impl Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
-    where
-        D: ConnectionTrait + TransactionTrait,
-    {
-        match &self.data {
-            TaskData::Scrobble(task) => task.run(db, self.id).await,
-            TaskData::ArtistUrl(task) => task.run(db, self.id).await,
-            TaskData::IndexSearch(task) => task.run(db, self.id).await,
-            TaskData::ArtistDescription(task) => task.run(db, self.id).await,
-            TaskData::LastFMArtistImage(task) => task.run(db, self.id).await,
-
-            TaskData::ImportFetch(task) => task.run(db, self.id).await,
-            TaskData::ImportFetchRelease(task) => task.run(db, self.id).await,
-        }
-    }
+    ImportFetch,
+    ImportFetchRelease,
 }
 
 lazy_static! {
-    pub static ref QUEUE: Arc<Queue<Task>> = Arc::new(Queue::new());
+    pub static ref TASKIE_CLIENT: Arc<OnceCell<Client>> = Arc::new(OnceCell::new());
 }
 
-pub fn get_queue() -> Arc<Queue<Task>> {
-    QUEUE.clone()
+pub async fn open_taskie_client() -> Result<Client> {
+    let taskie_url = &get_settings()?.taskie;
+    Ok(Client::new(taskie_url.clone()))
 }
 
-pub fn push_queue(task: Task) {
-    QUEUE.push(task);
+pub fn get_taskie_client() -> Result<&'static Client> {
+    Ok(TASKIE_CLIENT
+        .get()
+        .ok_or(eyre!("Taskie client uninitialized"))?)
 }
 
-async fn run_task<C>(db: &C, task: Task) -> Result<()>
+pub async fn push(tasks: &[InsertTask<TaskName>]) -> Result<Vec<Task<TaskName, TaskKey>>> {
+    let client = get_taskie_client()?;
+    Ok(client.push::<TaskName, TaskKey>(tasks).await?)
+}
+
+async fn run_task<C>(db: &C, task: Task<TaskName, TaskKey>) -> Result<()>
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    let mut task_model: Option<entity::TaskActive> = None;
-    if let Some(id) = task.id {
-        let mut task = entity::TaskEntity::find_by_id(id)
-            .one(db)
-            .await?
-            .ok_or(eyre!("Task {} not found", id))?
-            .into_active_model();
-        task.started_at = ActiveValue::Set(Some(OffsetDateTime::now_utc()));
-        task_model = Some(task);
-    }
-    task.run(db).await?;
-    if let Some(mut task) = task_model {
-        task.ended_at = ActiveValue::Set(Some(OffsetDateTime::now_utc()));
-        task.update(db).await?;
-    }
-    Ok(())
-}
-
-async fn check_task_deps<C>(db: &C, task_id: i64) -> Result<bool>
-where
-    C: ConnectionTrait + TransactionTrait,
-{
-    let non_ended_dependencies = entity::TaskEntity::find()
-        .join(
-            JoinType::InnerJoin,
-            entity::TaskDepTaskRelation::ChildTask.def(),
-        )
-        .count(db)
-        .await?;
-    // let task = entity::TaskEntity::find_by_id(task_id)
-    //     .one(db)
-    //     .await?
-    //     .ok_or(eyre!("Task {} not found", task_id))?;
-    // let non_ended_dependencies = task
-    //     .find_related(entity::TaskEntity)
-    //     .filter(entity::TaskColumn::EndedAt.is_not_null())
-    //     .count(db)
-    //     .await?;
-
-    Ok(non_ended_dependencies == 0)
+    Ok(match &task.name {
+        TaskName::Scrobble => {
+            serde_json::from_value::<scrobble::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::ArtistUrl => {
+            serde_json::from_value::<artist_url::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::IndexSearch => {
+            serde_json::from_value::<index_search::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::ArtistDescription => {
+            serde_json::from_value::<artist_description::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::LastFMArtistImage => {
+            serde_json::from_value::<lastfm_artist_image::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::ImportFetch => {
+            serde_json::from_value::<import::fetch::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::ImportFetchRelease => {
+            serde_json::from_value::<import::fetch_release::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+    })
 }
 
 pub fn queue_loop() -> Result<()> {
     let workers = std::cmp::max(get_settings()?.tasks.workers, 1);
     tracing::info!(%workers,"Starting worker pool for background tasks");
     for worker in 0..workers {
-        let queue = QUEUE.clone();
         let db = get_database()?;
+        let taskie_client = get_taskie_client()?;
         tokio::spawn(async move {
             loop {
-                let task = queue.pop().await;
-                let id = task.id;
-                tracing::trace!(%worker, ?id, ?task, "Executing task");
+                match taskie_client.pop::<TaskName, TaskKey>().await {
+                    Ok(Execution { task, deadline }) => {
+                        let id = task.id.clone();
+                        tracing::trace!(%worker, ?id, ?task, ?deadline, "Executing task");
 
-                let mut should_run = true;
-                if let Some(id) = task.id {
-                    match check_task_deps(db, id).await {
-                        Ok(run) => {
-                            should_run = run;
-                            if run {
-                                tracing::trace!(%worker, ?id, "Task can run")
-                            } else {
-                                tracing::trace!(%worker, ?id, "Task is blocked waiting on another task");
-                                sleep(Duration::from_millis(500)).await;
-                                queue.push(task.clone());
+                        let (sender, mut receiver) = mpsc::channel(1);
+                        let tsender = sender.clone();
+                        let t = tokio::spawn(async move {
+                            let res = run_task(db, task).await;
+                            sender.send(res);
+                        });
+                        let duration = deadline.sub(time::OffsetDateTime::now_utc());
+                        match timeout(duration.unsigned_abs(), receiver.recv()).await {
+                            Ok(Some(Ok(_))) => {
+                                tracing::info!(%worker, ?id, "Task completed");
+                                if let Err(err) = taskie_client.complete(id.clone()).await {
+                                    tracing::error!(%worker, ?id, %err, "Could not send task completion event to the taskie server");
+                                }
+                            }
+                            Ok(Some(Err(err))) => tracing::warn!(%worker, ?id, %err, "Task failed"),
+                            Ok(None) => tracing::warn!(%worker, ?id, "Task chanel closed"),
+                            Err(err) => {
+                                tracing::warn!(%worker, ?id, %err, "Task timed out")
                             }
                         }
-                        Err(error) => {
-                            tracing::warn!(%worker, ?id, %error, "Could not check task dependencies")
-                        }
                     }
-                }
-
-                if should_run {
-                    match run_task(db, task).await {
-                        Ok(_) => tracing::info!(%worker, ?id, "Task completed"),
-                        Err(error) => {
-                            tracing::warn!(%worker, ?id, %error, "Task failed with error")
-                        }
+                    Err(err) => {
+                        tracing::error!(%worker, ?err, "Taskie executor failed");
+                        break;
                     }
                 }
             }

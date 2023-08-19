@@ -4,16 +4,18 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::{
     fetch::musicbrainz::{self, MB_BASE_URL},
     import::SearchResult,
+    tasks::TaskName,
 };
 use base::util::dedup;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Task {
+pub struct Data {
     pub import_id: Uuid,
     pub release_id: Uuid,
 }
@@ -69,10 +71,10 @@ pub async fn fetch_release(id: Uuid) -> Result<SearchResult> {
 }
 
 #[async_trait::async_trait]
-impl crate::tasks::TaskTrait for Task {
-    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
+impl crate::tasks::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
         let tx = db.begin().await?;
         let mut import = entity::ImportEntity::find_by_id(self.import_id)

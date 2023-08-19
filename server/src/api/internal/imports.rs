@@ -21,8 +21,7 @@ use crate::{
                 Included, InsertImportResource, InsertJobResource, JobAttributes, JobFilter,
                 JobInclude, JobRelation, JobResource, ResourceType,
             },
-            downloads, jobs,
-            jobs::job,
+            downloads, 
         },
         jsonapi::{
             links_from_resource, make_cursor, Document, DocumentData, Error, InsertOneDocument,
@@ -31,8 +30,6 @@ use crate::{
         AppState,
     },
     import::{all_tracks, IntoInternal},
-    scheduling,
-    tasks::{import::ImportFetch, TaskData},
 };
 
 #[derive(Default)]
@@ -118,13 +115,13 @@ where
                 cond = cond.add(ColumnTrait::eq(&entity::JobColumn::Id, job.id));
             }
         }
-        let jobs = entity::JobEntity::find().filter(cond).all(db).await?;
-        let jobs_related = jobs::related(db, &jobs, true).await?;
-        for (i, job) in jobs.iter().enumerate() {
-            included.push(jobs::entity_to_included(job, &jobs_related[i]))
-        }
-        let jobs_included = map_to_jobs_include(include);
-        included.extend(jobs::included(db, jobs_related, &jobs_included).await?);
+        // let jobs = entity::JobEntity::find().filter(cond).all(db).await?;
+        // let jobs_related = jobs::related(db, &jobs, true).await?;
+        // for (i, job) in jobs.iter().enumerate() {
+        //     included.push(jobs::entity_to_included(job, &jobs_related[i]))
+        // }
+        // let jobs_included = map_to_jobs_include(include);
+        // included.extend(jobs::included(db, jobs_related, &jobs_included).await?);
     }
     Ok(included)
 }
@@ -217,14 +214,14 @@ pub async fn begin(
         title: "Couldn't save the import structure".to_string(),
         detail: Some(err.into()),
     })?;
-    let tasks = vec![TaskData::ImportFetch(ImportFetch(import.id))];
-    scheduling::schedule_tasks(tx, job.id, tasks, &[])
-        .await
-        .map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not schedule import tasks".to_string(),
-            detail: Some(err.into()),
-        })?;
+    // let tasks = vec![TaskData::ImportFetch(ImportFetch(import.id))];
+    // scheduling::schedule_tasks(tx, job.id, tasks, &[])
+    //     .await
+    //     .map_err(|err| Error {
+    //         status: StatusCode::INTERNAL_SERVER_ERROR,
+    //         title: "Could not schedule import tasks".to_string(),
+    //         detail: Some(err.into()),
+    //     })?;
 
     let related = ImportRelated {
         job: Some(job),

@@ -1,28 +1,30 @@
 use eyre::{eyre, Result};
 use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 
 use crate::search::{documents, INDEX_WRITERS};
+use crate::tasks::TaskName;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Task {
+pub enum Data {
     Artists,
     Tracks,
     Releases,
 }
 
-pub async fn all_data<C>(_: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(_: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
-    Ok(vec![Task::Artists, Task::Tracks, Task::Releases])
+    Ok(vec![Data::Artists, Data::Tracks, Data::Releases])
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
         let tx = db.begin().await?;
         let mut writers_cell = INDEX_WRITERS.lock().await;
@@ -30,7 +32,7 @@ impl super::TaskTrait for Task {
             .get_mut()
             .ok_or(eyre!("Could not get index writers"))?;
         match self {
-            Task::Artists => {
+            Data::Artists => {
                 let artists = entity::ArtistEntity::find().all(&tx).await?;
 
                 for artist in artists.into_iter() {
@@ -40,7 +42,7 @@ impl super::TaskTrait for Task {
                 }
                 writer.artists.commit()?;
             }
-            Task::Tracks => {
+            Data::Tracks => {
                 let tracks = entity::TrackEntity::find().all(&tx).await?;
                 let tracks_artist_credits = tracks
                     .load_many_to_many(
@@ -71,7 +73,7 @@ impl super::TaskTrait for Task {
                 }
                 writer.tracks.commit()?;
             }
-            Task::Releases => {
+            Data::Releases => {
                 let releases = entity::ReleaseEntity::find().all(&tx).await?;
                 let tracks_artist_credits = releases
                     .load_many_to_many(

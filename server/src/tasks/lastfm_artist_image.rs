@@ -11,9 +11,11 @@ use std::str::FromStr;
 use std::{io::Cursor, path::PathBuf};
 use strfmt::strfmt;
 use tag::PictureType;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::fetch::lastfm::send_request;
+use crate::tasks::TaskName;
 use base::setting::get_settings;
 use base::util::{mkdirp, path_to_str};
 use base::ImageFormat;
@@ -29,9 +31,9 @@ lazy_static! {
 static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Task(Uuid, String);
+pub struct Data(Uuid, String);
 
-pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
@@ -40,7 +42,7 @@ where
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Task(a.artist_id, a.url))
+        .map(|a| Data(a.artist_id, a.url))
         .collect())
 }
 
@@ -175,13 +177,13 @@ where
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
         let tx = db.begin().await?;
-        let Task(artist_id, url) = self;
+        let Data(artist_id, url) = self;
         tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
         let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
         let text = get_html(url.to_owned()).await?;

@@ -5,14 +5,16 @@ use reqwest::{
 };
 use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::fetch::lastfm;
+use crate::tasks::TaskName;
 use base::setting::get_settings;
 use entity::{full::ArtistInfo, user_connection::Named};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Task {
+pub struct Data {
     pub provider: entity::ConnectionProvider,
     pub username: String,
     pub time: time::OffsetDateTime,
@@ -34,10 +36,10 @@ struct LastFMScrobbleResponseError {
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D, _id: Option<i64>) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait + TransactionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
         let tx = db.begin().await?;
         let settings = get_settings()?;
