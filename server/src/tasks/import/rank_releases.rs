@@ -30,17 +30,17 @@ impl crate::tasks::TaskTrait for Data {
             .await?
             .ok_or(eyre!("Import not found"))?;
 
-        // let mut rated_search_results = search_results
-        //     .into_iter()
-        //     .map(|search_result| {
-        //         let rank::Rating(rating, mapping) = rank::rate_and_match(&tracks, &search_result);
-        //         RatedSearchResult {
-        //             rating,
-        //             search_result,
-        //             mapping,
-        //         }
-        //     })
-        //     .collect::<Vec<_>>();
+        let mut rated_search_results = search_results
+            .into_iter()
+            .map(|search_result| {
+                let rank::Rating(rating, mapping) = rank::rate_and_match(&tracks, &search_result);
+                RatedSearchResult {
+                    rating,
+                    search_result,
+                    mapping,
+                }
+            })
+            .collect::<Vec<_>>();
         // rated_search_results
         //     .sort_by(|a, b| a.rating.partial_cmp(&b.rating).unwrap_or(Ordering::Equal));
         // let fetch::SearchResult(full_release, _) = rated_search_results

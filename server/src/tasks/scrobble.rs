@@ -11,7 +11,10 @@ use uuid::Uuid;
 use crate::fetch::lastfm;
 use crate::tasks::TaskName;
 use base::setting::get_settings;
-use entity::{full::ArtistInfo, user_connection::Named};
+use entity::{
+    full::{ArtistInfo, GetArtist, GetArtistCredits},
+    user_connection::Named,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Data {
@@ -33,6 +36,24 @@ enum LastFMScrobbleResponse {
 struct LastFMScrobbleResponseError {
     code: usize,
     message: String,
+}
+
+struct TrackWithArtists(
+    entity::Track,
+    Vec<entity::ArtistCredit>,
+    Vec<entity::Artist>,
+);
+
+impl GetArtistCredits for TrackWithArtists {
+    fn get_artist_credits(&self) -> Vec<&entity::ArtistCredit> {
+        self.1.iter().map(|ac| ac).collect()
+    }
+}
+
+impl GetArtist for TrackWithArtists {
+    fn get_artist(&self, id: Uuid) -> Option<&entity::Artist> {
+        self.2.iter().find(|a| a.id == id)
+    }
 }
 
 #[async_trait::async_trait]
@@ -60,13 +81,7 @@ impl super::TaskTrait for Data {
             .into_iter()
             .flatten()
             .collect();
-        let full_track = entity::full::FullTrack {
-            track,
-            artist_credit: artist_credits,
-            artist: artists,
-            artist_credit_track: Vec::new(),
-            artist_track_relation: Vec::new(),
-        };
+        let track_with_artists = TrackWithArtists(track, artist_credits, artists);
         match self.provider {
             entity::ConnectionProvider::LastFM => {
                 let lastfm = settings
@@ -88,8 +103,11 @@ impl super::TaskTrait for Data {
                     serde_json::from_value(connection.data.to_owned())?;
                 let url = lastfm::LASTFM_BASE_URL.clone();
                 let mut body: Vec<(String, String)> = vec![
-                    ("artist".to_string(), full_track.get_joined_artists()?),
-                    ("track".to_string(), full_track.track.title.to_owned()),
+                    (
+                        "artist".to_string(),
+                        track_with_artists.get_joined_artists()?,
+                    ),
+                    ("track".to_string(), track_with_artists.0.title.to_owned()),
                     (
                         "timestamp".to_string(),
                         self.time.unix_timestamp().to_string(),

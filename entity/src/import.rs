@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
 
+use crate::full::ArtistInfo;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct InternalTrack {
     pub title: String,
@@ -33,21 +35,28 @@ pub struct InternalRelease {
 
 impl From<crate::full::FullRelease> for InternalRelease {
     fn from(full_release: crate::full::FullRelease) -> Self {
-        let crate::full::FullRelease {
-            release,
-            medium,
-            artist,
-            ..
-        } = full_release;
+        let release = full_release.get_release();
         InternalRelease {
-            title: release.title,
-            artists: artist.into_iter().map(|a| a.name).collect(),
-            discs: Some(medium.len() as i32),
-            media: medium.first().as_ref().and_then(|m| m.format.clone()),
-            tracks: medium.iter().fold(0, |acc, m| acc + m.tracks),
-            country: release.country,
-            label: release.label,
-            release_type: release.release_type,
+            title: release.title.clone(),
+            artists: full_release
+                .get_artists()
+                .unwrap()
+                .iter()
+                .map(|a| a.name.clone())
+                .collect(),
+            discs: Some(full_release.get_mediums().len() as i32),
+            media: full_release
+                .get_mediums()
+                .first()
+                .as_ref()
+                .and_then(|m| m.format.clone()),
+            tracks: full_release
+                .get_mediums()
+                .iter()
+                .fold(0, |acc, m| acc + m.tracks),
+            country: release.country.clone(),
+            label: release.label.clone(),
+            release_type: release.release_type.clone(),
             year: release.year,
             month: release.month.map(|m| m as u8),
             day: release.day.map(|d| d as u8),
@@ -60,10 +69,15 @@ impl From<crate::full::FullRelease> for InternalRelease {
 
 impl From<crate::full::FullTrack> for InternalTrack {
     fn from(full_track: crate::full::FullTrack) -> Self {
-        let crate::full::FullTrack { track, artist, .. } = full_track;
+        let track = full_track.get_track();
         InternalTrack {
-            title: track.title,
-            artists: artist.into_iter().map(|a| a.name).collect(),
+            title: track.title.clone(),
+            artists: full_track
+                .get_artists()
+                .unwrap()
+                .iter()
+                .map(|a| a.name.clone())
+                .collect(),
             length: Some(track.length),
             disc: None, // TODO: see above
             number: Some(track.number),

@@ -14,7 +14,7 @@ fn artist_names(artists: Vec<&Artist>) -> Vec<String> {
 }
 
 pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
-    let FullTrack { track, .. } = &full_track;
+    let track = full_track.get_track();
     let mut map = HashMap::new();
     map.insert(TagKey::MusicBrainzTrackID, vec![track.id.to_string()]);
     map.insert(TagKey::TrackTitle, vec![track.title.clone()]);
@@ -81,9 +81,8 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
 }
 
 pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
-    let FullRelease {
-        release, medium, ..
-    } = &full_release;
+    let release = full_release.get_release();
+    let mediums = full_release.get_mediums();
     let mut map = HashMap::new();
     map.insert(TagKey::MusicBrainzReleaseID, vec![release.id.to_string()]);
     if let Some(rel_group_id) = &release.release_group_id {
@@ -143,7 +142,7 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     if let Some(rel_script) = &release.script {
         map.insert(TagKey::Script, vec![rel_script.to_string()]);
     }
-    if let Some(media_format) = &medium.first().and_then(|m| m.format.as_ref()) {
+    if let Some(media_format) = &mediums.first().and_then(|m| m.format.as_ref()) {
         map.insert(TagKey::Media, vec![media_format.to_string()]);
     }
     map.insert(TagKey::Album, vec![release.title.clone()]);
@@ -172,10 +171,10 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
             .map(|a| a.id.to_string())
             .collect(),
     );
-    map.insert(TagKey::TotalDiscs, vec![medium.len().to_string()]);
+    map.insert(TagKey::TotalDiscs, vec![mediums.len().to_string()]);
     map.insert(
         TagKey::TotalTracks,
-        vec![medium.iter().fold(0, |v, e| v + e.tracks).to_string()],
+        vec![mediums.iter().fold(0, |v, e| v + e.tracks).to_string()],
     );
     Ok(map)
 }
@@ -194,9 +193,9 @@ pub fn tags_from_combination(full_release: &FullRelease, full_track: &FullTrack)
     let mut map = tags_from_full_release(full_release)?;
     map.extend(tags_from_full_track(full_track)?);
     let index = full_release
-        .medium
+        .get_mediums()
         .iter()
-        .position(|m| m.id == full_track.track.medium_id)
+        .position(|m| m.id == full_track.get_track().medium_id)
         .ok_or(eyre!("track references a missing medium"))?;
     map.insert(TagKey::DiscNumber, vec![(index + 1).to_string()]);
     Ok(map)
