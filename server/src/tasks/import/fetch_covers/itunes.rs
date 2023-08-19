@@ -20,8 +20,8 @@ static ITUNES_COUNTRIES: &[&str] = &[
     "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
 ];
 
-pub async fn probe(url: &url::Url) -> bool {
-    itunes::send_request(Request::new(Method::HEAD, url.clone()))
+pub async fn probe(url: url::Url) -> bool {
+    itunes::send_request(Request::new(Method::HEAD, url))
         .await
         .ok()
         .map(|r| r.status().is_success())
@@ -60,7 +60,7 @@ pub async fn search(
     let req = itunes::send_request(Request::new(
         Method::GET,
         format!(
-            "{}/search?media=music&entity=album&country={}&term={}",
+            "{}search?media=music&entity=album&country={}&term={}",
             ITUNES_BASE_STRURL,
             country,
             full_release.get_joined_artists()? + " " + release.title.as_str()
@@ -82,8 +82,8 @@ pub async fn search(
             let url = result
                 .artwork_url_100
                 .replace("100x100", format!("{size}x{size}").as_str());
-            let parsed_url: url::Url = url.parse()?;
-            if !probe(&parsed_url).await {
+            if !probe(url.parse()?).await {
+                tracing::info!(%url, %size, artist = %result.artist_name, release = %result.collection_name, "Skipping iTunes track, HEAD request failed");
                 continue;
             }
             res.push(entity::import::Cover {

@@ -93,7 +93,7 @@ impl crate::tasks::TaskTrait for Data {
                     release_id: rel.id,
                 })),
                 depends_on: vec![task.id.clone()],
-                duration: Duration::seconds(60),
+                duration: Duration::seconds(30),
             })
             .collect::<Vec<_>>();
 

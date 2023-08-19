@@ -1,24 +1,18 @@
 mod cover_art_archive;
+mod deezer;
 mod itunes;
 
 use base::setting::get_settings;
-use eyre::{bail, eyre, Result, WrapErr};
-use reqwest::{Method, Request};
+use eyre::{eyre, Result};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
-use taskie_client::{InsertTask, Task as TaskieTask, TaskKey};
-use time::Duration;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
-use crate::{
-    fetch::musicbrainz::{self, MB_BASE_URL},
-    import::{CombinedSearchResults, UNKNOWN_ARTIST},
-    tasks::{push, TaskName},
-};
+use crate::tasks::TaskName;
 use base::setting::ArtProvider;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -26,7 +20,7 @@ pub struct Data(pub Uuid);
 
 #[async_trait::async_trait]
 impl crate::tasks::TaskTrait for Data {
-    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
         C: ConnectionTrait + TransactionTrait,
     {
@@ -50,7 +44,7 @@ impl crate::tasks::TaskTrait for Data {
             let res = match *provider {
                 ArtProvider::CoverArtArchive => cover_art_archive::search(settings, &release).await,
                 ArtProvider::Itunes => itunes::search(&release).await,
-                ArtProvider::Deezer => Err(eyre!("missing")), //deezer::fetch(release).await,
+                ArtProvider::Deezer => deezer::search(&release).await,
             };
             match res {
                 Ok(r) => {

@@ -1,7 +1,8 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, IsolationLevel,
+    TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use taskie_client::{Task as TaskieTask, TaskKey};
@@ -76,12 +77,15 @@ impl crate::tasks::TaskTrait for Data {
     where
         C: ConnectionTrait + TransactionTrait,
     {
-        let tx = db.begin().await?;
+        let release = fetch_release(self.release_id).await?;
+
+        let tx = db
+            .begin_with_config(Some(IsolationLevel::Serializable), None)
+            .await?;
         let mut import = entity::ImportEntity::find_by_id(self.import_id)
             .one(&tx)
             .await?
             .ok_or(eyre!("Import not found"))?;
-        let release = fetch_release(self.release_id).await?;
 
         let mut import_active = import.clone().into_active_model();
         import.artists.0.extend(release.artists);

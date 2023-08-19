@@ -214,11 +214,11 @@ pub struct Art {
     pub image_name: String,
 
     #[serde(default = "default_provider_relevance")]
-    pub provider_relevance: f64,
+    pub provider_relevance: f32,
     #[serde(default = "default_match_relevance")]
-    pub match_relevance: f64,
+    pub match_relevance: f32,
     #[serde(default = "default_size_relevance")]
-    pub size_relevance: f64,
+    pub size_relevance: f32,
 
     #[serde(default = "default_true")]
     pub cover_art_archive_use_release_group: bool,
@@ -244,15 +244,15 @@ fn default_art_image_name() -> String {
     "cover".to_string()
 }
 
-fn default_provider_relevance() -> f64 {
+fn default_provider_relevance() -> f32 {
     2.0 / 8.0
 }
 
-fn default_match_relevance() -> f64 {
+fn default_match_relevance() -> f32 {
     2.0 / 8.0
 }
 
-fn default_size_relevance() -> f64 {
+fn default_size_relevance() -> f32 {
     4.0 / 8.0
 }
 
