@@ -181,6 +181,25 @@ pub struct Model {
     pub ended_at: Option<time::OffsetDateTime>,
 }
 
+impl Model {
+    pub fn get_best_release_id(&self) -> Option<Uuid> {
+        let mut iter = self.release_matches.0.iter();
+        let first = iter.next();
+        if let Some((mut best_release, ReleaseRating(mut best_rating, _))) = first {
+            for (release_id, ReleaseRating(rating, _)) in self.release_matches.0.iter() {
+                if *rating > best_rating {
+                    best_release = release_id;
+                    best_rating = *rating;
+                }
+            }
+
+            Some(*best_release)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 

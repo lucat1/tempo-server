@@ -145,7 +145,7 @@ impl crate::tasks::TaskTrait for Data {
                     .id
                     .clone(),
             ],
-            duration: Duration::seconds(60),
+            duration: Duration::seconds(360),
         }])
         .await?;
         push(&[InsertTask {

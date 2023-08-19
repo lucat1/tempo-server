@@ -1,11 +1,113 @@
 use crate::*;
 use eyre::{bail, eyre};
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct FullRelease {
     pub release: Uuid,
-    pub import: Import,
+    pub import: Arc<Import>,
+}
+
+impl FullRelease {
+    pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
+        if let None = import.releases.0.iter().find(|rel| rel.id == id) {
+            Err(eyre!(
+                "Cannot construct FullRelease from import with a missing release"
+            ))
+        } else {
+            Ok(Self {
+                release: id,
+                import,
+            })
+        }
+    }
+
+    pub fn get_release(&self) -> &Release {
+        self.import
+            .releases
+            .0
+            .iter()
+            .find(|rel| rel.id == self.release)
+            .unwrap()
+    }
+
+    pub fn get_mediums(&self) -> Vec<&Medium> {
+        self.import
+            .mediums
+            .0
+            .iter()
+            .filter(|medium| medium.release_id == self.release)
+            .collect()
+    }
+
+    pub fn get_medium(&self, id: Uuid) -> Option<&Medium> {
+        self.get_mediums()
+            .iter()
+            .find(|medium| medium.release_id == self.release && medium.id == id)
+            .copied()
+    }
+
+    pub fn get_tracks(&self) -> Vec<&Track> {
+        self.get_mediums()
+            .iter()
+            .flat_map(|medium| {
+                self.import
+                    .tracks
+                    .0
+                    .iter()
+                    .filter(|track| track.medium_id == medium.id)
+            })
+            .collect()
+    }
+
+    pub fn get_full_tracks(&self) -> Result<Vec<FullTrack>> {
+        Ok(self
+            .get_tracks()
+            .iter()
+            .map(|track| FullTrack::new(self.import.clone(), track.id))
+            .collect::<Result<Vec<_>>>()?)
+    }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct FullTrack {
+    pub track: Uuid,
+    pub import: Arc<Import>,
+}
+
+impl FullTrack {
+    pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
+        if let None = import.tracks.0.iter().find(|track| track.id == id) {
+            Err(eyre!(
+                "Cannot construct FullTrack from import with a missing track"
+            ))
+        } else {
+            Ok(Self { track: id, import })
+        }
+    }
+
+    pub fn get_track(&self) -> &Track {
+        self.import
+            .tracks
+            .0
+            .iter()
+            .find(|track| track.id == self.track)
+            .unwrap()
+    }
+
+    pub fn get_related(&self, relation_type: ArtistTrackRelationType) -> Result<Vec<&Artist>> {
+        self.import
+            .artist_track_relations
+            .0
+            .iter()
+            .filter(|atr| atr.track_id == self.track && atr.relation_type == relation_type)
+            .map(|atr| {
+                self.get_artist(atr.artist_id)
+                    .ok_or(eyre!("Track has a non existant related artist"))
+            })
+            .collect()
+    }
 }
 
 // impl FullRelease {
@@ -51,52 +153,6 @@ pub struct FullRelease {
 //         }
 //     }
 // }
-
-#[derive(Serialize, Debug, Clone)]
-pub struct FullTrack {
-    pub track: Uuid,
-    pub import: Import,
-    // pub track: Track,
-    // pub artist_credit_track: Vec<ArtistCreditTrack>,
-    // pub artist_credit: Vec<ArtistCredit>,
-    // pub artist_track_relation: Vec<ArtistTrackRelation>,
-    // pub artist: Vec<Artist>,
-}
-
-impl FullTrack {
-    pub fn new(import: Import, id: Uuid) -> Result<Self> {
-        if let None = import.tracks.0.iter().find(|track| track.id == id) {
-            Err(eyre!(
-                "Cannot construct FullTrack from import with a missing track"
-            ))
-        } else {
-            Ok(Self { track: id, import })
-        }
-    }
-
-    pub fn get_track(&self) -> &Track {
-        self.import
-            .tracks
-            .0
-            .iter()
-            .find(|track| track.id == self.track)
-            .unwrap()
-    }
-
-    pub fn get_related(&self, relation_type: ArtistTrackRelationType) -> Result<Vec<&Artist>> {
-        self.import
-            .artist_track_relations
-            .0
-            .iter()
-            .filter(|atr| atr.track_id == self.track && atr.relation_type == relation_type)
-            .map(|atr| {
-                self.get_artist(atr.artist_id)
-                    .ok_or(eyre!("Track has a non existant related artist"))
-            })
-            .collect()
-    }
-}
-
 // impl FullTrack {
 //     pub fn dedup(mut self) -> Self {
 //         self.artist_credit.sort_unstable_by_key(|a| a.id.clone());
@@ -180,46 +236,6 @@ impl GetArtistCredits for FullRelease {
                     .find(|ac| ac.id == acr.artist_credit_id)
             })
             .collect::<Vec<_>>()
-    }
-}
-
-impl FullRelease {
-    pub fn new(import: Import, id: Uuid) -> Result<Self> {
-        if let None = import.releases.0.iter().find(|rel| rel.id == id) {
-            Err(eyre!(
-                "Cannot construct FullRelease from import with a missing release"
-            ))
-        } else {
-            Ok(Self {
-                release: id,
-                import,
-            })
-        }
-    }
-
-    pub fn get_release(&self) -> &Release {
-        self.import
-            .releases
-            .0
-            .iter()
-            .find(|rel| rel.id == self.release)
-            .unwrap()
-    }
-
-    pub fn get_mediums(&self) -> Vec<&Medium> {
-        self.import
-            .mediums
-            .0
-            .iter()
-            .filter(|medium| medium.release_id == self.release)
-            .collect()
-    }
-
-    pub fn get_medium(&self, id: Uuid) -> Option<&Medium> {
-        self.get_mediums()
-            .iter()
-            .find(|medium| medium.release_id == self.release && medium.id == id)
-            .copied()
     }
 }
 
