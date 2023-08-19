@@ -36,7 +36,7 @@ impl crate::tasks::TaskTrait for Data {
         let release = entity::full::FullRelease::new(
             rc_import,
             import
-                .get_best_release_id()
+                .selected_release
                 .ok_or(eyre!("Trying to fetch covers with unrated releases"))?,
         )?;
         let mut covers = vec![];

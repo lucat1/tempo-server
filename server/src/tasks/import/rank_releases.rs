@@ -7,15 +7,10 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Sub, sync::Arc};
-use taskie_client::{InsertTask, Task as TaskieTask, TaskKey};
-use time::Duration;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
-use crate::{
-    fetch::musicbrainz::{self, MB_BASE_URL},
-    import::{CombinedSearchResults, UNKNOWN_ARTIST},
-    tasks::{push, TaskName},
-};
+use crate::tasks::TaskName;
 
 static TRACK_TITLE_FACTOR: usize = 5000;
 static TRACK_LENGTH_FACTOR: u32 = 300;
@@ -179,28 +174,33 @@ impl crate::tasks::TaskTrait for Data {
             .one(&tx)
             .await?
             .ok_or(eyre!("Import not found"))?;
+        let rc_import = Arc::new(import.clone());
         tracing::info!(id = %import.id, "Ranking releases for import");
 
         let mut release_matches = HashMap::new();
-        {
-            let rc_import = Arc::new(import.clone());
-            for release in rc_import.releases.0.iter() {
-                let full_release = entity::full::FullRelease::new(rc_import.clone(), release.id)?;
-                let full_tracks = full_release.get_full_tracks()?;
-                let rating = rate_and_match(
-                    (&rc_import.source_release, &rc_import.source_tracks.0),
-                    (&full_release, &full_tracks),
-                );
-                release_matches.insert(release.id, rating);
-            }
+        let mut best_rate = None;
+        let mut best_release = None;
+        for release in rc_import.releases.0.iter() {
+            let full_release = entity::full::FullRelease::new(rc_import.clone(), release.id)?;
+            let full_tracks = full_release.get_full_tracks()?;
+            let rating = rate_and_match(
+                (&rc_import.source_release, &rc_import.source_tracks.0),
+                (&full_release, &full_tracks),
+            );
+            let entity::import::ReleaseRating(rate, _) = rating;
+            (best_rate, best_release) = match best_rate {
+                Some(best) if rate > best => (Some(rate), Some(release.id)),
+                None => (Some(rate), Some(release.id)),
+                _ => (best_rate, best_release),
+            };
+            release_matches.insert(release.id, rating);
         }
 
         let mut import_active = import.into_active_model();
         import_active.release_matches =
             ActiveValue::Set(entity::import::ReleaseMatches(release_matches));
+        import_active.selected_release = ActiveValue::Set(best_release);
         import_active.update(&tx).await?;
-        tx.commit().await?;
-
-        Ok(())
+        Ok(tx.commit().await?)
     }
 }

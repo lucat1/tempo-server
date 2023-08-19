@@ -1,21 +1,14 @@
-use eyre::{bail, eyre, Result, WrapErr};
+use eyre::{eyre, Result};
 use levenshtein::levenshtein;
-use reqwest::{Method, Request};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
-use taskie_client::{InsertTask, Task as TaskieTask, TaskKey};
-use time::Duration;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
-use crate::{
-    fetch::musicbrainz::{self, MB_BASE_URL},
-    import::{CombinedSearchResults, UNKNOWN_ARTIST},
-    tasks::{push, TaskName},
-};
+use crate::tasks::TaskName;
 use base::setting::{get_settings, ArtProvider, Settings};
 use entity::full::ArtistInfo;
 
@@ -91,17 +84,23 @@ impl crate::tasks::TaskTrait for Data {
         let full_release = entity::full::FullRelease::new(
             Arc::new(import.clone()),
             import
-                .get_best_release_id()
+                .selected_release
                 .ok_or(eyre!("Trying to rank covers with unrated releases"))?,
         )?;
         tracing::info!(id = %import.id, "Ranking covers for import");
 
         let ratings = rank_covers(settings, &import.covers.0, &full_release);
+        let max_index = ratings
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map(|(index, _)| index as i32 /* for the db */);
         tracing::info!(?ratings, "Got the ratings");
 
         let mut import_active = import.into_active_model();
         import_active.cover_ratings = ActiveValue::Set(entity::import::CoverRatings(ratings));
+        import_active.selected_cover = ActiveValue::Set(max_index);
         import_active.update(&tx).await?;
-        Ok(())
+        Ok(tx.commit().await?)
     }
 }

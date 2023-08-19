@@ -4,7 +4,6 @@ use axum::{
 };
 use base::setting::get_settings;
 use eyre::Result;
-use time::Duration;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait, QueryOrder,
     TransactionTrait,
@@ -12,6 +11,7 @@ use sea_orm::{
 use serde_json::json;
 use std::{collections::HashMap, path::PathBuf};
 use taskie_client::InsertTask;
+use time::Duration;
 use uuid::Uuid;
 
 use crate::{
@@ -175,6 +175,8 @@ pub async fn begin(
 
         release_matches: ActiveValue::Set(entity::import::ReleaseMatches(HashMap::new())),
         cover_ratings: ActiveValue::Set(entity::import::CoverRatings(Vec::new())),
+        selected_release: ActiveValue::NotSet,
+        selected_cover: ActiveValue::NotSet,
 
         started_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
         ended_at: ActiveValue::NotSet,
@@ -195,12 +197,12 @@ pub async fn begin(
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
     }])
-        .await
-        .map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not schedule import tasks".to_string(),
-            detail: Some(err.into()),
-        })?;
+    .await
+    .map_err(|err| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not schedule import tasks".to_string(),
+        detail: Some(err.into()),
+    })?;
 
     let related = ImportRelated { directory: dir };
     let resource = entity_to_resource(&import, &related);
