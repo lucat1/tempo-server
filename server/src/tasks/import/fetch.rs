@@ -97,7 +97,6 @@ impl crate::tasks::TaskTrait for Data {
             })
             .collect::<Vec<_>>();
 
-        let import_job = import.job;
         let mut import_active = import.into_active_model();
         import_active.artists =
             ActiveValue::Set(entity::import::Artists(combined_search_results.artists));

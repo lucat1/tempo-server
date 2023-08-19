@@ -5,8 +5,8 @@ use axum::{
 use base::setting::get_settings;
 use eyre::Result;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, CursorTrait, DbErr,
-    EntityTrait, LoaderTrait, QueryFilter, QueryOrder, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait, QueryOrder,
+    TransactionTrait,
 };
 use std::{collections::HashMap, path::PathBuf};
 use uuid::Uuid;
@@ -16,16 +16,14 @@ use crate::{
         extract::{Json, Path},
         internal::{
             documents::{
-                dedup, DirectoryAttributes, DirectoryMeta, DirectoryRelation, DirectoryResource,
-                ImportAttributes, ImportFilter, ImportInclude, ImportRelation, ImportResource,
-                Included, InsertImportResource, InsertJobResource, JobAttributes, JobFilter,
-                JobInclude, JobRelation, JobResource, ResourceType,
+                dedup, ImportAttributes, ImportFilter, ImportInclude, ImportResource, Included,
+                InsertImportResource, JobInclude, ResourceType,
             },
-            downloads, 
+            downloads,
         },
         jsonapi::{
             links_from_resource, make_cursor, Document, DocumentData, Error, InsertOneDocument,
-            Query, Related, Relation, Relationship, ResourceIdentifier,
+            Query,
         },
         AppState,
     },
@@ -34,24 +32,11 @@ use crate::{
 
 #[derive(Default)]
 pub struct ImportRelated {
-    job: Option<entity::Job>,
+    // job: Option<entity::Job>,
     directory: String,
 }
 
 pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> ImportResource {
-    let mut relationships = HashMap::new();
-    if let Some(job) = related.job.as_ref() {
-        relationships.insert(
-            ImportRelation::Job,
-            Relationship {
-                data: Relation::Single(Related::Int(ResourceIdentifier {
-                    r#type: ResourceType::Job,
-                    id: job.id,
-                    meta: None,
-                })),
-            },
-        );
-    }
     ImportResource {
         id: entity.id,
         r#type: ResourceType::Import,
@@ -61,7 +46,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
             started_at: entity.started_at,
             ended_at: entity.ended_at,
         },
-        relationships,
+        relationships: HashMap::new(),
         meta: None,
     }
 }
@@ -71,7 +56,7 @@ pub fn entity_to_included(entity: &entity::Import, related: &ImportRelated) -> I
 }
 
 pub async fn related<C>(
-    db: &C,
+    _db: &C,
     entities: &[entity::Import],
     _light: bool,
 ) -> Result<Vec<ImportRelated>, DbErr>
@@ -79,11 +64,9 @@ where
     C: ConnectionTrait,
 {
     let mut result = Vec::new();
-    let jobs = entities.load_one(entity::JobEntity, db).await?;
-    for (i, job) in jobs.into_iter().enumerate() {
+    for entity in entities.iter() {
         result.push(ImportRelated {
-            job,
-            directory: entities[i].directory.to_owned(),
+            directory: entity.directory.to_owned(),
         })
     }
     Ok(result)
@@ -100,8 +83,8 @@ fn map_to_jobs_include(include: &[ImportInclude]) -> Vec<JobInclude> {
 }
 
 pub async fn included<C>(
-    db: &C,
-    related: Vec<ImportRelated>,
+    _db: &C,
+    _related: Vec<ImportRelated>,
     include: &[ImportInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
@@ -109,12 +92,12 @@ where
 {
     let mut included = Vec::new();
     if include.contains(&ImportInclude::Job) {
-        let mut cond = Condition::any();
-        for rel in related.iter() {
-            if let Some(job) = &rel.job {
-                cond = cond.add(ColumnTrait::eq(&entity::JobColumn::Id, job.id));
-            }
-        }
+        // let mut cond = Condition::any();
+        // for rel in related.iter() {
+        //     if let Some(job) = &rel.job {
+        //         cond = cond.add(ColumnTrait::eq(&entity::JobColumn::Id, job.id));
+        //     }
+        // }
         // let jobs = entity::JobEntity::find().filter(cond).all(db).await?;
         // let jobs_related = jobs::related(db, &jobs, true).await?;
         // for (i, job) in jobs.iter().enumerate() {
@@ -169,22 +152,6 @@ pub async fn begin(
         title: "Couldn't begin database transaction".to_string(),
         detail: Some(e.into()),
     })?;
-    let job = entity::JobActive {
-        title: ActiveValue::Set(format!("Import {}", dir.to_string_lossy())),
-        description: ActiveValue::Set(Some(format!(
-            "Import the album at {}, interpreted as {} - {}",
-            dir.to_string_lossy(),
-            release.artists.join(","),
-            release.title
-        ))),
-        scheduled_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
-        ..Default::default()
-    };
-    let job = job.insert(&tx).await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't save the import job".to_string(),
-        detail: Some(err.into()),
-    })?;
     let dir = dir.to_string_lossy().to_string();
     let import = entity::ImportActive {
         id: ActiveValue::Set(Uuid::new_v4()),
@@ -207,7 +174,6 @@ pub async fn begin(
 
         started_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
         ended_at: ActiveValue::NotSet,
-        job: ActiveValue::Set(job.id),
     };
     let import = import.insert(&tx).await.map_err(|err| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -223,10 +189,7 @@ pub async fn begin(
     //         detail: Some(err.into()),
     //     })?;
 
-    let related = ImportRelated {
-        job: Some(job),
-        directory: dir,
-    };
+    let related = ImportRelated { directory: dir };
     let resource = entity_to_resource(&import, &related);
 
     Ok(Json::new(Document {

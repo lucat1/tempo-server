@@ -26,7 +26,7 @@ use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 use base::setting::{load, Settings, SETTINGS};
 use base::{
     database::{get_database, open_database, DATABASE},
-    setting::{generate_default, get_settings},
+    setting::generate_default,
     CLI_NAME,
 };
 use tasks::{open_taskie_client, TASKIE_CLIENT};

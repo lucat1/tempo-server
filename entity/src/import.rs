@@ -165,25 +165,10 @@ pub struct Model {
 
     pub started_at: time::OffsetDateTime,
     pub ended_at: Option<time::OffsetDateTime>,
-
-    pub job: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::job::Entity",
-        from = "Column::Job",
-        to = "super::job::Column::Id"
-    )]
-    Job,
-}
-
-impl Related<super::job::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Job.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
@@ -208,7 +193,6 @@ impl TryFrom<String> for Column {
             "id" => Ok(Column::Id),
             "started_at" => Ok(Column::StartedAt),
             "ended_at" => Ok(Column::EndedAt),
-            "job" => Ok(Column::Job),
             &_ => Err("Invalid column name".to_owned()),
         }
     }

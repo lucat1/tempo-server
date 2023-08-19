@@ -9,18 +9,11 @@ use async_once_cell::OnceCell;
 use base::{database::get_database, setting::get_settings};
 use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JoinType, ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, RelationTrait,
-    TransactionTrait,
-};
+use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, ops::Sub, sync::Arc};
 use taskie_client::{Client, Execution, InsertTask, Task, TaskKey};
-use tokio::{
-    sync::mpsc,
-    time::{sleep, timeout},
-};
+use tokio::{sync::mpsc, time::timeout};
 
 #[async_trait::async_trait]
 pub trait TaskTrait: Debug {
