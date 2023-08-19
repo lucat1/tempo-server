@@ -5021,7 +5021,7 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 [[package]]
 name = "taskie-client"
 version = "0.1.0"
-source = "git+https://codeberg.org/lucat1/taskie#38ced06221aff4d37414441c1597b9bf75f36c9e"
+source = "git+https://codeberg.org/lucat1/taskie#f68d61e0521d2d426a444c55dc09a87e0aebde63"
 dependencies = [
  "reqwest",
  "serde",
@@ -5033,7 +5033,7 @@ dependencies = [
 [[package]]
 name = "taskie-structures"
 version = "0.1.0"
-source = "git+https://codeberg.org/lucat1/taskie#38ced06221aff4d37414441c1597b9bf75f36c9e"
+source = "git+https://codeberg.org/lucat1/taskie#f68d61e0521d2d426a444c55dc09a87e0aebde63"
 dependencies = [
  "serde",
  "serde_json",

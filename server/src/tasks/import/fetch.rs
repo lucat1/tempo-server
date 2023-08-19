@@ -92,7 +92,7 @@ impl crate::tasks::TaskTrait for Data {
                     import_id: self.0,
                     release_id: rel.id,
                 })),
-                depends_on: Vec::new(),
+                depends_on: vec![task.id.clone()],
                 duration: Duration::seconds(60),
             })
             .collect::<Vec<_>>();
@@ -120,37 +120,48 @@ impl crate::tasks::TaskTrait for Data {
         ));
 
         import_active.update(&tx).await?;
-        let tasks = push(&fetch_release_tasks).await?;
-        // let rank_id = push(&[TaskData::RankRelease]).await?;
-        // let cover_ids = schedule_tasks(tx, import_job, vec![TaskData::FetchCover], &[rank_id]).await?;
-        // schedule_tasks(tx, import_job, vec![TaskData::RankCover], &ids).await?;
+        let fetch_tasks = push(&fetch_release_tasks).await?;
 
-        // for result in compressed_search_results.into_iter() {
-        //     search_results.push(fetch::get(result.0.release.id.to_string().as_str()).await?);
-        // }
-        // let mut rated_search_results = search_results
-        //     .into_iter()
-        //     .map(|search_result| {
-        //         let rank::Rating(rating, mapping) = rank::rate_and_match(&tracks, &search_result);
-        //         RatedSearchResult {
-        //             rating,
-        //             search_result,
-        //             mapping,
-        //         }
-        //     })
-        //     .collect::<Vec<_>>();
-        // rated_search_results
-        //     .sort_by(|a, b| a.rating.partial_cmp(&b.rating).unwrap_or(Ordering::Equal));
-        // let fetch::SearchResult(full_release, _) = rated_search_results
-        //     .first()
-        //     .map(|r| r.search_result.clone())
-        //     .ok_or(eyre!("No results found"))?;
-        // let covers_by_provider = fetch::cover::search(library, &full_release).await?;
-        // let covers = rank::rank_covers(library, covers_by_provider, &full_release);
-        // let selected = (
-        //     full_release.release.id,
-        //     if !covers.is_empty() { Some(0) } else { None },
-        // );
+        let mut fetch_tasks_ids = fetch_tasks
+            .into_iter()
+            .map(|task| task.id)
+            .collect::<Vec<_>>();
+        fetch_tasks_ids.push(task.id.clone());
+        let rank_task = push(&[InsertTask {
+            name: TaskName::ImportRankReleases,
+            payload: Some(json!(super::ImportRankReleases(self.0))),
+            depends_on: fetch_tasks_ids,
+            duration: Duration::seconds(60),
+        }])
+        .await?;
+        let fetch_covers_task = push(&[InsertTask {
+            name: TaskName::ImportFetchCovers,
+            payload: Some(json!(super::ImportFetchCovers(self.0))),
+            depends_on: vec![
+                task.id.clone(),
+                rank_task
+                    .first()
+                    .ok_or(eyre!("Did not queue rank releases task"))?
+                    .id
+                    .clone(),
+            ],
+            duration: Duration::seconds(60),
+        }])
+        .await?;
+        push(&[InsertTask {
+            name: TaskName::ImportRankCovers,
+            payload: Some(json!(super::ImportRankCovers(self.0))),
+            depends_on: vec![
+                task.id,
+                fetch_covers_task
+                    .first()
+                    .ok_or(eyre!("Did not queue fetch cover task"))?
+                    .id
+                    .clone(),
+            ],
+            duration: Duration::seconds(60),
+        }])
+        .await?;
         Ok(())
     }
 }
