@@ -97,20 +97,22 @@ impl crate::tasks::TaskTrait for Data {
         )));
 
         import.releases.0.push(release.release);
-        import_active.releases = ActiveValue::Set(entity::import::Releases(import.releases.0));
+        import_active.releases =
+            ActiveValue::Set(entity::import::Releases(dedup(import.releases.0)));
 
         import.mediums.0.extend(release.mediums);
-        import_active.mediums = ActiveValue::Set(entity::import::Mediums(import.mediums.0));
+        import_active.mediums = ActiveValue::Set(entity::import::Mediums(dedup(import.mediums.0)));
 
         import.tracks.0.extend(release.tracks);
-        import_active.tracks = ActiveValue::Set(entity::import::Tracks(dedup(import.tracks.0)));
+        import_active.tracks =
+            ActiveValue::Set(entity::import::Tracks(dedup(dedup(import.tracks.0))));
 
         import
             .artist_track_relations
             .0
             .extend(release.artist_track_relations);
         import_active.artist_track_relations = ActiveValue::Set(
-            entity::import::ArtistTrackRelations(import.artist_track_relations.0),
+            entity::import::ArtistTrackRelations(dedup(import.artist_track_relations.0)),
         );
 
         import
@@ -118,7 +120,7 @@ impl crate::tasks::TaskTrait for Data {
             .0
             .extend(release.artist_credit_releases);
         import_active.artist_credit_releases = ActiveValue::Set(
-            entity::import::ArtistCreditReleases(import.artist_credit_releases.0),
+            entity::import::ArtistCreditReleases(dedup(import.artist_credit_releases.0)),
         );
 
         import
@@ -126,7 +128,7 @@ impl crate::tasks::TaskTrait for Data {
             .0
             .extend(release.artist_credit_tracks);
         import_active.artist_credit_tracks = ActiveValue::Set(entity::import::ArtistCreditTracks(
-            import.artist_credit_tracks.0,
+            dedup(import.artist_credit_tracks.0),
         ));
 
         import_active.update(&tx).await?;

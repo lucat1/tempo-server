@@ -228,6 +228,7 @@ impl GetArtistCredits for FullRelease {
             .artist_credit_releases
             .0
             .iter()
+            .filter(|acr| acr.release_id == self.release)
             .flat_map(|acr| {
                 self.import
                     .artist_credits
@@ -245,6 +246,7 @@ impl GetArtistCredits for FullTrack {
             .artist_credit_tracks
             .0
             .iter()
+            .filter(|act| act.track_id == self.track)
             .flat_map(|act| {
                 self.import
                     .artist_credits
