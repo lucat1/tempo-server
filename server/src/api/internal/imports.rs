@@ -38,7 +38,6 @@ use super::documents::{UpdateImportAttributes, UpdateImportRelease, UpdateImport
 
 #[derive(Default)]
 pub struct ImportRelated {
-    // job: Option<entity::Job>,
     directory: String,
 }
 
@@ -51,6 +50,8 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
             source_tracks: entity.source_tracks.0.clone(),
             started_at: entity.started_at,
             ended_at: entity.ended_at,
+            selected_release: entity.selected_release,
+            selected_cover: entity.selected_cover,
         },
         relationships: HashMap::new(),
         meta: None,
@@ -78,16 +79,6 @@ where
     Ok(result)
 }
 
-fn map_to_jobs_include(include: &[ImportInclude]) -> Vec<JobInclude> {
-    include
-        .iter()
-        .filter_map(|i| match *i {
-            ImportInclude::JobTasks => Some(JobInclude::Tasks),
-            _ => None,
-        })
-        .collect()
-}
-
 pub async fn included<C>(
     _db: &C,
     _related: Vec<ImportRelated>,
@@ -97,21 +88,6 @@ where
     C: ConnectionTrait,
 {
     let mut included = Vec::new();
-    if include.contains(&ImportInclude::Job) {
-        // let mut cond = Condition::any();
-        // for rel in related.iter() {
-        //     if let Some(job) = &rel.job {
-        //         cond = cond.add(ColumnTrait::eq(&entity::JobColumn::Id, job.id));
-        //     }
-        // }
-        // let jobs = entity::JobEntity::find().filter(cond).all(db).await?;
-        // let jobs_related = jobs::related(db, &jobs, true).await?;
-        // for (i, job) in jobs.iter().enumerate() {
-        //     included.push(jobs::entity_to_included(job, &jobs_related[i]))
-        // }
-        // let jobs_included = map_to_jobs_include(include);
-        // included.extend(jobs::included(db, jobs_related, &jobs_included).await?);
-    }
     Ok(included)
 }
 
@@ -152,7 +128,7 @@ pub async fn begin(
     let tracks: Vec<entity::InternalTrack> =
         tracks.into_iter().map(|t| t.into_internal()).collect();
 
-    // save the import in the db, alongside its job and tasks
+    // save the import in the db
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

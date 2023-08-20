@@ -124,6 +124,9 @@ pub struct ImportAttributes {
     pub started_at: OffsetDateTime,
     #[serde(with = "time::serde::iso8601::option")]
     pub ended_at: Option<OffsetDateTime>,
+
+    pub selected_release: Option<Uuid>,
+    pub selected_cover: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize)]
