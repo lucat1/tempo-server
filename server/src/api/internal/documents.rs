@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::api::jsonapi::{InsertResource, Resource};
+use crate::api::jsonapi::{InsertResource, Resource, UpdateResource};
 use entity::{InternalRelease, InternalTrack};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -131,6 +131,23 @@ pub struct InsertImportAttributes {
     pub directory: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UpdateImportRelease {
+    pub selected_release: Uuid,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateImportCover {
+    pub selected_cover: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateImportAttributes {
+    Release(UpdateImportRelease),
+    Cover(UpdateImportCover),
+}
+
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ImportRelation {
@@ -158,6 +175,8 @@ pub type ImportResource =
     Resource<ResourceType, Uuid, ImportAttributes, ImportRelation, ImportMeta>;
 pub type InsertImportResource =
     InsertResource<ResourceType, InsertImportAttributes, ImportRelation, ImportMeta>;
+pub type UpdateImportResource =
+    UpdateResource<ResourceType, Uuid, UpdateImportAttributes, ImportRelation, ImportMeta>;
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]

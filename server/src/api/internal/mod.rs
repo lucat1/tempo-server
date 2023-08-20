@@ -12,7 +12,7 @@ pub fn router() -> Router<AppState> {
         .route("/downloads", get(downloads::list))
         .route("/downloads/:id", get(downloads::list))
         .route("/imports", get(imports::imports).put(imports::begin))
-        .route("/imports/:id", get(imports::import))
+        .route("/imports/:id", get(imports::import).patch(imports::edit))
         // .route("/import/:job", patch(import::edit))
         // .route("/import/:job", post(import::run))
         // .route("/import/:job", delete(import::delete))

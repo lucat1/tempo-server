@@ -220,7 +220,6 @@ pub async fn connection(
     }))
 }
 
-#[axum_macros::debug_handler]
 pub async fn callback(
     State(AppState(db)): State<AppState>,
     path_provider: Path<entity::ConnectionProvider>,

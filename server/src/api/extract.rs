@@ -94,7 +94,7 @@ where
     }
 }
 
-pub struct Path<T>(AxumPath<T>);
+pub struct Path<T>(pub AxumPath<T>);
 
 impl<T> Path<T> {
     pub fn inner(self) -> T {

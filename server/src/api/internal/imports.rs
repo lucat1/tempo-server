@@ -1,12 +1,12 @@
 use axum::{
-    extract::{OriginalUri, State},
+    extract::{OriginalUri, Path as AxumPath, State},
     http::StatusCode,
 };
 use base::setting::get_settings;
-use eyre::Result;
+use eyre::{eyre, Result};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait, QueryOrder,
-    TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait,
+    IntoActiveModel, QueryOrder, TransactionTrait,
 };
 use serde_json::json;
 use std::{collections::HashMap, path::PathBuf};
@@ -20,19 +20,21 @@ use crate::{
         internal::{
             documents::{
                 dedup, ImportAttributes, ImportFilter, ImportInclude, ImportResource, Included,
-                InsertImportResource, JobInclude, ResourceType,
+                InsertImportResource, JobInclude, ResourceType, UpdateImportCover,
             },
             downloads,
         },
         jsonapi::{
             links_from_resource, make_cursor, Document, DocumentData, Error, InsertOneDocument,
-            Query,
+            Query, QueryOptions, UpdateOneDocument,
         },
         AppState,
     },
     import::{all_tracks, IntoInternal},
     tasks::{import, push, TaskName},
 };
+
+use super::documents::{UpdateImportAttributes, UpdateImportRelease, UpdateImportResource};
 
 #[derive(Default)]
 pub struct ImportRelated {
@@ -214,6 +216,100 @@ pub async fn begin(
     }))
 }
 
+async fn cover_refetch(import_id: Uuid) -> Result<()> {
+    let fetch_task = push(&[InsertTask {
+        name: TaskName::ImportFetchCovers,
+        payload: Some(json!(import::fetch_covers::Data(import_id))),
+        depends_on: Vec::new(),
+        duration: Duration::seconds(360),
+    }])
+    .await?;
+    push(&[InsertTask {
+        name: TaskName::ImportRankCovers,
+        payload: Some(json!(import::rank_covers::Data(import_id))),
+        depends_on: vec![fetch_task
+            .first()
+            .ok_or(eyre!("Expected a task to have been queued"))?
+            .id
+            .clone()],
+        duration: Duration::seconds(60),
+    }])
+    .await?;
+    Ok(())
+}
+
+pub async fn edit(
+    State(AppState(db)): State<AppState>,
+    Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
+    import_path: Path<Uuid>,
+    import_edit: Json<UpdateOneDocument<UpdateImportResource>>,
+) -> Result<Json<Document<ImportResource, Included>>, Error> {
+    let id = import_path.inner();
+    let body = import_edit.inner();
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let import = entity::ImportEntity::find_by_id(id)
+        .one(&tx)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the requried import".to_string(),
+            detail: Some(e.into()),
+        })?
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Import not found".to_string(),
+            detail: None,
+        })?;
+    let releases = import.releases.0.clone();
+    let covers_len = import.covers.0.len();
+    let mut import_active = import.into_active_model();
+    match &body.data.attributes {
+        UpdateImportAttributes::Release(UpdateImportRelease { selected_release }) => {
+            if !releases.iter().any(|rel| rel.id == *selected_release) {
+                return Err(Error {
+                    status: StatusCode::BAD_REQUEST,
+                    title: "Cannot select a non-existant release".to_string(),
+                    detail: None,
+                });
+            }
+            import_active.selected_release = ActiveValue::Set(Some(*selected_release))
+        }
+        UpdateImportAttributes::Cover(UpdateImportCover { selected_cover }) => {
+            if *selected_cover < 0 || *selected_cover >= (covers_len as i32) {
+                return Err(Error {
+                    status: StatusCode::BAD_REQUEST,
+                    title: "Cannot select a non-existant cover".to_string(),
+                    detail: None,
+                });
+            }
+            import_active.selected_cover = ActiveValue::Set(Some(*selected_cover))
+        }
+    }
+    import_active.update(&tx).await.map_err(|err| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't update the import structure".to_string(),
+        detail: Some(err.into()),
+    })?;
+    tx.commit().await.map_err(|err| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't commit the transaction".to_string(),
+        detail: Some(err.into()),
+    })?;
+    if matches!(body.data.attributes, UpdateImportAttributes::Release(_)) {
+        cover_refetch(id).await.map_err(|err| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not schedule cover refetches".to_string(),
+            detail: Some(err.into()),
+        })?;
+    }
+
+    self::import(State(AppState(db)), Query(opts), Path(AxumPath(id))).await
+}
+
 pub async fn imports(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
@@ -258,9 +354,41 @@ pub async fn imports(
     }))
 }
 
+async fn fetch_import_data<C>(
+    db: &C,
+    import: entity::Import,
+    opts: &QueryOptions<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
+) -> Result<Json<Document<ImportResource, Included>>, Error>
+where
+    C: ConnectionTrait,
+{
+    let related_to_imports = related(db, &[import.clone()], false)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the related imports".to_string(),
+            detail: Some(e.into()),
+        })?;
+    let empty_relationship = ImportRelated::default();
+    let related = related_to_imports.first().unwrap_or(&empty_relationship);
+    let data = entity_to_resource(&import, related);
+    let included = included(db, related_to_imports, &opts.include)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the included resurces".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(Json::new(Document {
+        data: DocumentData::Single(data),
+        included: dedup(included),
+        links: HashMap::new(),
+    }))
+}
+
 pub async fn import(
     State(AppState(db)): State<AppState>,
-    Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, i64>,
+    Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
     import_path: Path<Uuid>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
     let id = import_path.inner();
@@ -282,65 +410,9 @@ pub async fn import(
             title: "Import not found".to_string(),
             detail: None,
         })?;
-    let related_to_imports = related(&tx, &[import.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the related imports".to_string(),
-            detail: Some(e.into()),
-        })?;
-    let empty_relationship = ImportRelated::default();
-    let related = related_to_imports.first().unwrap_or(&empty_relationship);
-    let data = entity_to_resource(&import, related);
-    let included = included(&tx, related_to_imports, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
-    Ok(Json::new(Document {
-        data: DocumentData::Single(data),
-        included: dedup(included),
-        links: HashMap::new(),
-    }))
+    fetch_import_data(&tx, import, &opts).await
 }
 
-// pub async fn edit(
-//     job_path: Path<Uuid>,
-//     json_edit: Json<ImportEdit>,
-// ) -> Result<Json<Import>, StatusCode> {
-//     let job = job_path.inner();
-//     let edit = json_edit.inner();
-//     let mut imports = JOBS.lock().await;
-//     let mut import = imports
-//         .get(&job)
-//         .ok_or(StatusCode::NOT_FOUND)
-//         .map(|v| v.clone())?;
-//     match edit {
-//         ImportEdit::MbId(id) => {
-//             if !import
-//                 .import
-//                 .search_results
-//                 .iter()
-//                 .any(|r| r.search_result.0.release.id == id)
-//             {
-//                 return Err(StatusCode::BAD_REQUEST);
-//             }
-//             // TODO: the MbId has been changed, update the cover options
-//             import.import.selected.0 = id
-//         }
-//         ImportEdit::Cover(i) => {
-//             if i >= import.import.covers.len() {
-//                 return Err(StatusCode::BAD_REQUEST);
-//             }
-//             import.import.selected.1 = Some(i)
-//         }
-//     }
-//     imports.insert(job, import.clone());
-//     Ok(Json::new(import))
-// }
-//
 // pub async fn run(job_path: Path<Uuid>) -> Result<Json<()>, (StatusCode, Json<ImportError>)> {
 //     let job = job_path.inner();
 //     let mut imports = JOBS.lock().await;
@@ -360,7 +432,7 @@ pub async fn import(
 //     })?;
 //     Ok(Json::new(()))
 // }
-//
+
 // pub async fn delete(job_path: Path<Uuid>) -> Result<Json<()>, StatusCode> {
 //     let job = job_path.inner();
 //     let mut imports = JOBS.lock().await;
