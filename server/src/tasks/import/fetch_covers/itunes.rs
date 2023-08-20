@@ -20,13 +20,13 @@ static ITUNES_COUNTRIES: &[&str] = &[
     "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
 ];
 
-pub async fn probe(url: url::Url) -> bool {
-    itunes::send_request(Request::new(Method::HEAD, url))
-        .await
-        .ok()
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
-}
+// pub async fn probe(url: url::Url) -> bool {
+//     itunes::send_request(Request::new(Method::HEAD, url))
+//         .await
+//         .ok()
+//         .map(|r| r.status().is_success())
+//         .unwrap_or(false)
+// }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Itunes {
@@ -82,10 +82,10 @@ pub async fn search(
             let url = result
                 .artwork_url_100
                 .replace("100x100", format!("{size}x{size}").as_str());
-            if !probe(url.parse()?).await {
-                tracing::info!(%url, %size, artist = %result.artist_name, release = %result.collection_name, "Skipping iTunes track, HEAD request failed");
-                continue;
-            }
+            // if !probe(url.parse()?).await {
+            //     tracing::info!(%url, %size, artist = %result.artist_name, release = %result.collection_name, "Skipping iTunes track, HEAD request failed");
+            //     continue;
+            // }
             res.push(entity::import::Cover {
                 provider: ArtProvider::Itunes,
                 url,
