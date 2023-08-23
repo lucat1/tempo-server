@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use crate::api::{
     auth::Claims,
     documents::{
-        dedup, Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter,
-        UserInclude, UserRelation, UserResource,
+        Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter, UserInclude,
+        UserRelation, UserResource,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -23,6 +23,7 @@ use crate::api::{
     AppState,
 };
 use base::setting::get_settings;
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct UserRelated {

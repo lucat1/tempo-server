@@ -9,18 +9,22 @@ use sea_orm::{
     IntoActiveModel, QueryOrder, TransactionTrait,
 };
 use serde_json::json;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 use taskie_client::InsertTask;
 use time::Duration;
 use uuid::Uuid;
 
+use crate::api::tempo::{artists, mediums, releases, tracks};
 use crate::{
     api::{
         extract::{Json, Path},
         internal::{
             documents::{
-                dedup, ImportAttributes, ImportFilter, ImportInclude, ImportResource, Included,
-                InsertImportResource, JobInclude, ResourceType, UpdateImportCover,
+                ImportAttributes, ImportFilter, ImportInclude, ImportResource, Included,
+                InsertImportResource, ResourceType, UpdateImportCover,
             },
             downloads,
         },
@@ -33,12 +37,22 @@ use crate::{
     import::{all_tracks, IntoInternal},
     tasks::{import, push, TaskName},
 };
+use base::util::dedup;
 
 use super::documents::{UpdateImportAttributes, UpdateImportRelease, UpdateImportResource};
 
 #[derive(Default)]
 pub struct ImportRelated {
     directory: String,
+    artists: Vec<entity::Artist>,
+    artist_credits: Vec<entity::ArtistCredit>,
+    releases: Vec<entity::Release>,
+    mediums: Vec<entity::Medium>,
+    tracks: Vec<entity::Track>,
+    artist_track_relations: Vec<entity::ArtistTrackRelation>,
+    artist_credit_releases: Vec<entity::ArtistCreditRelease>,
+    artist_credit_tracks: Vec<entity::ArtistCreditTrack>,
+    covers: Vec<entity::import::Cover>,
 }
 
 pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> ImportResource {
@@ -48,6 +62,8 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
         attributes: ImportAttributes {
             source_release: entity.source_release.clone(),
             source_tracks: entity.source_tracks.0.clone(),
+            release_matches: entity.release_matches.0.clone(),
+            cover_ratings: entity.cover_ratings.0.clone(),
             started_at: entity.started_at,
             ended_at: entity.ended_at,
             selected_release: entity.selected_release,
@@ -72,8 +88,18 @@ where
 {
     let mut result = Vec::new();
     for entity in entities.iter() {
+        let entity_clone = entity.clone();
         result.push(ImportRelated {
-            directory: entity.directory.to_owned(),
+            directory: entity_clone.directory,
+            artists: entity_clone.artists.0,
+            artist_credits: entity_clone.artist_credits.0,
+            releases: entity_clone.releases.0,
+            mediums: entity_clone.mediums.0,
+            tracks: entity_clone.tracks.0,
+            artist_track_relations: entity_clone.artist_track_relations.0,
+            artist_credit_releases: entity_clone.artist_credit_releases.0,
+            artist_credit_tracks: entity_clone.artist_credit_tracks.0,
+            covers: entity_clone.covers.0,
         })
     }
     Ok(result)
@@ -81,13 +107,131 @@ where
 
 pub async fn included<C>(
     _db: &C,
-    _related: Vec<ImportRelated>,
+    related: Vec<ImportRelated>,
     include: &[ImportInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
 {
     let mut included = Vec::new();
+    for related in related.into_iter() {
+        let ImportRelated {
+            directory,
+            artists,
+            artist_credits,
+            releases,
+            mediums,
+            tracks,
+            artist_track_relations,
+            artist_credit_releases,
+            artist_credit_tracks,
+            covers,
+        } = related;
+        for artist in artists.iter() {
+            let related = artists::ArtistRelated {
+                recordings: artist_track_relations
+                    .iter()
+                    .filter_map(|atr| {
+                        if atr.artist_id == artist.id {
+                            Some(atr.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                ..Default::default()
+            };
+            included.push(Included::TempoInclude(artists::entity_to_included(
+                artist, &related,
+            )));
+        }
+        for release in releases.iter() {
+            let artist_credit_ids: HashSet<String> =
+                HashSet::from_iter(artist_credit_releases.iter().filter_map(|acr| {
+                    if acr.release_id == release.id {
+                        Some(acr.artist_credit_id.to_owned())
+                    } else {
+                        None
+                    }
+                }));
+            let related = releases::ReleaseRelated {
+                image: None,
+                artist_credits: artist_credits
+                    .iter()
+                    .filter_map(|ac| {
+                        if artist_credit_ids.contains(&ac.id) {
+                            Some(ac.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                mediums: mediums
+                    .iter()
+                    .filter_map(|med| {
+                        if med.release_id == release.id {
+                            Some(med.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            };
+            included.push(Included::TempoInclude(releases::entity_to_included(
+                release, &related,
+            )));
+        }
+        for medium in mediums.iter() {
+            let related = mediums::MediumRelated {
+                release: releases.iter().find_map(|rel| {
+                    if medium.release_id == rel.id {
+                        Some(rel.clone())
+                    } else {
+                        None
+                    }
+                }),
+                tracks: tracks
+                    .iter()
+                    .filter_map(|track| {
+                        if track.medium_id == medium.id {
+                            Some(track.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            };
+            included.push(Included::TempoInclude(mediums::entity_to_included(
+                medium, &related,
+            )));
+        }
+        for track in tracks.iter() {
+            let artist_credit_ids: HashSet<String> =
+                HashSet::from_iter(artist_credit_tracks.iter().filter_map(|act| {
+                    if act.track_id == track.id {
+                        Some(act.artist_credit_id.to_owned())
+                    } else {
+                        None
+                    }
+                }));
+            let related = tracks::TrackRelated {
+                artist_credits: artist_credits
+                    .iter()
+                    .filter_map(|ac| {
+                        if artist_credit_ids.contains(&ac.id) {
+                            Some(ac.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                ..Default::default()
+            };
+            included.push(Included::TempoInclude(tracks::entity_to_included(
+                track, &related,
+            )));
+        }
+    }
     Ok(included)
 }
 
@@ -182,8 +326,20 @@ pub async fn begin(
         detail: Some(err.into()),
     })?;
 
-    let related = ImportRelated { directory: dir };
-    let resource = entity_to_resource(&import, &related);
+    let import_vec = vec![import];
+    let all_related = related(&db, &import_vec, false)
+        .await
+        .map_err(|err| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch related documents".to_string(),
+            detail: Some(err.into()),
+        })?;
+    let related = all_related.first().ok_or(Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "No related document has been retourned".to_string(),
+        detail: None,
+    })?;
+    let resource = entity_to_resource(&import_vec[0], &related);
 
     Ok(Json::new(Document {
         data: DocumentData::Single(resource),

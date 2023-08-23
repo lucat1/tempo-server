@@ -14,8 +14,8 @@ use super::{artists, mediums};
 use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
-        dedup, ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes,
-        ResourceType, TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
+        ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes, ResourceType,
+        TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -24,12 +24,13 @@ use crate::api::{
     },
     AppState,
 };
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct TrackRelated {
-    artist_credits: Vec<entity::ArtistCredit>,
-    medium: Option<entity::Medium>,
-    recorders: Vec<entity::ArtistTrackRelation>,
+    pub artist_credits: Vec<entity::ArtistCredit>,
+    pub medium: Option<entity::Medium>,
+    pub recorders: Vec<entity::ArtistTrackRelation>,
 }
 
 pub async fn related<C>(

@@ -148,7 +148,10 @@ pub struct ArtistCreditTracks(pub Vec<super::ArtistCreditTrack>);
 pub struct Covers(pub Vec<Cover>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
-pub struct ReleaseRating(pub i64, pub Vec<usize>);
+pub struct ReleaseRating {
+    pub score: i64,
+    pub assignment: HashMap<usize, Uuid>,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct ReleaseMatches(pub HashMap<Uuid, ReleaseRating>);
 

@@ -1,6 +1,5 @@
-use base::setting::JobType;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -11,8 +10,6 @@ use entity::{InternalRelease, InternalTrack};
 #[serde(rename_all = "snake_case")]
 pub enum ResourceType {
     Directory,
-    Job,
-    Task,
     Import,
 }
 
@@ -44,81 +41,12 @@ pub type DirectoryResource =
     Resource<ResourceType, String, DirectoryAttributes, DirectoryRelation, DirectoryMeta>;
 
 #[derive(Serialize, Deserialize)]
-pub struct JobAttributes {
-    pub title: String,
-    pub description: Option<String>,
-    #[serde(with = "time::serde::iso8601")]
-    pub scheduled_at: OffsetDateTime,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct InsertJobAttributes {
-    pub r#type: JobType,
-}
-
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum JobRelation {
-    Tasks,
-}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum JobInclude {
-    Tasks,
-}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum JobMeta {}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum JobFilter {}
-
-pub type JobResource = Resource<ResourceType, i64, JobAttributes, JobRelation, JobMeta>;
-pub type InsertJobResource =
-    InsertResource<ResourceType, InsertJobAttributes, JobRelation, JobMeta>;
-
-#[derive(Serialize, Deserialize)]
-pub struct TaskAttributes {
-    pub data: serde_json::Value,
-    pub description: Option<String>,
-
-    #[serde(with = "time::serde::iso8601")]
-    pub scheduled_at: OffsetDateTime,
-    #[serde(with = "time::serde::iso8601::option")]
-    pub started_at: Option<OffsetDateTime>,
-    #[serde(with = "time::serde::iso8601::option")]
-    pub ended_at: Option<OffsetDateTime>,
-}
-
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskRelation {
-    Job,
-}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskInclude {
-    Job,
-}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskMeta {}
-
-#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskFilter {}
-
-pub type TaskResource = Resource<ResourceType, i64, TaskAttributes, TaskRelation, TaskMeta>;
-
-#[derive(Serialize, Deserialize)]
 pub struct ImportAttributes {
     pub source_release: InternalRelease,
     pub source_tracks: Vec<InternalTrack>,
+
+    pub release_matches: HashMap<Uuid, entity::import::ReleaseRating>,
+    pub cover_ratings: Vec<f32>,
 
     #[serde(with = "time::serde::iso8601")]
     pub started_at: OffsetDateTime,
@@ -155,16 +83,10 @@ pub enum UpdateImportAttributes {
 #[serde(rename_all = "snake_case")]
 pub enum ImportRelation {
     Directory,
-    Job,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
-pub enum ImportInclude {
-    #[serde(rename = "job")]
-    Job,
-    #[serde(rename = "job.tasks")]
-    JobTasks,
-}
+pub enum ImportInclude {}
 
 #[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -185,32 +107,38 @@ pub type UpdateImportResource =
 #[serde(untagged)]
 pub enum Included {
     Directory(DirectoryResource),
-    Job(JobResource),
-    Task(TaskResource),
     Import(ImportResource),
+
+    TempoInclude(crate::api::documents::Included),
 }
 
-#[derive(PartialEq)]
-enum Identifier {
-    Directory(String),
-    Task(i64),
-    Job(i64),
-    Import(Uuid),
+impl PartialEq for Included {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Included::Directory(a), Included::Directory(b)) => a.id == b.id,
+            (Included::Import(a), Included::Import(b)) => a.id == b.id,
+            (_, _) => false,
+        }
+    }
+}
+impl Eq for Included {}
+
+impl std::cmp::PartialOrd for Included {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Included::Directory(a), Included::Directory(b)) => a.id.partial_cmp(&b.id),
+            (Included::Import(a), Included::Import(b)) => a.id.partial_cmp(&b.id),
+            (_, _) => None,
+        }
+    }
 }
 
-pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
-    included.sort_unstable_by(|_a, _b| match (_a, _b) {
-        (Included::Directory(a), Included::Directory(b)) => a.id.cmp(&b.id),
-        (Included::Job(a), Included::Job(b)) => a.id.cmp(&b.id),
-        (Included::Task(a), Included::Task(b)) => a.id.cmp(&b.id),
-        (Included::Import(a), Included::Import(b)) => a.id.cmp(&b.id),
-        (_, _) => std::cmp::Ordering::Less,
-    });
-    included.dedup_by_key(|e| match e {
-        Included::Directory(e) => Identifier::Directory(e.id.to_owned()),
-        Included::Job(e) => Identifier::Job(e.id),
-        Included::Task(e) => Identifier::Task(e.id),
-        Included::Import(e) => Identifier::Import(e.id),
-    });
-    included
+impl std::cmp::Ord for Included {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Included::Directory(a), Included::Directory(b)) => a.id.cmp(&b.id),
+            (Included::Import(a), Included::Import(b)) => a.id.cmp(&b.id),
+            (_, _) => std::cmp::Ordering::Less,
+        }
+    }
 }

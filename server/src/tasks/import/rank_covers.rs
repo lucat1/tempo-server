@@ -95,7 +95,6 @@ impl crate::tasks::TaskTrait for Data {
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(index, _)| index as i32 /* for the db */);
-        tracing::info!(?ratings, "Got the ratings");
 
         let mut import_active = import.into_active_model();
         import_active.cover_ratings = ActiveValue::Set(entity::import::CoverRatings(ratings));

@@ -135,7 +135,10 @@ pub fn rate_and_match(
         }
     }
     if matrix_vec.is_empty() {
-        return entity::import::ReleaseRating(0, vec![]);
+        return entity::import::ReleaseRating {
+            score: 0,
+            assignment: HashMap::new(),
+        };
     }
     tracing::debug!(%rows, %columns, "The kuhn_munkers matrix has size");
     if rows > columns {
@@ -149,15 +152,31 @@ pub fn rate_and_match(
         columns = rows
     }
     let matrix = Matrix::from_vec(rows, columns, matrix_vec);
+    tracing::info!(
+        %matrix.rows, %matrix.columns,
+        source = %tracks.len(), candidates = %full_tracks.len(),
+        "Adjacency matrix (rows = source, columns = candidates)"
+    );
     let (val, map) = kuhn_munkres_min(&matrix);
-    let value = val + release.diff(&candidate_release);
+    let score = val + release.diff(&candidate_release);
     tracing::debug!(
         original = ?(release, tracks),
         candidate = ?(candidate_release.artists, candidate_release.title),
-        %value,
+        %score,
         "Release/tracks match value"
     );
-    entity::import::ReleaseRating(value, map)
+    entity::import::ReleaseRating {
+        score,
+        assignment: map
+            .into_iter()
+            .enumerate()
+            .filter_map(|(src, candidate)| {
+                full_tracks
+                    .get(candidate)
+                    .map(|ft| (src, ft.get_track().id))
+            })
+            .collect(),
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -187,10 +206,10 @@ impl crate::tasks::TaskTrait for Data {
                 (&rc_import.source_release, &rc_import.source_tracks.0),
                 (&full_release, &full_tracks),
             );
-            let entity::import::ReleaseRating(rate, _) = rating;
+            let entity::import::ReleaseRating { score, .. } = rating;
             (best_rate, best_release) = match best_rate {
-                Some(best) if rate > best => (Some(rate), Some(release.id)),
-                None => (Some(rate), Some(release.id)),
+                Some(best) if score < best => (Some(score), Some(release.id)),
+                None => (Some(score), Some(release.id)),
                 _ => (best_rate, best_release),
             };
             release_matches.insert(release.id, rating);

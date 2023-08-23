@@ -1,12 +1,12 @@
-mod artists;
-mod connections;
-mod images;
-mod mediums;
-mod releases;
-mod scrobbles;
-mod search;
-mod tracks;
-mod users;
+pub mod artists;
+pub mod connections;
+pub mod images;
+pub mod mediums;
+pub mod releases;
+pub mod scrobbles;
+pub mod search;
+pub mod tracks;
+pub mod users;
 
 use axum::{middleware::from_fn, routing::get, Router};
 use std::collections::HashMap;

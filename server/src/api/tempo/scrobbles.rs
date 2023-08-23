@@ -15,7 +15,7 @@ use super::{tracks, users};
 use crate::api::{
     auth::Claims,
     documents::{
-        dedup, Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
+        Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
         ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
     extract::{Json, Path},
@@ -26,6 +26,7 @@ use crate::api::{
     AppState,
 };
 use crate::tasks::{self, TaskName};
+use base::util::dedup;
 
 pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     let mut relationships = HashMap::new();

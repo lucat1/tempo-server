@@ -13,7 +13,7 @@ use crate::api::documents::ReleaseInclude;
 use crate::api::AppState;
 use crate::api::{
     documents::{
-        dedup, Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
+        Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
         MediumResource, ResourceType, TrackInclude,
     },
     extract::{Json, Path},
@@ -22,11 +22,12 @@ use crate::api::{
         Relationship, ResourceIdentifier,
     },
 };
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct MediumRelated {
-    release: Option<entity::Release>,
-    tracks: Vec<entity::Track>,
+    pub release: Option<entity::Release>,
+    pub tracks: Vec<entity::Track>,
 }
 
 pub async fn related<C>(
