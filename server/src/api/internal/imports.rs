@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::api::tempo::{artists, mediums, releases, tracks};
 use crate::{
     api::{
+        documents,
         extract::{Json, Path},
         internal::{
             documents::{
@@ -30,7 +31,8 @@ use crate::{
         },
         jsonapi::{
             links_from_resource, make_cursor, Document, DocumentData, Error, InsertOneDocument,
-            Query, QueryOptions, UpdateOneDocument,
+            Query, QueryOptions, Related, Relation, Relationship, ResourceIdentifier,
+            UpdateOneDocument,
         },
         AppState,
     },
@@ -39,7 +41,9 @@ use crate::{
 };
 use base::util::dedup;
 
-use super::documents::{UpdateImportAttributes, UpdateImportRelease, UpdateImportResource};
+use super::documents::{
+    ImportRelation, UpdateImportAttributes, UpdateImportRelease, UpdateImportResource,
+};
 
 #[derive(Default)]
 pub struct ImportRelated {
@@ -69,7 +73,99 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
             selected_release: entity.selected_release,
             selected_cover: entity.selected_cover,
         },
-        relationships: HashMap::new(),
+        relationships: [
+            (
+                ImportRelation::Directory,
+                Relationship {
+                    data: Relation::Single(Related::String(ResourceIdentifier {
+                        r#type: ResourceType::Directory,
+                        id: related.directory.to_owned(),
+                        meta: None,
+                    })),
+                },
+            ),
+            (
+                ImportRelation::Releases,
+                Relationship {
+                    data: Relation::Multi(
+                        related
+                            .releases
+                            .iter()
+                            .map(|r| {
+                                Related::Uuid(ResourceIdentifier {
+                                    r#type: ResourceType::TempoResourceType(
+                                        documents::ResourceType::Release,
+                                    ),
+                                    id: r.id,
+                                    meta: None,
+                                })
+                            })
+                            .collect(),
+                    ),
+                },
+            ),
+            (
+                ImportRelation::Mediums,
+                Relationship {
+                    data: Relation::Multi(
+                        related
+                            .mediums
+                            .iter()
+                            .map(|m| {
+                                Related::Uuid(ResourceIdentifier {
+                                    r#type: ResourceType::TempoResourceType(
+                                        documents::ResourceType::Medium,
+                                    ),
+                                    id: m.id,
+                                    meta: None,
+                                })
+                            })
+                            .collect(),
+                    ),
+                },
+            ),
+            (
+                ImportRelation::Tracks,
+                Relationship {
+                    data: Relation::Multi(
+                        related
+                            .tracks
+                            .iter()
+                            .map(|t| {
+                                Related::Uuid(ResourceIdentifier {
+                                    r#type: ResourceType::TempoResourceType(
+                                        documents::ResourceType::Track,
+                                    ),
+                                    id: t.id,
+                                    meta: None,
+                                })
+                            })
+                            .collect(),
+                    ),
+                },
+            ),
+            (
+                ImportRelation::Artists,
+                Relationship {
+                    data: Relation::Multi(
+                        related
+                            .artists
+                            .iter()
+                            .map(|a| {
+                                Related::Uuid(ResourceIdentifier {
+                                    r#type: ResourceType::TempoResourceType(
+                                        documents::ResourceType::Artist,
+                                    ),
+                                    id: a.id,
+                                    meta: None,
+                                })
+                            })
+                            .collect(),
+                    ),
+                },
+            ),
+        ]
+        .into(),
         meta: None,
     }
 }

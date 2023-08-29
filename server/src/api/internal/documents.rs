@@ -8,9 +8,12 @@ use entity::{InternalRelease, InternalTrack};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum ResourceType {
     Directory,
     Import,
+
+    TempoResourceType(crate::api::documents::ResourceType),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -83,6 +86,10 @@ pub enum UpdateImportAttributes {
 #[serde(rename_all = "snake_case")]
 pub enum ImportRelation {
     Directory,
+    Releases,
+    Mediums,
+    Tracks,
+    Artists,
 }
 
 #[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
