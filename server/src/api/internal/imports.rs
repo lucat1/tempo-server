@@ -24,8 +24,10 @@ use crate::{
         extract::{Json, Path},
         internal::{
             documents::{
-                ImportAttributes, ImportFilter, ImportInclude, ImportResource, Included,
-                InsertImportResource, ResourceType, UpdateImportCover,
+                ImportAttributes, ImportFilter, ImportInclude, ImportRelation, ImportResource,
+                Included, InsertImportResource, InternalResourceType, ResourceType,
+                UpdateImportAttributes, UpdateImportCover, UpdateImportRelease,
+                UpdateImportResource,
             },
             downloads,
         },
@@ -40,10 +42,6 @@ use crate::{
     tasks::{import, push, TaskName},
 };
 use base::util::dedup;
-
-use super::documents::{
-    ImportRelation, UpdateImportAttributes, UpdateImportRelease, UpdateImportResource,
-};
 
 #[derive(Default)]
 pub struct ImportRelated {
@@ -62,7 +60,7 @@ pub struct ImportRelated {
 pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> ImportResource {
     ImportResource {
         id: entity.id,
-        r#type: ResourceType::Import,
+        r#type: ResourceType::Internal(super::documents::InternalResourceType::Import),
         attributes: ImportAttributes {
             source_release: entity.source_release.clone(),
             source_tracks: entity.source_tracks.0.clone(),
@@ -78,7 +76,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
                 ImportRelation::Directory,
                 Relationship {
                     data: Relation::Single(Related::String(ResourceIdentifier {
-                        r#type: ResourceType::Directory,
+                        r#type: ResourceType::Internal(InternalResourceType::Directory),
                         id: related.directory.to_owned(),
                         meta: None,
                     })),
@@ -93,9 +91,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
                             .iter()
                             .map(|r| {
                                 Related::Uuid(ResourceIdentifier {
-                                    r#type: ResourceType::TempoResourceType(
-                                        documents::ResourceType::Release,
-                                    ),
+                                    r#type: ResourceType::Tempo(documents::ResourceType::Release),
                                     id: r.id,
                                     meta: None,
                                 })
@@ -113,9 +109,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
                             .iter()
                             .map(|m| {
                                 Related::Uuid(ResourceIdentifier {
-                                    r#type: ResourceType::TempoResourceType(
-                                        documents::ResourceType::Medium,
-                                    ),
+                                    r#type: ResourceType::Tempo(documents::ResourceType::Medium),
                                     id: m.id,
                                     meta: None,
                                 })
@@ -133,9 +127,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
                             .iter()
                             .map(|t| {
                                 Related::Uuid(ResourceIdentifier {
-                                    r#type: ResourceType::TempoResourceType(
-                                        documents::ResourceType::Track,
-                                    ),
+                                    r#type: ResourceType::Tempo(documents::ResourceType::Track),
                                     id: t.id,
                                     meta: None,
                                 })
@@ -153,9 +145,7 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
                             .iter()
                             .map(|a| {
                                 Related::Uuid(ResourceIdentifier {
-                                    r#type: ResourceType::TempoResourceType(
-                                        documents::ResourceType::Artist,
-                                    ),
+                                    r#type: ResourceType::Tempo(documents::ResourceType::Artist),
                                     id: a.id,
                                     meta: None,
                                 })
@@ -204,7 +194,7 @@ where
 pub async fn included<C>(
     _db: &C,
     related: Vec<ImportRelated>,
-    include: &[ImportInclude],
+    _include: &[ImportInclude],
 ) -> Result<Vec<Included>, DbErr>
 where
     C: ConnectionTrait,
@@ -333,9 +323,8 @@ where
 
 pub async fn begin(
     State(AppState(db)): State<AppState>,
-    json_import: Json<InsertOneDocument<InsertImportResource>>,
+    Json(body): Json<InsertOneDocument<InsertImportResource>>,
 ) -> Result<Json<Document<ImportResource, ImportInclude>>, Error> {
-    let body = json_import.inner();
     let settings = get_settings().map_err(|err| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not read settings".to_string(),
@@ -437,7 +426,7 @@ pub async fn begin(
     })?;
     let resource = entity_to_resource(&import_vec[0], &related);
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(resource),
         included: Vec::new(),
         links: HashMap::new(),
@@ -470,10 +459,9 @@ pub async fn edit(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
     import_path: Path<Uuid>,
-    import_edit: Json<UpdateOneDocument<UpdateImportResource>>,
+    Json(body): Json<UpdateOneDocument<UpdateImportResource>>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
     let id = import_path.inner();
-    let body = import_edit.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -575,7 +563,7 @@ pub async fn imports(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -607,7 +595,7 @@ where
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),
@@ -646,24 +634,24 @@ pub async fn import(
 //     let mut imports = JOBS.lock().await;
 //     let import = imports.remove(&job).ok_or((
 //         StatusCode::NOT_FOUND,
-//         Json::new(ImportError {
+//         Json(ImportError {
 //             message: "".to_string(),
 //         }),
 //     ))?;
 //     import::run(import.import).await.map_err(|e| {
 //         (
 //             StatusCode::INTERNAL_SERVER_ERROR,
-//             Json::new(ImportError {
+//             Json(ImportError {
 //                 message: e.to_string(),
 //             }),
 //         )
 //     })?;
-//     Ok(Json::new(()))
+//     Ok(Json(()))
 // }
 
 // pub async fn delete(job_path: Path<Uuid>) -> Result<Json<()>, StatusCode> {
 //     let job = job_path.inner();
 //     let mut imports = JOBS.lock().await;
 //     imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
-//     Ok(Json::new(()))
+//     Ok(Json(()))
 // }

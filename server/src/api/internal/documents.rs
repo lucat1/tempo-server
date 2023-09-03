@@ -7,13 +7,17 @@ use crate::api::jsonapi::{InsertResource, Resource, UpdateResource};
 use entity::{InternalRelease, InternalTrack};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "snake_case")]
 #[serde(untagged)]
 pub enum ResourceType {
+    Internal(InternalResourceType),
+    Tempo(crate::api::documents::ResourceType),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum InternalResourceType {
     Directory,
     Import,
-
-    TempoResourceType(crate::api::documents::ResourceType),
 }
 
 #[derive(Serialize, Deserialize)]

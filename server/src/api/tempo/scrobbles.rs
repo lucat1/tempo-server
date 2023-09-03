@@ -198,7 +198,7 @@ where
 pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    json_scrobbles: Json<InsertDocument<InsertScrobbleResource>>,
+    Json(scrobbles): Json<InsertDocument<InsertScrobbleResource>>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -206,7 +206,7 @@ pub async fn insert_scrobbles(
         detail: Some(e.into()),
     })?;
     let after = entity::ScrobbleEntity::find().count(&tx).await.unwrap();
-    let scrobbles = match json_scrobbles.inner().data {
+    let scrobbles = match scrobbles.data {
         DocumentData::Multi(v) => v,
         DocumentData::Single(r) => vec![r],
     };
@@ -280,7 +280,7 @@ pub async fn insert_scrobbles(
         after: Some(after as i64),
     };
     let (data, included) = fetch_scrobbles(&tx, claims.username, &page, &[]).await?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -299,7 +299,7 @@ pub async fn scrobbles(
         detail: Some(e.into()),
     })?;
     let (data, included) = fetch_scrobbles(&tx, claims.username, &opts.page, &opts.include).await?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -338,7 +338,7 @@ pub async fn scrobble(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Single(resource),
         included: dedup(included),

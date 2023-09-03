@@ -336,7 +336,7 @@ pub async fn artists(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -385,7 +385,7 @@ pub async fn artist(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),

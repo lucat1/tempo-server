@@ -124,7 +124,7 @@ pub async fn auth(
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
     let auth = auth_header.inner();
     let token_data = check_token::<Claims>(auth.token())?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(auth_resource(
             Token {
                 value: auth.token().to_string(),
@@ -181,9 +181,8 @@ fn token_pair(settings: &Settings, username: &str) -> Result<(Token, Token)> {
 }
 
 pub async fn login(
-    json_login_data: Json<LoginData>,
+    Json(login_data): Json<LoginData>,
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
-    let login_data = json_login_data.inner();
     let settings = get_settings().map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Error while checking user authentication".to_owned(),
@@ -203,7 +202,7 @@ pub async fn login(
             detail: Some(e.into()),
         })?;
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(auth_resource(token, Some(refresh_token), user.username)),
         included: vec![],
         links: HashMap::new(),
@@ -233,7 +232,7 @@ pub async fn refresh(
             title: "Could not sign JWT".to_owned(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(auth_resource(
             token,
             Some(refresh_token),

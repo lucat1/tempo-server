@@ -233,7 +233,7 @@ pub async fn search(
     results.append(&mut releases);
     results.append(&mut tracks);
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Multi(results),
         included: dedup(Vec::new()),

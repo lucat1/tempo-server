@@ -53,7 +53,7 @@ pub async fn image(
             title: "Image not found".to_string(),
             detail: Some("Not found".into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(entity_to_resource(&image)),
         included: Vec::new(),
         links: HashMap::new(),

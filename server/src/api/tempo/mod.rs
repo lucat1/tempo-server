@@ -60,7 +60,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn server() -> Json<Document<ServerResource, Included>> {
-    Json::new(Document {
+    Json(Document {
         data: DocumentData::Single(ServerResource {
             r#type: ResourceType::Server,
             id: "0".to_string(),

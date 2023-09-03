@@ -6,7 +6,8 @@ use std::{collections::HashMap, fs::read_dir, path::PathBuf};
 use crate::api::{
     extract::{Json, Path},
     internal::documents::{
-        DirectoryAttributes, DirectoryRelation, DirectoryResource, FileEntry, ResourceType,
+        DirectoryAttributes, DirectoryRelation, DirectoryResource, FileEntry, InternalResourceType,
+        ResourceType,
     },
     jsonapi::{Document, DocumentData, Error, Related, Relation, Relationship, ResourceIdentifier},
 };
@@ -84,7 +85,7 @@ pub async fn list(
                     .to_path_buf();
                 Some(Entry::Directory(DirectoryResource {
                     id: urlencoding::encode(rel.to_string_lossy().to_string().as_str()).to_string(),
-                    r#type: ResourceType::Directory,
+                    r#type: ResourceType::Internal(InternalResourceType::Directory),
                     attributes: DirectoryAttributes {
                         name: f
                             .path()
@@ -121,7 +122,7 @@ pub async fn list(
                 .iter()
                 .filter_map(|e| match e {
                     Entry::Directory(f) => Some(Related::String(ResourceIdentifier {
-                        r#type: ResourceType::Directory,
+                        r#type: ResourceType::Internal(InternalResourceType::Directory),
                         id: f.id.to_owned(),
                         meta: None,
                     })),
@@ -138,10 +139,10 @@ pub async fn list(
         })
         .collect();
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(DirectoryResource {
             id: urlencoding::encode(rel.to_string_lossy().to_string().as_str()).to_string(),
-            r#type: ResourceType::Directory,
+            r#type: ResourceType::Internal(InternalResourceType::Directory),
             attributes: DirectoryAttributes {
                 name: abs_path
                     .file_name()
