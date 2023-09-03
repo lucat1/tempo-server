@@ -52,16 +52,17 @@ pub struct ImportAttributes {
     pub source_release: InternalRelease,
     pub source_tracks: Vec<InternalTrack>,
 
+    pub covers: Vec<entity::import::Cover>,
     pub release_matches: HashMap<Uuid, entity::import::ReleaseRating>,
     pub cover_ratings: Vec<f32>,
+
+    pub selected_release: Option<Uuid>,
+    pub selected_cover: Option<i32>,
 
     #[serde(with = "time::serde::iso8601")]
     pub started_at: OffsetDateTime,
     #[serde(with = "time::serde::iso8601::option")]
     pub ended_at: Option<OffsetDateTime>,
-
-    pub selected_release: Option<Uuid>,
-    pub selected_cover: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -64,12 +64,13 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
         attributes: ImportAttributes {
             source_release: entity.source_release.clone(),
             source_tracks: entity.source_tracks.0.clone(),
+            covers: entity.covers.0.clone(),
             release_matches: entity.release_matches.0.clone(),
             cover_ratings: entity.cover_ratings.0.clone(),
-            started_at: entity.started_at,
-            ended_at: entity.ended_at,
             selected_release: entity.selected_release,
             selected_cover: entity.selected_cover,
+            started_at: entity.started_at,
+            ended_at: entity.ended_at,
         },
         relationships: [
             (
