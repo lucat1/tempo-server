@@ -36,6 +36,7 @@ pub enum TaskName {
     ImportRankReleases,
     ImportFetchCovers,
     ImportRankCovers,
+    ImportPopulate,
 }
 
 lazy_static! {
@@ -111,6 +112,11 @@ where
         }
         TaskName::ImportRankCovers => {
             serde_json::from_value::<import::rank_covers::Data>(task.payload.clone().into())?
+                .run(db, task)
+                .await?
+        }
+        TaskName::ImportPopulate => {
+            serde_json::from_value::<import::populate::Data>(task.payload.clone().into())?
                 .run(db, task)
                 .await?
         }

@@ -400,15 +400,15 @@ pub async fn begin(
         detail: Some(err.into()),
     })?;
     push(&[InsertTask {
-        name: TaskName::ImportFetch,
-        payload: Some(json!(import::fetch::Data(import.id))),
+        name: TaskName::ImportPopulate,
+        payload: Some(json!(import::populate::Data(import.id))),
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
     }])
     .await
     .map_err(|err| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not schedule import tasks".to_string(),
+        title: "Could not schedule populate task".to_string(),
         detail: Some(err.into()),
     })?;
 
@@ -630,29 +630,56 @@ pub async fn import(
     fetch_import_data(&tx, import, &opts).await
 }
 
-// pub async fn run(job_path: Path<Uuid>) -> Result<Json<()>, (StatusCode, Json<ImportError>)> {
-//     let job = job_path.inner();
-//     let mut imports = JOBS.lock().await;
-//     let import = imports.remove(&job).ok_or((
-//         StatusCode::NOT_FOUND,
-//         Json(ImportError {
-//             message: "".to_string(),
-//         }),
-//     ))?;
-//     import::run(import.import).await.map_err(|e| {
-//         (
-//             StatusCode::INTERNAL_SERVER_ERROR,
-//             Json(ImportError {
-//                 message: e.to_string(),
-//             }),
-//         )
-//     })?;
-//     Ok(Json(()))
-// }
+pub async fn run(
+    State(AppState(db)): State<AppState>,
+    import_path: Path<Uuid>,
+) -> Result<(), Error> {
+    let id = import_path.inner();
+    let tx = db.begin().await.map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Couldn't begin database transaction".to_string(),
+        detail: Some(e.into()),
+    })?;
+    let import = entity::ImportEntity::find_by_id(id)
+        .one(&tx)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not fetch the requried import".to_string(),
+            detail: Some(e.into()),
+        })?
+        .ok_or(Error {
+            status: StatusCode::NOT_FOUND,
+            title: "Import not found".to_string(),
+            detail: None,
+        })?;
+    push(&[InsertTask {
+        name: TaskName::ImportFetch,
+        payload: Some(json!(import::fetch::Data(import.id))),
+        depends_on: Vec::new(),
+        duration: Duration::seconds(60),
+    }])
+    .await
+    .map_err(|err| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not schedule import tasks".to_string(),
+        detail: Some(err.into()),
+    })?;
+    Ok(())
+}
 
-// pub async fn delete(job_path: Path<Uuid>) -> Result<Json<()>, StatusCode> {
-//     let job = job_path.inner();
-//     let mut imports = JOBS.lock().await;
-//     imports.remove(&job).ok_or(StatusCode::NOT_FOUND)?;
-//     Ok(Json(()))
-// }
+pub async fn delete(
+    State(AppState(db)): State<AppState>,
+    import_path: Path<Uuid>,
+) -> Result<(), Error> {
+    let id = import_path.inner();
+    entity::ImportEntity::delete_by_id(id)
+        .exec(&db)
+        .await
+        .map_err(|e| Error {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: "Could not find the import to delete".to_string(),
+            detail: Some(e.into()),
+        })?;
+    Ok(())
+}
