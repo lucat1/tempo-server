@@ -26,6 +26,7 @@ use entity::{
         TRACK_CONFLICT,
     },
     full::{ArtistInfo, GetArtistCredits},
+    IgnoreNone,
 };
 use tag::{
     sanitize_map, tag_to_string_map, tags_from_combination, tags_from_full_release,
@@ -119,7 +120,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::TrackEntity::insert(track)
             .on_conflict(TRACK_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artists: Vec<_> = full_track
             .get_artists()?
             .into_iter()
@@ -128,7 +130,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistEntity::insert_many(artists)
             .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artist_credits: Vec<_> = full_track
             .get_artist_credits()
             .into_iter()
@@ -137,7 +140,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistCreditEntity::insert_many(artist_credits)
             .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artist_credits_track: Vec<_> = full_track
             .get_artist_credits_track()
             .into_iter()
@@ -146,7 +150,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistCreditTrackEntity::insert_many(artist_credits_track)
             .on_conflict(ARTIST_CREDIT_TRACK_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artists: Vec<_> = full_track
             .get_related_artists()?
             .into_iter()
@@ -155,7 +160,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistEntity::insert_many(artists)
             .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artist_relations: Vec<_> = full_track
             .get_relations()
             .into_iter()
@@ -164,7 +170,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistTrackRelationEntity::insert_many(artist_relations)
             .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         Ok(tx.commit().await?)
     }
 }

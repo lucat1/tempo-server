@@ -36,6 +36,7 @@ use entity::{
         TRACK_CONFLICT,
     },
     full::{ArtistInfo, GetArtistCredits},
+    IgnoreNone,
 };
 use tag::{sanitize_map, tag_to_string_map, tags_from_full_release, PictureType};
 
@@ -121,7 +122,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ReleaseEntity::insert(release.into_active_model())
             .on_conflict(RELEASE_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artists: Vec<_> = full_release
             .get_artists()?
             .into_iter()
@@ -130,7 +132,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistEntity::insert_many(artists)
             .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artist_credits: Vec<_> = full_release
             .get_artist_credits()
             .into_iter()
@@ -139,7 +142,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistCreditEntity::insert_many(artist_credits)
             .on_conflict(ARTIST_CREDIT_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
         let artist_credits_release: Vec<_> = full_release
             .get_artist_credits_release()
             .into_iter()
@@ -148,7 +152,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::ArtistCreditReleaseEntity::insert_many(artist_credits_release)
             .on_conflict(ARTIST_CREDIT_RELEASE_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
 
         // Save mediums
         let mediums: Vec<_> = full_release
@@ -159,7 +164,8 @@ impl crate::tasks::TaskTrait for Data {
         entity::MediumEntity::insert_many(mediums)
             .on_conflict(MEDIUM_CONFLICT.to_owned())
             .exec(&tx)
-            .await?;
+            .await
+            .ignore_none()?;
 
         mkdirp(&release_root).wrap_err(eyre!(
             "Could not create folder {:?} for release",
@@ -189,14 +195,18 @@ impl crate::tasks::TaskTrait for Data {
                 height: ActiveValue::Set(height as i32),
                 size: ActiveValue::Set(buf.len() as i32),
             };
-            entity::ImageEntity::insert(image).exec(&tx).await?;
+            entity::ImageEntity::insert(image)
+                .exec(&tx)
+                .await
+                .ignore_none()?;
             let image_release = entity::ImageReleaseActive {
                 image_id: ActiveValue::Set(image_id),
                 release_id: ActiveValue::Set(release_id),
             };
             entity::ImageReleaseEntity::insert(image_release)
                 .exec(&tx)
-                .await?;
+                .await
+                .ignore_none()?;
             Some(image_dest)
         } else {
             None
