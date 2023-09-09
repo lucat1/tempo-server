@@ -1,7 +1,7 @@
 use base::setting::ArtProvider;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap, hash::Hash};
+use std::{cmp::Ordering, collections::HashMap, hash::Hash, path::PathBuf};
 use uuid::Uuid;
 
 use crate::full::ArtistInfo;
@@ -13,6 +13,7 @@ pub struct InternalTrack {
     pub length: Option<i32>,
     pub disc: Option<i32>,
     pub number: Option<i32>,
+    pub path: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
@@ -79,8 +80,9 @@ impl From<crate::full::FullTrack> for InternalTrack {
                 .map(|a| a.name.clone())
                 .collect(),
             length: Some(track.length),
-            disc: None, // TODO: see above
+            disc: Some(full_track.get_medium().position),
             number: Some(track.number),
+            path: "".to_string(),
         }
     }
 }

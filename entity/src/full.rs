@@ -105,6 +105,16 @@ impl FullTrack {
             .unwrap()
     }
 
+    pub fn get_medium(&self) -> &Medium {
+        let medium_id = self.get_track().medium_id;
+        self.import
+            .mediums
+            .0
+            .iter()
+            .find(|med| med.id == medium_id)
+            .unwrap()
+    }
+
     pub fn get_artist_credits_track(&self) -> Vec<&ArtistCreditTrack> {
         self.import
             .artist_credit_tracks

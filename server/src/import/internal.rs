@@ -3,7 +3,7 @@ use itertools::Itertools;
 use tag::TagKey;
 
 use super::TrackFile;
-use base::util::{dedup, maybe_date};
+use base::util::{dedup, maybe_date, path_to_str};
 
 pub const UNKNOWN_ARTIST: &str = "(unkown artist)";
 pub const UNKNOWN_TITLE: &str = "(unkown title)";
@@ -97,6 +97,7 @@ impl IntoInternal<InternalTrack> for TrackFile {
                 .and_then(|d| d.parse::<i32>().ok()),
             number: first_tag(&file_singleton, TagKey::TrackNumber)
                 .and_then(|d| d.parse::<i32>().ok()),
+            path: path_to_str(&file_singleton[0].path).unwrap(), // TODO: look into this, can this fail?
         }
     }
 }
