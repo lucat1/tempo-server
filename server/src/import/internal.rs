@@ -70,7 +70,7 @@ impl IntoInternal<InternalRelease> for Vec<TrackFile> {
             media: first_tag(&self, TagKey::Media),
             tracks: first_tag(&self, TagKey::TotalTracks)
                 .and_then(|d| d.parse::<i32>().ok())
-                .unwrap_or_else(|| self.len() as i32),
+                .unwrap_or(self.len() as i32),
             country: first_tag(&self, TagKey::ReleaseCountry),
             label: first_tag(&self, TagKey::RecordLabel),
             release_type: first_tag(&self, TagKey::ReleaseType),

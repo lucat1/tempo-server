@@ -144,7 +144,7 @@ impl crate::tasks::TaskTrait for Data {
             full_track
                 .get_related_artists()?
                 .into_iter()
-                .map(|a| a.clone())
+                .cloned()
                 .collect(),
         );
         let artists: Vec<_> = artists.into_iter().map(|a| a.into_active_model()).collect();

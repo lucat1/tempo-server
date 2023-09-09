@@ -61,7 +61,7 @@ pub fn rank_covers(
                 distance = 0.9; // TODO: better way? otherwise art from the CoverArtArchive always
                                 // achieves the best score
             }
-            Some(valuate_cover(settings, distance, &cover))
+            Some(valuate_cover(settings, distance, cover))
         })
         .collect()
 }

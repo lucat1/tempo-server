@@ -418,7 +418,7 @@ pub async fn begin(
         title: "No related document has been retourned".to_string(),
         detail: None,
     })?;
-    let resource = entity_to_resource(&import_vec[0], &related);
+    let resource = entity_to_resource(&import_vec[0], related);
 
     Ok(Json(Document {
         data: DocumentData::Single(resource),

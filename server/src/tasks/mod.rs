@@ -50,9 +50,9 @@ pub async fn open_taskie_client() -> Result<Client> {
 }
 
 pub fn get_taskie_client() -> Result<&'static Client> {
-    Ok(TASKIE_CLIENT
+    TASKIE_CLIENT
         .get()
-        .ok_or(eyre!("Taskie client uninitialized"))?)
+        .ok_or(eyre!("Taskie client uninitialized"))
 }
 
 pub async fn push(tasks: &[InsertTask<TaskName>]) -> Result<Vec<Task<TaskName, TaskKey>>> {
@@ -64,7 +64,7 @@ async fn run_task<C>(db: &C, task: Task<TaskName, TaskKey>) -> Result<()>
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    Ok(match &task.name {
+    match &task.name {
         TaskName::Scrobble => {
             serde_json::from_value::<scrobble::Data>(task.payload.clone().into())?
                 .run(db, task)
@@ -126,7 +126,8 @@ where
                 .run(db, task)
                 .await?
         }
-    })
+    };
+    Ok(())
 }
 
 pub fn queue_loop() -> Result<()> {

@@ -11,7 +11,7 @@ pub struct FullRelease {
 
 impl FullRelease {
     pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
-        if let None = import.releases.0.iter().find(|rel| rel.id == id) {
+        if import.releases.0.iter().any(|rel| rel.id == id) {
             Err(eyre!(
                 "Cannot construct FullRelease from import with a missing release"
             ))
@@ -71,11 +71,10 @@ impl FullRelease {
     }
 
     pub fn get_full_tracks(&self) -> Result<Vec<FullTrack>> {
-        Ok(self
-            .get_tracks()
+        self.get_tracks()
             .iter()
             .map(|track| FullTrack::new(self.import.clone(), track.id))
-            .collect::<Result<Vec<_>>>()?)
+            .collect::<Result<Vec<_>>>()
     }
 }
 
@@ -87,7 +86,7 @@ pub struct FullTrack {
 
 impl FullTrack {
     pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
-        if let None = import.tracks.0.iter().find(|track| track.id == id) {
+        if import.tracks.0.iter().any(|track| track.id == id) {
             Err(eyre!(
                 "Cannot construct FullTrack from import with a missing track"
             ))

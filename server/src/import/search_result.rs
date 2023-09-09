@@ -165,7 +165,7 @@ impl From<musicbrainz::Release> for SearchResult {
                         .artist_credit
                         .as_ref()
                         .unwrap_or(&vec![])
-                        .into_iter()
+                        .iter()
                         .map(|ac| entity::ArtistCreditTrack {
                             artist_credit_id: ac.id(),
                             track_id: track.id,
@@ -286,14 +286,14 @@ impl From<Vec<musicbrainz::Release>> for CombinedSearchResults {
                 artist_credit_tracks: partial_artist_credit_tracks,
                 artist_credit_releases: partial_artist_credit_releases,
             } = release.into();
-            artists.extend(partial_artists.into_iter());
-            artist_credits.extend(partial_artist_credits.into_iter());
+            artists.extend(partial_artists);
+            artist_credits.extend(partial_artist_credits);
             releases.push(release);
-            mediums.extend(partial_mediums.into_iter());
-            tracks.extend(partial_tracks.into_iter());
-            artist_track_relations.extend(partial_artist_track_relations.into_iter());
-            artist_credit_releases.extend(partial_artist_credit_releases.into_iter());
-            artist_credit_tracks.extend(partial_artist_credit_tracks.into_iter());
+            mediums.extend(partial_mediums);
+            tracks.extend(partial_tracks);
+            artist_track_relations.extend(partial_artist_track_relations);
+            artist_credit_releases.extend(partial_artist_credit_releases);
+            artist_credit_tracks.extend(partial_artist_credit_tracks);
         }
 
         Self {

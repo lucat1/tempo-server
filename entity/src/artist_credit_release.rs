@@ -61,7 +61,7 @@ impl PartialOrd for Model {
 
 impl Ord for Model {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.eq(&other) {
+        if self.eq(other) {
             std::cmp::Ordering::Equal
         } else {
             self.artist_credit_id.cmp(&other.artist_credit_id)

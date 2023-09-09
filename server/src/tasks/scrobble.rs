@@ -46,7 +46,7 @@ struct TrackWithArtists(
 
 impl GetArtistCredits for TrackWithArtists {
     fn get_artist_credits(&self) -> Vec<&entity::ArtistCredit> {
-        self.1.iter().map(|ac| ac).collect()
+        self.1.iter().collect()
     }
 }
 
