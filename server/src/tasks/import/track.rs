@@ -28,8 +28,8 @@ use entity::{
     full::{ArtistInfo, GetArtistCredits},
 };
 use tag::{
-    sanitize_map, tag_to_string_map, tags_from_full_release, tags_from_full_track, Picture,
-    PictureType,
+    sanitize_map, tag_to_string_map, tags_from_combination, tags_from_full_release,
+    tags_from_full_track, Picture, PictureType,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,13 +62,14 @@ impl crate::tasks::TaskTrait for Data {
             .ok_or(eyre!("Release not found"))?;
         let import_rc = Arc::new(import);
         let full_track = entity::full::FullTrack::new(import_rc.clone(), self.track)?;
+        let full_release = entity::full::FullRelease::new(import_rc.clone(), self.release)?;
         let internal_track = import_rc
             .source_tracks
             .0
             .get(self.source)
             .ok_or(eyre!("Invalid track mapping"))?;
         let mut file = TrackFile::open(&settings.library, &internal_track.path.parse()?)?;
-        let tags = tags_from_full_track(&full_track)?;
+        let tags = tags_from_combination(&full_release, &full_track)?;
 
         let release_path: PathBuf = release
             .path

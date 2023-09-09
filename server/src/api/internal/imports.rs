@@ -400,7 +400,7 @@ pub async fn begin(
         detail: Some(err.into()),
     })?;
     push(&[InsertTask {
-        name: TaskName::ImportPopulate,
+        name: TaskName::ImportFetch,
         payload: Some(json!(import::populate::Data(import.id))),
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
@@ -654,7 +654,7 @@ pub async fn run(
             detail: None,
         })?;
     push(&[InsertTask {
-        name: TaskName::ImportFetch,
+        name: TaskName::ImportPopulate,
         payload: Some(json!(import::fetch::Data(import.id))),
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
