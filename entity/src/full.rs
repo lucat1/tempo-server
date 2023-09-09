@@ -23,6 +23,15 @@ impl FullRelease {
         }
     }
 
+    pub fn get_artist_credits_release(&self) -> Vec<&ArtistCreditRelease> {
+        self.import
+            .artist_credit_releases
+            .0
+            .iter()
+            .filter(|rel| rel.release_id == self.release)
+            .collect()
+    }
+
     pub fn get_release(&self) -> &Release {
         self.import
             .releases
@@ -94,6 +103,35 @@ impl FullTrack {
             .iter()
             .find(|track| track.id == self.track)
             .unwrap()
+    }
+
+    pub fn get_artist_credits_track(&self) -> Vec<&ArtistCreditTrack> {
+        self.import
+            .artist_credit_tracks
+            .0
+            .iter()
+            .filter(|rel| rel.track_id == self.track)
+            .collect()
+    }
+
+    pub fn get_relations(&self) -> Vec<&ArtistTrackRelation> {
+        self.import
+            .artist_track_relations
+            .0
+            .iter()
+            .filter(|atr| atr.track_id == self.track)
+            .collect()
+    }
+
+    pub fn get_related_artists(&self) -> Result<Vec<&Artist>> {
+        self.get_relations()
+            .iter()
+            .filter(|atr| atr.track_id == self.track)
+            .map(|atr| {
+                self.get_artist(atr.artist_id)
+                    .ok_or(eyre!("Track has a non existant related artist"))
+            })
+            .collect()
     }
 
     pub fn get_related(&self, relation_type: ArtistTrackRelationType) -> Result<Vec<&Artist>> {

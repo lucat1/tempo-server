@@ -102,14 +102,6 @@ struct Job {
 //         picture = Some((pic, image));
 //     }
 //
-//     let release_root = library.path.join(PathBuf::from_str(
-//         strfmt(
-//             library.release_name.as_str(),
-//             &sanitize_map(tag_to_string_map(&tags_from_full_release(&full_release)?)),
-//         )?
-//         .as_str(),
-//     )?);
-//     full_release.release.path = Some(path_to_str(&release_root)?);
 //     let mut tasks: Vec<Job> = mapping
 //         .iter()
 //         .enumerate()
