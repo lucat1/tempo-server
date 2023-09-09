@@ -196,6 +196,8 @@ impl crate::tasks::TaskTrait for Data {
                 size: ActiveValue::Set(buf.len() as i32),
             };
             entity::ImageEntity::insert(image)
+                .on_conflict(IMAGE_CONFLICT_1.to_owned())
+                .on_conflict(IMAGE_CONFLICT_2.to_owned())
                 .exec(&tx)
                 .await
                 .ignore_none()?;
@@ -204,6 +206,7 @@ impl crate::tasks::TaskTrait for Data {
                 release_id: ActiveValue::Set(release_id),
             };
             entity::ImageReleaseEntity::insert(image_release)
+                .on_conflict(IMAGE_RELEASE_CONFLICT.to_owned())
                 .exec(&tx)
                 .await
                 .ignore_none()?;
