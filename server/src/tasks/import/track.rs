@@ -17,7 +17,10 @@ use crate::{
     import::{CombinedSearchResults, UNKNOWN_ARTIST},
     tasks::{push, TaskName},
 };
-use base::{setting::get_settings, util::path_to_str};
+use base::{
+    setting::get_settings,
+    util::{dedup, path_to_str},
+};
 use entity::{
     conflict::{
         ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
@@ -76,17 +79,14 @@ impl crate::tasks::TaskTrait for Data {
             .path
             .ok_or(eyre!("Importing a track for a release without a path"))?
             .parse()?;
-        let track_path = settings.library.path.join(PathBuf::from_str(
-            format!(
-                "{}.{}",
-                strfmt(
-                    settings.library.track_name.as_str(),
-                    &sanitize_map(tag_to_string_map(&tags)),
-                )?,
-                file.format.ext()
-            )
-            .as_str(),
-        )?);
+        let track_path = format!(
+            "{}.{}",
+            strfmt(
+                settings.library.track_name.as_str(),
+                &sanitize_map(tag_to_string_map(&tags)),
+            )?,
+            file.format.ext()
+        );
         let track_path = release_path.join(track_path);
 
         file.duplicate_to(&settings.library, &track_path)
@@ -116,7 +116,9 @@ impl crate::tasks::TaskTrait for Data {
                 .wrap_err(eyre!("Could not add picture tag to file: {:?}", track_path))?;
         }
 
-        let track = full_track.get_track().clone().into_active_model();
+        let mut track = full_track.get_track().clone().into_active_model();
+        track.path = ActiveValue::Set(Some(path_to_str(&track_path)?));
+        track.format = ActiveValue::Set(Some(file.format));
         entity::TrackEntity::insert(track)
             .on_conflict(TRACK_CONFLICT.to_owned())
             .exec(&tx)
@@ -152,11 +154,14 @@ impl crate::tasks::TaskTrait for Data {
             .exec(&tx)
             .await
             .ignore_none()?;
-        let artists: Vec<_> = full_track
-            .get_related_artists()?
-            .into_iter()
-            .map(|a| a.clone().into_active_model())
-            .collect();
+        let artists = dedup(
+            full_track
+                .get_related_artists()?
+                .into_iter()
+                .map(|a| a.clone())
+                .collect(),
+        );
+        let artists: Vec<_> = artists.into_iter().map(|a| a.into_active_model()).collect();
         entity::ArtistEntity::insert_many(artists)
             .on_conflict(ARTIST_CONFLICT.to_owned())
             .exec(&tx)
