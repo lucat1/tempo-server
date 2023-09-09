@@ -7,7 +7,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct Instruments(Vec<String>);
 
-#[derive(Serialize, Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, DeriveEntityModel)]
 #[sea_orm(table_name = "medium")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
@@ -70,5 +70,27 @@ impl TryFrom<String> for Column {
             "format" => Ok(Column::Format),
             &_ => Err("Invalid column name".to_owned()),
         }
+    }
+}
+
+impl PartialEq for Model {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
+}
+impl Eq for Model {}
+
+impl PartialOrd for Model {
+    fn lt(&self, other: &Self) -> bool {
+        self.id.lt(&other.id)
+    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
     }
 }

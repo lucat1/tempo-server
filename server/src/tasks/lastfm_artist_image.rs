@@ -3,15 +3,19 @@ use image::io::Reader as ImageReader;
 use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::{io::Cursor, path::PathBuf};
 use strfmt::strfmt;
 use tag::PictureType;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::fetch::lastfm::send_request;
+use crate::tasks::TaskName;
 use base::setting::get_settings;
 use base::util::{mkdirp, path_to_str};
 use base::ImageFormat;
@@ -27,9 +31,9 @@ lazy_static! {
 static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Task(Uuid, String);
+pub struct Data(Uuid, String);
 
-pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
@@ -38,7 +42,7 @@ where
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Task(a.artist_id, a.url))
+        .map(|a| Data(a.artist_id, a.url))
         .collect())
 }
 
@@ -173,12 +177,13 @@ where
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
-        let Task(artist_id, url) = self;
+        let tx = db.begin().await?;
+        let Data(artist_id, url) = self;
         tracing::trace!(%artist_id, %url, "Fetching artist images from lastfm");
         let mut url = (url.clone() + "/").parse::<url::Url>()?.join("+images")?;
         let text = get_html(url.to_owned()).await?;
@@ -186,14 +191,14 @@ impl super::TaskTrait for Task {
         // TODO: paginate over lastfm, setting limit
         let urls = get_urls(&mut url, text.as_str(), *artist_id)?;
         for url_data in urls.into_iter() {
-            let new_image = download(db, *artist_id, url_data).await?;
+            let new_image = download(&tx, *artist_id, url_data).await?;
             if let Some(image) = new_image {
                 let id = image.id.to_owned();
                 tracing::trace! {path = ?image.path, artist_id = %artist_id, "Downloaded image for artist"};
                 entity::ImageEntity::insert(image.into_active_model())
                     .on_conflict(entity::conflict::IMAGE_CONFLICT_1.to_owned())
                     .on_conflict(entity::conflict::IMAGE_CONFLICT_2.to_owned())
-                    .exec(db)
+                    .exec(&tx)
                     .await
                     .ignore_none()?;
 
@@ -203,11 +208,12 @@ impl super::TaskTrait for Task {
                 };
                 entity::ImageArtistEntity::insert(artist_image.into_active_model())
                     .on_conflict(entity::conflict::IMAGE_ARTIST_CONFLICT.to_owned())
-                    .exec(db)
+                    .exec(&tx)
                     .await
                     .ignore_none()?;
             }
         }
+        tx.commit().await?;
         Ok(())
     }
 }

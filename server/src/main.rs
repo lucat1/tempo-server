@@ -1,6 +1,7 @@
 mod api;
 pub mod fetch;
-mod scheduling;
+pub mod import;
+// mod scheduling;
 pub mod search;
 pub mod tasks;
 
@@ -25,9 +26,10 @@ use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 use base::setting::{load, Settings, SETTINGS};
 use base::{
     database::{get_database, open_database, DATABASE},
-    setting::{generate_default, get_settings},
+    setting::generate_default,
     CLI_NAME,
 };
+use tasks::{open_taskie_client, TASKIE_CLIENT};
 
 #[derive(Parser)]
 #[command(name = CLI_NAME,author, version, about, long_about = None)]
@@ -37,7 +39,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    #[arg(short, long, name = "ADDRESS", default_value_t = String::from("127.0.0.1:3000"))]
+    #[arg(short, long, name = "ADDRESS", default_value_t = String::from("127.0.0.1:4000"))]
     listen_address: String,
 
     #[clap(subcommand)]
@@ -96,14 +98,13 @@ impl FromStr for HashPasswordAlgorithm {
 async fn main() -> Result<()> {
     // logging
     color_eyre::install()?;
-
-    let subscriber = tracing_subscriber::registry().with(fmt::layer()).with(
-        EnvFilter::builder()
-            .with_default_directive(LevelFilter::TRACE.into())
-            .with_env_var(base::TEMPO_LOGLEVEL)
-            .from_env_lossy(),
-    );
-    tracing::subscriber::set_global_default(subscriber)?;
+    let tracing_builder = tracing_subscriber::registry().with(fmt::layer());
+    if std::env::var(base::TEMPO_LOGLEVEL).is_ok() {
+        tracing_builder.with(EnvFilter::from_env(base::TEMPO_LOGLEVEL))
+    } else {
+        tracing_builder.with(EnvFilter::default().add_directive(LevelFilter::INFO.into()))
+    }
+    .init();
 
     let cli = Cli::parse();
     match cli.command.unwrap_or(Command::Serve) {
@@ -136,6 +137,9 @@ async fn main() -> Result<()> {
         Command::Serve => {
             // settings
             SETTINGS.get_or_try_init(async { load(cli.config) }).await?;
+            TASKIE_CLIENT
+                .get_or_try_init(async { open_taskie_client().await })
+                .await?;
 
             // database
             DATABASE
@@ -153,11 +157,11 @@ async fn main() -> Result<()> {
 
             // background tasks
             crate::tasks::queue_loop()?;
-            let mut scheduler = scheduling::new().await?;
-            for (task, schedule) in get_settings()?.tasks.recurring.iter() {
-                scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
-            }
-            scheduling::start(&mut scheduler).await?;
+            // let mut scheduler = scheduling::new().await?;
+            // for (task, schedule) in get_settings()?.tasks.recurring.iter() {
+            //     scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+            // }
+            // scheduling::start(&mut scheduler).await?;
 
             let addr: SocketAddr = cli
                 .listen_address

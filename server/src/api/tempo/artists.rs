@@ -12,9 +12,9 @@ use uuid::Uuid;
 use super::{images, releases, tracks};
 use crate::api::{
     documents::{
-        dedup, ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude,
-        ArtistRelation, ArtistResource, Included, IntoColumn, Meta, RecordingAttributes,
-        ReleaseInclude, ResourceType,
+        ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude, ArtistRelation,
+        ArtistResource, Included, IntoColumn, Meta, RecordingAttributes, ReleaseInclude,
+        ResourceType,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -23,15 +23,16 @@ use crate::api::{
     },
     AppState,
 };
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct ArtistRelated {
-    relations: Vec<entity::ArtistUrl>,
-    images: Vec<entity::ImageArtist>,
-    recordings: Vec<entity::ArtistTrackRelation>,
-    artist_credits: Vec<entity::ArtistCredit>,
-    releases: Vec<Vec<entity::ArtistCreditRelease>>,
-    tracks: Vec<Vec<entity::ArtistCreditTrack>>,
+    pub urls: Vec<entity::ArtistUrl>,
+    pub images: Vec<entity::ImageArtist>,
+    pub recordings: Vec<entity::ArtistTrackRelation>,
+    pub artist_credits: Vec<entity::ArtistCredit>,
+    pub releases: Vec<Vec<entity::ArtistCreditRelease>>,
+    pub tracks: Vec<Vec<entity::ArtistCreditTrack>>,
 }
 
 pub async fn related<C>(
@@ -68,7 +69,7 @@ where
         };
 
         related.push(ArtistRelated {
-            relations: artist_relations[i].to_owned(),
+            urls: artist_relations[i].to_owned(),
             artist_credits: if !light {
                 artist_credits.to_owned()
             } else {
@@ -161,7 +162,7 @@ where
 
 pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> ArtistResource {
     let ArtistRelated {
-        relations,
+        urls: relations,
         images,
         recordings,
         artist_credits,
@@ -335,7 +336,7 @@ pub async fn artists(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -384,7 +385,7 @@ pub async fn artist(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),

@@ -176,7 +176,7 @@ impl ProviderImpl for entity::ConnectionProvider {
 }
 
 pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, Error> {
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Multi(
             PROVIDERS
                 .iter()
@@ -207,7 +207,7 @@ pub async fn connection(
             detail: None,
         })?;
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(ConnectionResource {
             id: id.to_owned(),
             r#type: ResourceType::Connection,
@@ -220,7 +220,6 @@ pub async fn connection(
     }))
 }
 
-#[axum_macros::debug_handler]
 pub async fn callback(
     State(AppState(db)): State<AppState>,
     path_provider: Path<entity::ConnectionProvider>,

@@ -5,14 +5,17 @@ use sea_orm::{
     ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
+use serde_json::json;
 use std::collections::HashMap;
+use taskie_client::InsertTask;
+use time::Duration;
 use uuid::Uuid;
 
 use super::{tracks, users};
 use crate::api::{
     auth::Claims,
     documents::{
-        dedup, Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
+        Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
         ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
     extract::{Json, Path},
@@ -22,7 +25,8 @@ use crate::api::{
     },
     AppState,
 };
-use crate::tasks;
+use crate::tasks::{self, TaskName};
+use base::util::dedup;
 
 pub fn entity_to_resource(entity: &entity::Scrobble) -> ScrobbleResource {
     let mut relationships = HashMap::new();
@@ -167,30 +171,34 @@ where
     Ok((data, included))
 }
 
-pub fn schedule_scrobble_tasks<I>(username: &str, tracks: I)
+pub async fn schedule_scrobble_tasks<I>(username: &str, tracks: I) -> Result<()>
 where
     I: Iterator<Item = (Uuid, time::OffsetDateTime)>,
 {
     for (track_id, time) in tracks.into_iter() {
         // TODO: use user's setting to determine the subset of connections he wants
         // to scrobble to.
-        let data = tasks::scrobble::Task {
+        let data = tasks::scrobble::Data {
             provider: entity::ConnectionProvider::LastFM,
             username: username.to_owned(),
             time,
             track_id,
         };
-        tasks::push_queue(tasks::Task {
-            id: None,
-            data: tasks::TaskData::Scrobble(data),
-        });
+        tasks::push(&[InsertTask {
+            name: TaskName::Scrobble,
+            payload: Some(json!(data)),
+            depends_on: Vec::new(),
+            duration: Duration::seconds(60),
+        }])
+        .await?;
     }
+    Ok(())
 }
 
 pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    json_scrobbles: Json<InsertDocument<InsertScrobbleResource>>,
+    Json(scrobbles): Json<InsertDocument<InsertScrobbleResource>>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -198,7 +206,7 @@ pub async fn insert_scrobbles(
         detail: Some(e.into()),
     })?;
     let after = entity::ScrobbleEntity::find().count(&tx).await.unwrap();
-    let scrobbles = match json_scrobbles.inner().data {
+    let scrobbles = match scrobbles.data {
         DocumentData::Multi(v) => v,
         DocumentData::Single(r) => vec![r],
     };
@@ -258,7 +266,13 @@ pub async fn insert_scrobbles(
                 ) => Some((*id, *time)),
                 _ => None,
             }),
-    );
+    )
+    .await
+    .map_err(|e| Error {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        title: "Could not start scrobble tasks".to_string(),
+        detail: Some(e.into()),
+    })?;
 
     let page = Page {
         size: u32::MAX,
@@ -266,7 +280,7 @@ pub async fn insert_scrobbles(
         after: Some(after as i64),
     };
     let (data, included) = fetch_scrobbles(&tx, claims.username, &page, &[]).await?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -285,7 +299,7 @@ pub async fn scrobbles(
         detail: Some(e.into()),
     })?;
     let (data, included) = fetch_scrobbles(&tx, claims.username, &opts.page, &opts.include).await?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -324,7 +338,7 @@ pub async fn scrobble(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Single(resource),
         included: dedup(included),

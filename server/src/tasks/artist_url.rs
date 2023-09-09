@@ -2,18 +2,20 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use url::Url;
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz::{send_request, MB_BASE_STRURL};
+use crate::tasks::TaskName;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Task(Uuid);
+pub struct Data(Uuid);
 
-pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
@@ -21,7 +23,7 @@ where
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Task(a.id))
+        .map(|a| Data(a.id))
         .collect())
 }
 
@@ -117,12 +119,13 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
-        let Task(data) = self;
+        let tx = db.begin().await?;
+        let Data(data) = self;
         tracing::trace!(%data, "Fetching artist urls");
         let req = Request::new(
             Method::GET,
@@ -167,9 +170,10 @@ impl super::TaskTrait for Task {
         if !urls.is_empty() {
             entity::ArtistUrlEntity::insert_many(urls)
                 .on_conflict(entity::conflict::ARTIST_RELATION_CONFLICT.to_owned())
-                .exec(db)
+                .exec(&tx)
                 .await
                 .ignore_none()?;
+            tx.commit().await?;
         }
         Ok(())
     }

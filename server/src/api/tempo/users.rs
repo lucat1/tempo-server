@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use crate::api::{
     auth::Claims,
     documents::{
-        dedup, Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter,
-        UserInclude, UserRelation, UserResource,
+        Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter, UserInclude,
+        UserRelation, UserResource,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -23,6 +23,7 @@ use crate::api::{
     AppState,
 };
 use base::setting::get_settings;
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct UserRelated {
@@ -211,7 +212,7 @@ pub async fn user(
         detail: Some(e.into()),
     })?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Single(data),
         included: dedup(included),
@@ -239,7 +240,7 @@ pub async fn relation(
             title: "No relationship data".to_string(),
             detail: None,
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: match related {
             Relation::Multi(r) => DocumentData::Multi(r),
@@ -258,13 +259,13 @@ pub async fn post_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     user_rel_path: Path<(String, UserRelation)>,
-    body: Json<
+    Json(relation): Json<
         InsertExactlyOneRelation<
             ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
         >,
     >,
 ) -> Result<(StatusCode, TypedHeader<Location>), Error> {
-    let (username, relation) = user_rel_path.inner();
+    let (username, relation_kind) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,
@@ -272,15 +273,13 @@ pub async fn post_relation(
             detail: None,
         });
     }
-    if relation != UserRelation::Connections {
+    if relation_kind != UserRelation::Connections {
         return Err(Error {
             status: StatusCode::BAD_REQUEST,
             title: "Users can only edit connection relationships".to_string(),
             detail: None,
         });
     }
-
-    let relation = body.inner();
 
     let connection =
         entity::UserConnectionEntity::find_by_id((claims.username, relation.data[0].id))
@@ -330,11 +329,11 @@ pub async fn delete_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     user_rel_path: Path<(String, UserRelation)>,
-    body: Json<
+    Json(relation): Json<
         InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
     >,
 ) -> Result<StatusCode, Error> {
-    let (username, relation) = user_rel_path.inner();
+    let (username, relation_kind) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,
@@ -343,7 +342,7 @@ pub async fn delete_relation(
         });
     }
     // TODO: support deleting scrobbles and others
-    if relation != UserRelation::Connections {
+    if relation_kind != UserRelation::Connections {
         return Err(Error {
             status: StatusCode::BAD_REQUEST,
             title: "Users can only edit connection relationships".to_string(),
@@ -351,7 +350,6 @@ pub async fn delete_relation(
         });
     }
 
-    let relation = body.inner();
     entity::UserConnectionEntity::delete_by_id((claims.username, relation.data[0].id))
         .exec(&db)
         .await

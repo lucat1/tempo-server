@@ -1,4 +1,4 @@
-use entity::{JobEntity, TaskDepTaskEntity, TaskEntity};
+use entity::ImportEntity;
 use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
@@ -11,13 +11,7 @@ impl MigrationTrait for Migration {
         let builder = manager.get_database_backend();
         let schema = Schema::new(builder);
         manager
-            .exec_stmt(schema.create_table_from_entity(JobEntity))
-            .await?;
-        manager
-            .exec_stmt(schema.create_table_from_entity(TaskEntity))
-            .await?;
-        manager
-            .exec_stmt(schema.create_table_from_entity(TaskDepTaskEntity))
+            .exec_stmt(schema.create_table_from_entity(ImportEntity))
             .await?;
         Ok(())
     }

@@ -13,8 +13,7 @@ use uuid::Uuid;
 use super::{artists, releases, tracks};
 use crate::api::{
     documents::{
-        dedup, ArtistResource, Included, Meta, ReleaseResource, SearchResultAttributes,
-        TrackResource,
+        ArtistResource, Included, Meta, ReleaseResource, SearchResultAttributes, TrackResource,
     },
     extract::Json,
     jsonapi::{Document, DocumentData, Error},
@@ -24,6 +23,7 @@ use crate::search::{
     documents::{artist_fields, release_fields, track_fields},
     get_indexes,
 };
+use base::util::dedup;
 
 #[derive(Serialize)]
 #[serde(untagged)]
@@ -233,7 +233,7 @@ pub async fn search(
     results.append(&mut releases);
     results.append(&mut tracks);
 
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Multi(results),
         included: dedup(Vec::new()),

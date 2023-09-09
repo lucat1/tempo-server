@@ -1,8 +1,8 @@
 use sea_orm::entity::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Serialize, Deserialize, Clone, Debug, DeriveEntityModel)]
 #[sea_orm(table_name = "artists_credit_release")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -40,3 +40,31 @@ impl Related<super::release::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl PartialEq for Model {
+    fn eq(&self, other: &Self) -> bool {
+        self.artist_credit_id.eq(&other.artist_credit_id) && self.release_id.eq(&other.release_id)
+    }
+}
+impl Eq for Model {}
+
+impl PartialOrd for Model {
+    fn lt(&self, other: &Self) -> bool {
+        self.artist_credit_id.lt(&other.artist_credit_id) && self.release_id.lt(&other.release_id)
+    }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.artist_credit_id
+            .partial_cmp(&other.artist_credit_id)
+            .and(self.release_id.partial_cmp(&other.release_id))
+    }
+}
+
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.eq(other) {
+            std::cmp::Ordering::Equal
+        } else {
+            self.artist_credit_id.cmp(&other.artist_credit_id)
+        }
+    }
+}

@@ -43,6 +43,11 @@ pub struct InsertDocument<R> {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct InsertOneDocument<R> {
+    pub data: R,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct InsertOneRelation<R> {
     pub data: R,
 }
@@ -50,6 +55,16 @@ pub struct InsertOneRelation<R> {
 #[derive(Serialize, Deserialize)]
 pub struct InsertManyRelation<R> {
     pub data: Vec<R>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateDocument<R> {
+    pub data: DocumentData<R>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateOneDocument<R> {
+    pub data: R,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -74,6 +89,18 @@ pub struct Resource<RT, I, T, R: Eq + Hash, M> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InsertResource<RT, T, R: Eq + Hash, M> {
     pub r#type: RT,
+    pub attributes: T,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(default = "HashMap::new")]
+    pub relationships: HashMap<R, Relationship<RT, M>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<M>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateResource<RT, I, T, R: Eq + Hash, M> {
+    pub r#type: RT,
+    pub id: I,
     pub attributes: T,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(default = "HashMap::new")]

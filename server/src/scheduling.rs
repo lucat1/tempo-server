@@ -1,11 +1,14 @@
 use eyre::Result;
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseTransaction, EntityTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, DatabaseTransaction, EntityTrait, IntoActiveModel,
+    TransactionTrait,
+};
 use time::OffsetDateTime;
 use tokio_cron_scheduler::{Job, JobScheduler};
 
 use crate::{
     tasks,
-    tasks::{push_queue, Task, TaskData},
+    tasks::{Task, TaskData},
 };
 use base::{database::get_database, setting::JobType};
 
@@ -65,6 +68,55 @@ impl From<JobType> for TaskDescription {
     }
 }
 
+pub async fn schedule_tasks(
+    db: DatabaseTransaction,
+    job: i64,
+    tasks: Vec<TaskData>,
+    depend_on: &[i64],
+) -> Result<Vec<i64>> {
+    let len = tasks.len();
+    let db_tasks = tasks
+        .iter()
+        .map(|task| -> Result<entity::TaskActive> {
+            Ok(entity::TaskActive {
+                data: ActiveValue::Set(serde_json::to_value(task)?),
+
+                scheduled_at: ActiveValue::Set(OffsetDateTime::now_utc()),
+                job: ActiveValue::Set(job),
+                ..Default::default()
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let res = entity::TaskEntity::insert_many(db_tasks).exec(&db).await?;
+    if !depend_on.is_empty() {
+        let mut dependencies = Vec::new();
+        for i in 0..tasks.len() {
+            let id = res.last_insert_id - (len - i - 1) as i64;
+            for parent_task in depend_on.iter() {
+                dependencies.push(entity::TaskDepTaskActive {
+                    parent_task: ActiveValue::Set(*parent_task),
+                    child_task: ActiveValue::Set(id),
+                });
+            }
+        }
+        entity::TaskDepTaskEntity::insert_many(dependencies)
+            .exec(&db)
+            .await?;
+    }
+    db.commit().await?;
+
+    let mut ids = Vec::with_capacity(tasks.len());
+    for (i, task) in tasks.into_iter().rev().enumerate() {
+        let id = res.last_insert_id - (len - i - 1) as i64;
+        push_queue(Task {
+            id: Some(id),
+            data: task,
+        });
+        ids.push(id);
+    }
+    Ok(ids)
+}
+
 pub async fn trigger_job(db: DatabaseTransaction, task: &JobType) -> Result<entity::Job> {
     let TaskDescription { title, description } = (*task).into();
 
@@ -103,31 +155,8 @@ pub async fn trigger_job(db: DatabaseTransaction, task: &JobType) -> Result<enti
             }
         }
     };
-    let db_tasks = tasks
-        .iter()
-        .map(|task| -> Result<entity::TaskActive> {
-            Ok(entity::TaskActive {
-                data: ActiveValue::Set(serde_json::to_value(task)?),
 
-                scheduled_at: ActiveValue::Set(OffsetDateTime::now_utc()),
-                job: ActiveValue::Set(job.id),
-                ..Default::default()
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let res = entity::TaskEntity::insert_many(db_tasks).exec(&db).await?;
-    db.commit().await?;
-    tracing::info!(last_id = res.last_insert_id, "Inserted all tasks");
-
-    let len = tasks.len();
-    for (i, task) in tasks.into_iter().rev().enumerate() {
-        let id = res.last_insert_id - (len - i - 1) as i64;
-        push_queue(Task {
-            id: Some(id),
-            data: task,
-        });
-    }
-
+    schedule_tasks(db, job.id, tasks, &[]).await?;
     Ok(job)
 }
 

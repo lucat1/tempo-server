@@ -1,14 +1,23 @@
 use eyre::{eyre, Result};
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait};
+use reqwest::{
+    header::{HeaderValue, CONTENT_TYPE},
+    Method, Request,
+};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, ModelTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::fetch::lastfm;
+use crate::tasks::TaskName;
 use base::setting::get_settings;
-use entity::{full::ArtistInfo, user_connection::Named};
+use entity::{
+    full::{ArtistInfo, GetArtist, GetArtistCredits},
+    user_connection::Named,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Task {
+pub struct Data {
     pub provider: entity::ConnectionProvider,
     pub username: String,
     pub time: time::OffsetDateTime,
@@ -29,15 +38,34 @@ struct LastFMScrobbleResponseError {
     message: String,
 }
 
+struct TrackWithArtists(
+    entity::Track,
+    Vec<entity::ArtistCredit>,
+    Vec<entity::Artist>,
+);
+
+impl GetArtistCredits for TrackWithArtists {
+    fn get_artist_credits(&self) -> Vec<&entity::ArtistCredit> {
+        self.1.iter().collect()
+    }
+}
+
+impl GetArtist for TrackWithArtists {
+    fn get_artist(&self, id: Uuid) -> Option<&entity::Artist> {
+        self.2.iter().find(|a| a.id == id)
+    }
+}
+
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let settings = get_settings()?;
         let track = entity::TrackEntity::find_by_id(self.track_id)
-            .one(db)
+            .one(&tx)
             .await?
             .ok_or(eyre!(
                 "Track to be scrobbled doesn't exist: {}",
@@ -45,21 +73,15 @@ impl super::TaskTrait for Task {
             ))?;
         let artist_credits = track
             .find_related(entity::ArtistCreditEntity)
-            .all(db)
+            .all(&tx)
             .await?;
         let artists: Vec<_> = artist_credits
-            .load_one(entity::ArtistEntity, db)
+            .load_one(entity::ArtistEntity, &tx)
             .await?
             .into_iter()
             .flatten()
             .collect();
-        let full_track = entity::full::FullTrack {
-            track,
-            artist_credit: artist_credits,
-            artist: artists,
-            artist_credit_track: Vec::new(),
-            artist_track_relation: Vec::new(),
-        };
+        let track_with_artists = TrackWithArtists(track, artist_credits, artists);
         match self.provider {
             entity::ConnectionProvider::LastFM => {
                 let lastfm = settings
@@ -71,7 +93,7 @@ impl super::TaskTrait for Task {
                     self.username.to_owned(),
                     self.provider,
                 ))
-                .one(db)
+                .one(&tx)
                 .await?
                 .ok_or(eyre!(
                     "Scrobbling user is not connected to the required service"
@@ -81,8 +103,11 @@ impl super::TaskTrait for Task {
                     serde_json::from_value(connection.data.to_owned())?;
                 let url = lastfm::LASTFM_BASE_URL.clone();
                 let mut body: Vec<(String, String)> = vec![
-                    ("artist".to_string(), full_track.get_joined_artists()?),
-                    ("track".to_string(), full_track.track.title.to_owned()),
+                    (
+                        "artist".to_string(),
+                        track_with_artists.get_joined_artists()?,
+                    ),
+                    ("track".to_string(), track_with_artists.0.title.to_owned()),
                     (
                         "timestamp".to_string(),
                         self.time.unix_timestamp().to_string(),
@@ -100,7 +125,14 @@ impl super::TaskTrait for Task {
                 body.push(("api_sig".to_string(), signature));
                 tracing::trace! {?body,"Scrobbling to last.fm"};
 
-                let req = common::fetch::CLIENT.post(url).form(&body).build()?;
+                // taken from https://docs.rs/reqwest/latest/src/reqwest/async_impl/request.rs.html#406-424
+                let body = serde_urlencoded::to_string(body)?;
+                let mut req = Request::new(Method::POST, url);
+                req.headers_mut().insert(
+                    CONTENT_TYPE,
+                    HeaderValue::from_static("application/x-www-form-urlencoded"),
+                );
+                *req.body_mut() = Some(body.into());
                 let res = lastfm::send_request(req).await?;
                 let raw_self: LastFMScrobbleResponse = res.json().await.map_err(|e| eyre!(e))?;
                 tracing::trace! {?raw_self, "Last.fm scrobble response"}

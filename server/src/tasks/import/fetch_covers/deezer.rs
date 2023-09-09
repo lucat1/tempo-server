@@ -1,12 +1,12 @@
 use eyre::{bail, Result};
+use reqwest::{Method, Request};
 use serde_derive::{Deserialize, Serialize};
-use std::time::Instant;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use super::{Cover, CLIENT};
+use crate::fetch::deezer::{self, DEEZER_BASE_STRURL};
 use base::setting::ArtProvider;
-use entity::full::{ArtistInfo, FullRelease};
+use entity::full::ArtistInfo;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Deezer {
@@ -53,19 +53,21 @@ fn get_image_of_type(album: &Album, size: &Size) -> (String, usize) {
     }
 }
 
-pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
-    let FullRelease { release, .. } = full_release;
-    let start = Instant::now();
-    let res = CLIENT
-        .get(format!(
-            "https://api.deezer.com/search?order=RANKING&q=artist:\"{}\" album:\"{}\"",
+pub async fn search(
+    full_release: &entity::full::FullRelease,
+) -> Result<Vec<entity::import::Cover>> {
+    let release = full_release.get_release();
+    let res = deezer::send_request(Request::new(
+        Method::GET,
+        format!(
+            "{}/search?order=RANKING&q=artist:\"{}\" album:\"{}\"",
+            DEEZER_BASE_STRURL,
             full_release.get_joined_artists()?,
             release.title.clone().as_str()
-        ))
-        .send()
-        .await?;
-    let req_time = start.elapsed();
-    tracing::trace! {?req_time, "Time taken by the Deezer HTTP request"};
+        )
+        .parse()?,
+    ))
+    .await?;
     if !res.status().is_success() {
         bail!(
             "Itunes request returned non-success error code: {} {}",
@@ -80,7 +82,7 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
         .flat_map(|release| {
             Size::iter().map(|size_type| {
                 let (url, size) = get_image_of_type(&release.album, &size_type);
-                Cover {
+                entity::import::Cover {
                     provider: ArtProvider::Deezer,
                     url,
                     width: size,

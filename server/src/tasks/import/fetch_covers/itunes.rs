@@ -1,10 +1,10 @@
 use eyre::{bail, Result};
+use reqwest::{Method, Request};
 use serde_derive::{Deserialize, Serialize};
-use std::time::Instant;
 
-use super::{cover::probe, Cover, CLIENT};
+use crate::fetch::itunes::{self, ITUNES_BASE_STRURL};
 use base::setting::ArtProvider;
-use entity::full::{ArtistInfo, FullRelease};
+use entity::full::ArtistInfo;
 
 static DEFAULT_COUNTRY: &str = "US";
 static ITUNES_COUNTRIES: &[&str] = &[
@@ -19,6 +19,14 @@ static ITUNES_COUNTRIES: &[&str] = &[
     "SN", "SR", "ST", "SV", "SZ", "TC", "TD", "TH", "TJ", "TM", "TN", "TR", "TT", "TW", "TZ", "UA",
     "UG", "US", "UY", "UZ", "VC", "VE", "VG", "VN", "YE", "ZA", "ZW",
 ];
+
+// pub async fn probe(url: url::Url) -> bool {
+//     itunes::send_request(Request::new(Method::HEAD, url))
+//         .await
+//         .ok()
+//         .map(|r| r.status().is_success())
+//         .unwrap_or(false)
+// }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Itunes {
@@ -35,9 +43,10 @@ pub struct ItunesResult {
     pub artwork_url_100: String,
 }
 
-pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
-    let FullRelease { release, .. } = full_release;
-    let start = Instant::now();
+pub async fn search(
+    full_release: &entity::full::FullRelease,
+) -> Result<Vec<entity::import::Cover>> {
+    let release = full_release.get_release();
     let raw_country = release
         .country
         .clone()
@@ -48,34 +57,36 @@ pub async fn fetch(full_release: &FullRelease) -> Result<Vec<Cover>> {
         DEFAULT_COUNTRY
     };
 
-    let res = CLIENT
-        .get(format!(
-            "http://itunes.apple.com/search?media=music&entity=album&country={}&term={}",
+    let req = itunes::send_request(Request::new(
+        Method::GET,
+        format!(
+            "{}search?media=music&entity=album&country={}&term={}",
+            ITUNES_BASE_STRURL,
             country,
-            full_release.get_joined_artists()? + " " + release.title.clone().as_str()
-        ))
-        .send()
-        .await?;
-    let req_time = start.elapsed();
-    tracing::trace! {?req_time,"Completed the Itunes HTTP request"};
-    if !res.status().is_success() {
+            full_release.get_joined_artists()? + " " + release.title.as_str()
+        )
+        .parse()?,
+    ))
+    .await?;
+    if !req.status().is_success() {
         bail!(
             "Itunes request returned non-success error code: {} {}",
-            res.status(),
-            res.text().await?
+            req.status(),
+            req.text().await?
         );
     }
-    let json = res.json::<Itunes>().await?;
+    let json = req.json::<Itunes>().await?;
     let mut res = vec![];
     for result in json.results.iter() {
         for size in [5000, 1200, 600].iter() {
             let url = result
                 .artwork_url_100
                 .replace("100x100", format!("{size}x{size}").as_str());
-            if !probe(url.as_str(), None).await {
-                continue;
-            }
-            res.push(Cover {
+            // if !probe(url.parse()?).await {
+            //     tracing::info!(%url, %size, artist = %result.artist_name, release = %result.collection_name, "Skipping iTunes track, HEAD request failed");
+            //     continue;
+            // }
+            res.push(entity::import::Cover {
                 provider: ArtProvider::Itunes,
                 url,
                 width: *size,

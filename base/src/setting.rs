@@ -26,6 +26,8 @@ static DEFAULT_DB_FILE: &str = "lib.db";
 pub struct Settings {
     #[serde(default)]
     pub db: String,
+    #[serde(default = "default_taskie_url")]
+    pub taskie: url::Url,
     #[serde(default = "default_url")]
     pub url: url::Url,
     #[serde(default)]
@@ -49,6 +51,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             db: String::new(),
+            taskie: default_taskie_url(),
             url: default_url(),
             library: Library::default(),
             downloads: PathBuf::default(),
@@ -60,8 +63,12 @@ impl Default for Settings {
     }
 }
 
-fn default_url() -> url::Url {
+fn default_taskie_url() -> url::Url {
     url::Url::parse("http://localhost:3000").unwrap()
+}
+
+fn default_url() -> url::Url {
+    url::Url::parse("http://localhost:4000").unwrap()
 }
 
 fn default_library_name() -> String {
@@ -207,11 +214,11 @@ pub struct Art {
     pub image_name: String,
 
     #[serde(default = "default_provider_relevance")]
-    pub provider_relevance: f64,
+    pub provider_relevance: f32,
     #[serde(default = "default_match_relevance")]
-    pub match_relevance: f64,
+    pub match_relevance: f32,
     #[serde(default = "default_size_relevance")]
-    pub size_relevance: f64,
+    pub size_relevance: f32,
 
     #[serde(default = "default_true")]
     pub cover_art_archive_use_release_group: bool,
@@ -237,15 +244,15 @@ fn default_art_image_name() -> String {
     "cover".to_string()
 }
 
-fn default_provider_relevance() -> f64 {
+fn default_provider_relevance() -> f32 {
     2.0 / 8.0
 }
 
-fn default_match_relevance() -> f64 {
+fn default_match_relevance() -> f32 {
     2.0 / 8.0
 }
 
-fn default_size_relevance() -> f64 {
+fn default_size_relevance() -> f32 {
     4.0 / 8.0
 }
 

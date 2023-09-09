@@ -11,9 +11,8 @@ use uuid::Uuid;
 use super::{artists, images, mediums};
 use crate::api::{
     documents::{
-        dedup, ArtistCreditAttributes, Included, IntoColumn, MediumInclude, Meta,
-        ReleaseAttributes, ReleaseFilter, ReleaseInclude, ReleaseRelation, ReleaseResource,
-        ResourceType,
+        ArtistCreditAttributes, Included, IntoColumn, MediumInclude, Meta, ReleaseAttributes,
+        ReleaseFilter, ReleaseInclude, ReleaseRelation, ReleaseResource, ResourceType,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -22,12 +21,13 @@ use crate::api::{
     },
     AppState,
 };
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct ReleaseRelated {
-    image: Option<entity::ImageRelease>,
-    artist_credits: Vec<entity::ArtistCredit>,
-    mediums: Vec<entity::Medium>,
+    pub image: Option<entity::ImageRelease>,
+    pub artist_credits: Vec<entity::ArtistCredit>,
+    pub mediums: Vec<entity::Medium>,
 }
 
 pub async fn related<C>(
@@ -258,7 +258,7 @@ pub async fn releases(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -307,7 +307,7 @@ pub async fn release(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),

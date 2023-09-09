@@ -59,36 +59,44 @@ pub enum Included {
     Release(ReleaseResource),
 }
 
-#[derive(PartialEq)]
-enum Identifier {
-    Image(String),
-    User(String),
-    Scrobble(i64),
-    Artist(Uuid),
-    Track(Uuid),
-    Medium(Uuid),
-    Release(Uuid),
+impl PartialEq for Included {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Included::Image(a), Included::Image(b)) => a.id == b.id,
+            (Included::Artist(a), Included::Artist(b)) => a.id == b.id,
+            (Included::Track(a), Included::Track(b)) => a.id == b.id,
+            (Included::Medium(a), Included::Medium(b)) => a.id == b.id,
+            (Included::Release(a), Included::Release(b)) => a.id == b.id,
+            (_, _) => false,
+        }
+    }
+}
+impl Eq for Included {}
+
+impl std::cmp::PartialOrd for Included {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Included::Image(a), Included::Image(b)) => a.id.partial_cmp(&b.id),
+            (Included::Artist(a), Included::Artist(b)) => a.id.partial_cmp(&b.id),
+            (Included::Track(a), Included::Track(b)) => a.id.partial_cmp(&b.id),
+            (Included::Medium(a), Included::Medium(b)) => a.id.partial_cmp(&b.id),
+            (Included::Release(a), Included::Release(b)) => a.id.partial_cmp(&b.id),
+            (_, _) => None,
+        }
+    }
 }
 
-pub fn dedup(mut included: Vec<Included>) -> Vec<Included> {
-    included.sort_unstable_by(|_a, _b| match (_a, _b) {
-        (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
-        (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
-        (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
-        (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
-        (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
-        (_, _) => std::cmp::Ordering::Less,
-    });
-    included.dedup_by_key(|e| match e {
-        Included::Image(e) => Identifier::Image(e.id.to_owned()),
-        Included::User(e) => Identifier::User(e.id.to_owned()),
-        Included::Scrobble(e) => Identifier::Scrobble(e.id.to_owned()),
-        Included::Artist(e) => Identifier::Artist(e.id),
-        Included::Track(e) => Identifier::Track(e.id),
-        Included::Medium(e) => Identifier::Medium(e.id),
-        Included::Release(e) => Identifier::Release(e.id),
-    });
-    included
+impl std::cmp::Ord for Included {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
+            (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
+            (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
+            (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
+            (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
+            (_, _) => std::cmp::Ordering::Less,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -123,6 +131,7 @@ pub struct ServerAttributes {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
 pub enum ServerRelation {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -244,6 +253,7 @@ pub struct ReleaseAttributes {
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ReleaseRelation {
     Image,
     Mediums,

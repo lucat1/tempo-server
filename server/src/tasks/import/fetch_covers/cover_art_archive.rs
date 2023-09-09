@@ -1,12 +1,12 @@
 use eyre::{bail, Result};
-use itertools::Itertools;
+use reqwest::{Method, Request};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::Instant;
 
-use super::{Cover, CLIENT};
-use base::setting::{ArtProvider, Library};
-use entity::full::FullRelease;
+use base::setting::{ArtProvider, Settings};
+use entity::full::ArtistInfo;
+
+use crate::fetch::musicbrainz;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoverArtArchive {
@@ -14,7 +14,7 @@ pub struct CoverArtArchive {
 }
 
 impl CoverArtArchive {
-    pub fn into(self, title: String, artist: String) -> Vec<super::cover::Cover> {
+    pub fn covers(self, title: String, artist: String) -> Vec<entity::import::Cover> {
         self.images
             .into_iter()
             .filter_map(|i| {
@@ -25,7 +25,7 @@ impl CoverArtArchive {
                         .filter_map(|(k, v)| k.parse::<usize>().ok().map(|d| (d, v)))
                         .collect();
                     sizes.keys().max().and_then(|size| {
-                        sizes.get(size).map(|url| super::cover::Cover {
+                        sizes.get(size).map(|url| entity::import::Cover {
                             provider: ArtProvider::CoverArtArchive,
                             url: url.to_string(),
                             width: *size,
@@ -61,29 +61,25 @@ pub struct Thumbnails {
     small: String,
 }
 
-pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<Cover>> {
-    let FullRelease {
-        release, artist, ..
-    } = full_release;
-    let start = Instant::now();
-    let res = CLIENT
-        .get(format!(
-            "http://coverartarchive.org/{}/{}",
-            if library.art.cover_art_archive_use_release_group {
-                "release-group"
-            } else {
-                "release"
-            },
-            if library.art.cover_art_archive_use_release_group {
-                release.release_group_id.unwrap_or(release.id)
-            } else {
-                release.id
-            }
-        ))
-        .send()
-        .await?;
-    let req_time = start.elapsed();
-    tracing::trace! {?req_time, "Time taken by the CoverArtArchive HTTP request"};
+pub async fn search(
+    settings: &Settings,
+    full_release: &entity::full::FullRelease,
+) -> Result<Vec<entity::import::Cover>> {
+    let release = full_release.get_release();
+    let (kind, value) = if settings.library.art.cover_art_archive_use_release_group {
+        (
+            "release-group",
+            release.release_group_id.unwrap_or(release.id),
+        )
+    } else {
+        ("release", release.id)
+    };
+    let res = musicbrainz::send_request(Request::new(
+        Method::GET,
+        format!("http://coverartarchive.org/{}/{}", kind, value).parse()?,
+    ))
+    .await?;
+
     if !res.status().is_success() {
         bail!(
             "CoverArtArchive request returned non-success error code: {} {}",
@@ -92,14 +88,5 @@ pub async fn fetch(library: &Library, full_release: &FullRelease) -> Result<Vec<
         );
     }
     let json = res.json::<CoverArtArchive>().await?;
-    let json_time = start.elapsed();
-    tracing::trace! {
-        parse_time = ?(json_time - req_time),
-        "Time taken by the CoverArtArchive JSON parse"
-    };
-    // TODO: make the "," configurable
-    Ok(json.into(
-        release.title.clone(),
-        artist.iter().map(|a| a.name.clone()).join(","),
-    ))
+    Ok(json.covers(release.title.clone(), full_release.get_joined_artists()?))
 }

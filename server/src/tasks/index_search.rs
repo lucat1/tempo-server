@@ -1,36 +1,39 @@
 use eyre::{eyre, Result};
-use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 
 use crate::search::{documents, INDEX_WRITERS};
+use crate::tasks::TaskName;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Task {
+pub enum Data {
     Artists,
     Tracks,
     Releases,
 }
 
-pub async fn all_data<C>(_: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(_: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
-    Ok(vec![Task::Artists, Task::Tracks, Task::Releases])
+    Ok(vec![Data::Artists, Data::Tracks, Data::Releases])
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
+        let tx = db.begin().await?;
         let mut writers_cell = INDEX_WRITERS.lock().await;
         let writer = writers_cell
             .get_mut()
             .ok_or(eyre!("Could not get index writers"))?;
         match self {
-            Task::Artists => {
-                let artists = entity::ArtistEntity::find().all(db).await?;
+            Data::Artists => {
+                let artists = entity::ArtistEntity::find().all(&tx).await?;
 
                 for artist in artists.into_iter() {
                     writer
@@ -39,13 +42,13 @@ impl super::TaskTrait for Task {
                 }
                 writer.artists.commit()?;
             }
-            Task::Tracks => {
-                let tracks = entity::TrackEntity::find().all(db).await?;
+            Data::Tracks => {
+                let tracks = entity::TrackEntity::find().all(&tx).await?;
                 let tracks_artist_credits = tracks
                     .load_many_to_many(
                         entity::ArtistCreditEntity,
                         entity::ArtistCreditTrackEntity,
-                        db,
+                        &tx,
                     )
                     .await?;
                 for (i, track) in tracks.into_iter().enumerate() {
@@ -54,7 +57,7 @@ impl super::TaskTrait for Task {
                         i,
                         track.id
                     ))?;
-                    let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
+                    let artists = artist_credits.load_one(entity::ArtistEntity, &tx).await?;
                     let mut artists_self = Vec::new();
                     for (i, artist_credit) in artist_credits.iter().enumerate() {
                         let artist = artists
@@ -70,13 +73,13 @@ impl super::TaskTrait for Task {
                 }
                 writer.tracks.commit()?;
             }
-            Task::Releases => {
-                let releases = entity::ReleaseEntity::find().all(db).await?;
+            Data::Releases => {
+                let releases = entity::ReleaseEntity::find().all(&tx).await?;
                 let tracks_artist_credits = releases
                     .load_many_to_many(
                         entity::ArtistCreditEntity,
                         entity::ArtistCreditReleaseEntity,
-                        db,
+                        &tx,
                     )
                     .await?;
                 for (i, release) in releases.into_iter().enumerate() {
@@ -85,7 +88,7 @@ impl super::TaskTrait for Task {
                         i,
                         release.id
                     ))?;
-                    let artists = artist_credits.load_one(entity::ArtistEntity, db).await?;
+                    let artists = artist_credits.load_one(entity::ArtistEntity, &tx).await?;
                     let mut artists_self = Vec::new();
                     for (i, artist_credit) in artist_credits.iter().enumerate() {
                         let artist = artists

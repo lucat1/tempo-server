@@ -1,15 +1,19 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz::send_request;
+use crate::tasks::TaskName;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Task(Uuid);
+pub struct Data(Uuid);
 
-pub async fn all_data<C>(db: &C) -> Result<Vec<Task>>
+pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
 where
     C: ConnectionTrait,
 {
@@ -17,7 +21,7 @@ where
         .all(db)
         .await?
         .into_iter()
-        .map(|a| Task(a.id))
+        .map(|a| Data(a.id))
         .collect())
 }
 
@@ -33,12 +37,13 @@ struct WikipediExtract {
 }
 
 #[async_trait::async_trait]
-impl super::TaskTrait for Task {
-    async fn run<D>(&self, db: &D) -> Result<()>
+impl super::TaskTrait for Data {
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
-        D: ConnectionTrait,
+        C: ConnectionTrait + TransactionTrait,
     {
-        let Task(data) = self;
+        let tx = db.begin().await?;
+        let Data(data) = self;
         tracing::trace!(%data, "Fetching the description for artist");
         let req = Request::new(
             Method::GET,
@@ -70,17 +75,18 @@ impl super::TaskTrait for Task {
         match document.wikipedia_extract {
             Some(extract) => {
                 let mut entity = entity::ArtistEntity::find_by_id(*data)
-                    .one(db)
+                    .one(&tx)
                     .await?
                     .ok_or(eyre!("Could not find a user with id: {}", data))?
                     .into_active_model();
 
                 entity.description = ActiveValue::Set(Some(extract.content));
                 entity
-                    .save(db)
+                    .save(&tx)
                     .await
                     .wrap_err(eyre!("Could not update the description of artist {}", data))?;
 
+                tx.commit().await?;
                 Ok(())
             }
             None => {

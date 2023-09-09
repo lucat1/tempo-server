@@ -14,8 +14,8 @@ use super::{artists, mediums};
 use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
-        dedup, ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes,
-        ResourceType, TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
+        ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes, ResourceType,
+        TrackAttributes, TrackFilter, TrackInclude, TrackRelation, TrackResource,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -24,12 +24,13 @@ use crate::api::{
     },
     AppState,
 };
+use base::util::dedup;
 
 #[derive(Default)]
 pub struct TrackRelated {
-    artist_credits: Vec<entity::ArtistCredit>,
-    medium: Option<entity::Medium>,
-    recorders: Vec<entity::ArtistTrackRelation>,
+    pub artist_credits: Vec<entity::ArtistCredit>,
+    pub medium: Option<entity::Medium>,
+    pub recorders: Vec<entity::ArtistTrackRelation>,
 }
 
 pub async fn related<C>(
@@ -298,7 +299,7 @@ pub async fn tracks(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
         included: dedup(included),
@@ -335,7 +336,7 @@ pub async fn track(
             title: "Could not fetch the included resurces".to_string(),
             detail: Some(e.into()),
         })?;
-    Ok(Json::new(Document {
+    Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
         links: HashMap::new(),
