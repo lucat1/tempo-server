@@ -54,7 +54,6 @@ pub struct ImportRelated {
     artist_track_relations: Vec<entity::ArtistTrackRelation>,
     artist_credit_releases: Vec<entity::ArtistCreditRelease>,
     artist_credit_tracks: Vec<entity::ArtistCreditTrack>,
-    covers: Vec<entity::import::Cover>,
 }
 
 pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> ImportResource {
@@ -161,10 +160,6 @@ pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> I
     }
 }
 
-pub fn entity_to_included(entity: &entity::Import, related: &ImportRelated) -> Included {
-    Included::Import(entity_to_resource(entity, related))
-}
-
 pub async fn related<C>(
     _db: &C,
     entities: &[entity::Import],
@@ -186,7 +181,6 @@ where
             artist_track_relations: entity_clone.artist_track_relations.0,
             artist_credit_releases: entity_clone.artist_credit_releases.0,
             artist_credit_tracks: entity_clone.artist_credit_tracks.0,
-            covers: entity_clone.covers.0,
         })
     }
     Ok(result)
@@ -203,7 +197,6 @@ where
     let mut included = Vec::new();
     for related in related.into_iter() {
         let ImportRelated {
-            directory,
             artists,
             artist_credits,
             releases,
@@ -212,7 +205,7 @@ where
             artist_track_relations,
             artist_credit_releases,
             artist_credit_tracks,
-            covers,
+            ..
         } = related;
         for artist in artists.iter() {
             let related = artists::ArtistRelated {

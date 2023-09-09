@@ -38,7 +38,7 @@ struct WikipediExtract {
 
 #[async_trait::async_trait]
 impl super::TaskTrait for Data {
-    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
         C: ConnectionTrait + TransactionTrait,
     {

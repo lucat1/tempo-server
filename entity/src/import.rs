@@ -1,7 +1,7 @@
 use base::setting::ArtProvider;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap, hash::Hash, path::PathBuf};
+use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
 
 use crate::full::ArtistInfo;

@@ -5,9 +5,7 @@ use image::{
     DynamicImage, ImageOutputFormat,
 };
 use reqwest::{Method, Request};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
-};
+use sea_orm::{ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Cursor, path::PathBuf, str::FromStr, sync::Arc};
@@ -17,11 +15,7 @@ use time::Duration;
 use uuid::Uuid;
 
 use crate::{
-    fetch::{
-        deezer, itunes,
-        musicbrainz::{self, MB_BASE_URL},
-    },
-    import::{CombinedSearchResults, UNKNOWN_ARTIST},
+    fetch::{deezer, itunes, musicbrainz},
     tasks::{push, TaskName},
 };
 use base::{
@@ -30,10 +24,8 @@ use base::{
 };
 use entity::{
     conflict::{
-        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
-        ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, IMAGE_CONFLICT_1,
+        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT, IMAGE_CONFLICT_1,
         IMAGE_CONFLICT_2, IMAGE_RELEASE_CONFLICT, MEDIUM_CONFLICT, RELEASE_CONFLICT,
-        TRACK_CONFLICT,
     },
     full::{ArtistInfo, GetArtistCredits},
     IgnoreNone,

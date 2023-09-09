@@ -73,7 +73,7 @@ pub async fn fetch_release(id: Uuid) -> Result<SearchResult> {
 
 #[async_trait::async_trait]
 impl crate::tasks::TaskTrait for Data {
-    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
         C: ConnectionTrait + TransactionTrait,
     {

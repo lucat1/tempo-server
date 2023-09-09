@@ -1,40 +1,26 @@
 use common::track::TrackFile;
-use eyre::{bail, eyre, Result, WrapErr};
-use reqwest::{Method, Request};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
-};
+use eyre::{eyre, Result, WrapErr};
+use sea_orm::{ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use strfmt::strfmt;
-use taskie_client::{InsertTask, Task as TaskieTask, TaskKey};
-use time::Duration;
+use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
-use crate::{
-    fetch::musicbrainz::{self, MB_BASE_URL},
-    import::{CombinedSearchResults, UNKNOWN_ARTIST},
-    tasks::{push, TaskName},
-};
+use crate::tasks::TaskName;
 use base::{
     setting::get_settings,
     util::{dedup, path_to_str},
 };
 use entity::{
     conflict::{
-        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT,
-        ARTIST_CREDIT_TRACK_CONFLICT, ARTIST_TRACK_RELATION_CONFLICT, IMAGE_CONFLICT_1,
-        IMAGE_CONFLICT_2, IMAGE_RELEASE_CONFLICT, MEDIUM_CONFLICT, RELEASE_CONFLICT,
-        TRACK_CONFLICT,
+        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_TRACK_CONFLICT,
+        ARTIST_TRACK_RELATION_CONFLICT, TRACK_CONFLICT,
     },
     full::{ArtistInfo, GetArtistCredits},
     IgnoreNone,
 };
-use tag::{
-    sanitize_map, tag_to_string_map, tags_from_combination, tags_from_full_release,
-    tags_from_full_track, Picture, PictureType,
-};
+use tag::{sanitize_map, tag_to_string_map, tags_from_combination, Picture, PictureType};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Data {
@@ -50,7 +36,7 @@ pub struct Data {
 
 #[async_trait::async_trait]
 impl crate::tasks::TaskTrait for Data {
-    async fn run<C>(&self, db: &C, task: TaskieTask<TaskName, TaskKey>) -> Result<()>
+    async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
     where
         C: ConnectionTrait + TransactionTrait,
     {

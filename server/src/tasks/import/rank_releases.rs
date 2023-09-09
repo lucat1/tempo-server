@@ -189,7 +189,7 @@ impl crate::tasks::TaskTrait for Data {
         C: ConnectionTrait + TransactionTrait,
     {
         let tx = db.begin().await?;
-        let mut import = entity::ImportEntity::find_by_id(self.0)
+        let import = entity::ImportEntity::find_by_id(self.0)
             .one(&tx)
             .await?
             .ok_or(eyre!("Import not found"))?;
