@@ -2,8 +2,8 @@ steps:
   build:
     image: "ghcr.io/rust-cross/rust-musl-cross:${IMAGE}"
     commands:
-      - rustup update nightly
-      - rustup target add --toolchain nightly ${IMAGE}
+      - rustup toolchain install nightly-${IMAGE}
+      - rustup default nightly
       - cargo build --package server --release --target=${PLATFORM}
       - musl-strip target/${PLATFORM}/release/server
       - mv target/${PLATFORM}/release/server target/server-${ARCH}
