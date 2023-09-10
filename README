@@ -1,23 +1,30 @@
-OLD README. Ignore.
+Tempo Server is the reference implementation for the Tempo API [1].
+It is an all-in-one music server and a library manager. This allows for a
+greater quality of metadata collection and integration, compared to what is
+possible via simple audio tags. The collection management functionality include:
 
-A music tagger pulling metadata from MusicBrainz and album arts from a iTunes
-and CoverArtArchive (more to come). Multi-valued tags support is a first-class
-citizen along with speedy performance (compared to Beets).
+1. Importing of releaes
+2. Fetching releases's artwork
+3. Fetching artists's urls on other platforms
+4. Fetching artists's pictures from
+5. Fetching artists's descriptions
 
-You can find prebuild releases for Linux x86_64, aarch64, i686 on the Releases
-page. If you are on a different platform (for now) compiling from source is the
-only option:
+All the tasks from 3 onwards can be automated and run periodically, to keep
+your music collection up to date.
 
-$ cargo build --release
+On the other hand, Tempo implements the Tempo API which offers the following
+features as a media streaming server:
 
-A list of all available commands can be obtained by running the program with no
-arguments. Some of the most frequently used include:
-- import [path]: recursively scans the `path` and tries to import all music
-  files as a single release in your music library
-- list: lists all music files in your library currently being managed by the
-  tagger
-- config: prints the current config. The output can be piped in the default 
-  configuration path, in order to generate a starting config:
+- Browsing of all artists, with advanced filtering
+- Browsing of all releases, with advanced filtering
+- Browsing of all tracks, with advanced filtering
+- Full-text, typo tolerant search for artists, releases, tracks
+- Displaying artists and releases
+- Support for multi valued tags everywhere (it makes sense to):
+  1. track artist
+  2. release artists
+  3. genres
+- Support for join phrases for multi valued artists
+- Scrobbling to any service (currently only support last.fm)
 
-  $ mkdir -p "${XDG_DATA_HOME:-$HOME}"/.config/tagger
-  $ tagger config > "${XDG_DATA_HOME:-$HOME}"/.config/tagger/config.toml
+[1]: https://tempo.codeberg.page/
