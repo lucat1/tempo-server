@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{request::Parts, StatusCode, Uri},
     response::{IntoResponse, Response},
@@ -211,7 +210,7 @@ pub struct Query<
     Id: for<'a> Deserialize<'a> + Default,
 >(pub QueryOptions<F, C, I, Id>);
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<S, F, C, I, Id> FromRequestParts<S> for Query<F, C, I, Id>
 where
     S: Send + Sync,

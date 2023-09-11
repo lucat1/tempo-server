@@ -1,8 +1,10 @@
 pub mod auth;
 pub mod documents;
 pub mod extract;
-mod internal;
 pub mod jsonapi;
+pub mod loader;
+
+mod internal;
 mod tempo;
 
 use axum::Router;
