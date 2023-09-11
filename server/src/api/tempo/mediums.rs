@@ -217,10 +217,9 @@ pub async fn mediums(
 
 pub async fn medium(
     State(AppState(db)): State<AppState>,
-    medium_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource, Included>>, Error> {
-    let id = medium_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

@@ -267,10 +267,9 @@ pub async fn releases(
 
 pub async fn release(
     State(AppState(db)): State<AppState>,
-    release_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
-    let id = release_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

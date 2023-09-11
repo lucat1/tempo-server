@@ -203,9 +203,8 @@ where
 pub async fn user(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
-    username_path: Path<String>,
+    Path(username): Path<String>,
 ) -> Result<Json<Document<UserResource, Included>>, Error> {
-    let username = username_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -222,9 +221,8 @@ pub async fn user(
 pub async fn relation(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
-    user_rel_path: Path<(String, UserRelation)>,
+    Path((username, relation)): Path<(String, UserRelation)>,
 ) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, Error> {
-    let (username, relation) = user_rel_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -258,14 +256,13 @@ pub struct InsertExactlyOneRelation<R> {
 pub async fn post_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    user_rel_path: Path<(String, UserRelation)>,
+    Path((username, relation_kind)): Path<(String, UserRelation)>,
     Json(relation): Json<
         InsertExactlyOneRelation<
             ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
         >,
     >,
 ) -> Result<(StatusCode, TypedHeader<Location>), Error> {
-    let (username, relation_kind) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,
@@ -328,12 +325,11 @@ pub async fn post_relation(
 pub async fn delete_relation(
     State(AppState(db)): State<AppState>,
     claims: Claims,
-    user_rel_path: Path<(String, UserRelation)>,
+    Path((username, relation_kind)): Path<(String, UserRelation)>,
     Json(relation): Json<
         InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
     >,
 ) -> Result<StatusCode, Error> {
-    let (username, relation_kind) = user_rel_path.inner();
     if claims.username != username {
         return Err(Error {
             status: StatusCode::UNAUTHORIZED,

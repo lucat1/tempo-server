@@ -309,9 +309,8 @@ pub async fn scrobbles(
 pub async fn scrobble(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
-    scrobble_path: Path<i64>,
+    Path(id): Path<i64>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
-    let id = scrobble_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),

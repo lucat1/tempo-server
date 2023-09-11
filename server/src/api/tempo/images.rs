@@ -37,9 +37,8 @@ pub fn entity_to_included(image: &entity::Image) -> Included {
 
 pub async fn image(
     State(AppState(db)): State<AppState>,
-    image_path: Path<String>,
+    Path(id): Path<String>,
 ) -> Result<Json<Document<ImageResource, Included>>, Error> {
-    let id = image_path.inner();
     let image = entity::ImageEntity::find_by_id(id)
         .one(&db)
         .await
@@ -62,10 +61,9 @@ pub async fn image(
 
 pub async fn file(
     State(AppState(db)): State<AppState>,
-    image_path: Path<String>,
+    Path(id): Path<String>,
     request: Request<Body>,
 ) -> Result<impl IntoResponse, Error> {
-    let id = image_path.inner();
     let image = entity::ImageEntity::find_by_id(id)
         .one(&db)
         .await

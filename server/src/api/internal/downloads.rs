@@ -50,7 +50,7 @@ pub fn abs_path(settings: &Settings, path: Option<PathBuf>) -> Result<PathBuf, E
 pub async fn list(
     path_param: Option<Path<PathBuf>>,
 ) -> Result<Json<Document<DirectoryResource, DirectoryResource>>, Error> {
-    let path = path_param.map(|p| p.inner());
+    let path = path_param.map(|Path(p)| p);
     let settings = get_settings().map_err(|err| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Could not read settings".to_string(),

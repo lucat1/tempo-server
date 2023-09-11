@@ -308,10 +308,9 @@ pub async fn tracks(
 
 pub async fn track(
     State(AppState(db)): State<AppState>,
-    track_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
 ) -> Result<Json<Document<TrackResource, Included>>, Error> {
-    let id = track_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -345,10 +344,10 @@ pub async fn track(
 
 pub async fn audio(
     State(AppState(db)): State<AppState>,
-    track_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     request: Request<Body>,
 ) -> Result<impl IntoResponse, Error> {
-    let track = find_track_by_id(&db, track_path.inner()).await?;
+    let track = find_track_by_id(&db, id).await?;
     let path = track.path.ok_or(Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Track does not have an associated path".to_string(),

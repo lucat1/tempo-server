@@ -49,9 +49,8 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let header = TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
-            .await?
-            .inner();
+        let TypedHeader(header) =
+            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state).await?;
         check_token(header.token()).map(|td| td.claims)
     }
 }
@@ -120,9 +119,8 @@ fn auth_resource(token: Token, refresh: Option<Token>, username: String) -> Auth
 }
 
 pub async fn auth(
-    auth_header: TypedHeader<Authorization<Bearer>>,
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
-    let auth = auth_header.inner();
     let token_data = check_token::<Claims>(auth.token())?;
     Ok(Json(Document {
         data: DocumentData::Single(auth_resource(
@@ -210,9 +208,8 @@ pub async fn login(
 }
 
 pub async fn refresh(
-    auth_header: TypedHeader<Authorization<Bearer>>,
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
-    let auth = auth_header.inner();
     let token_data = check_token::<Claims>(auth.token())?;
     if token_data.claims.sub != ClaimsSubject::Refresh {
         return Err(Error {

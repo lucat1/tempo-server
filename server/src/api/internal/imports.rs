@@ -1,5 +1,5 @@
 use axum::{
-    extract::{OriginalUri, Path as AxumPath, State},
+    extract::{OriginalUri, State},
     http::StatusCode,
 };
 use base::setting::get_settings;
@@ -452,10 +452,9 @@ async fn cover_refetch(import_id: Uuid) -> Result<()> {
 pub async fn edit(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
-    import_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     Json(body): Json<UpdateOneDocument<UpdateImportResource>>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
-    let id = import_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -517,7 +516,7 @@ pub async fn edit(
         })?;
     }
 
-    self::import(State(AppState(db)), Query(opts), Path(AxumPath(id))).await
+    self::import(State(AppState(db)), Query(opts), Path(id)).await
 }
 
 pub async fn imports(
@@ -599,9 +598,8 @@ where
 pub async fn import(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
-    import_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
-    let id = import_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -623,11 +621,7 @@ pub async fn import(
     fetch_import_data(&tx, import, &opts).await
 }
 
-pub async fn run(
-    State(AppState(db)): State<AppState>,
-    import_path: Path<Uuid>,
-) -> Result<(), Error> {
-    let id = import_path.inner();
+pub async fn run(State(AppState(db)): State<AppState>, Path(id): Path<Uuid>) -> Result<(), Error> {
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
@@ -663,9 +657,8 @@ pub async fn run(
 
 pub async fn delete(
     State(AppState(db)): State<AppState>,
-    import_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
 ) -> Result<(), Error> {
-    let id = import_path.inner();
     entity::ImportEntity::delete_by_id(id)
         .exec(&db)
         .await

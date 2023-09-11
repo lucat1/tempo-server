@@ -195,9 +195,8 @@ pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>
 }
 
 pub async fn connection(
-    path_provider: Path<entity::ConnectionProvider>,
+    Path(provider): Path<entity::ConnectionProvider>,
 ) -> Result<Json<Document<ConnectionResource, Included>>, Error> {
-    let provider = path_provider.inner();
     let (id, attrs) = PROVIDERS
         .iter()
         .find(|(id, _)| id == &provider)
@@ -222,10 +221,9 @@ pub async fn connection(
 
 pub async fn callback(
     State(AppState(db)): State<AppState>,
-    path_provider: Path<entity::ConnectionProvider>,
+    Path(provider): Path<entity::ConnectionProvider>,
     Query(opts): Query<CallbackOptions>,
 ) -> Result<Response, Error> {
-    let provider = path_provider.inner();
     let settings = get_settings().map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Error while handling connection callback".to_owned(),

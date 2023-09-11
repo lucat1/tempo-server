@@ -122,13 +122,7 @@ where
     }
 }
 
-pub struct TypedHeader<T>(AxumTypedHeader<T>);
-
-impl<T> TypedHeader<T> {
-    pub fn inner(self) -> T {
-        self.0 .0
-    }
-}
+pub struct TypedHeader<T>(pub T);
 
 #[async_trait]
 impl<T, S> FromRequestParts<S> for TypedHeader<T>
@@ -139,24 +133,18 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        AxumTypedHeader::<T>::from_request_parts(parts, state)
+        let AxumTypedHeader(t) = AxumTypedHeader::<T>::from_request_parts(parts, state)
             .await
-            .map(|val| TypedHeader(val))
             .map_err(|e| Error {
                 status: StatusCode::BAD_REQUEST,
                 title: format!("Invalid header: {}", T::name()),
                 detail: Some(e.into()),
-            })
+            })?;
+        Ok(Self(t))
     }
 }
 
-pub struct Path<T>(pub AxumPath<T>);
-
-impl<T> Path<T> {
-    pub fn inner(self) -> T {
-        self.0 .0
-    }
-}
+pub struct Path<T>(pub T);
 
 #[async_trait]
 impl<T, S> FromRequestParts<S> for Path<T>
@@ -167,13 +155,13 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        AxumPath::<T>::from_request_parts(parts, state)
+        let AxumPath(t) = AxumPath::<T>::from_request_parts(parts, state)
             .await
-            .map(|val| Path(val))
             .map_err(|e| Error {
                 status: StatusCode::NOT_FOUND,
                 title: "Invalid URL path".to_string(),
                 detail: Some(e.into()),
-            })
+            })?;
+        Ok(Self(t))
     }
 }

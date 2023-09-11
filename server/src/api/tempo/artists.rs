@@ -345,10 +345,9 @@ pub async fn artists(
 
 pub async fn artist(
     State(AppState(db)): State<AppState>,
-    artist_path: Path<Uuid>,
+    Path(id): Path<Uuid>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource, Included>>, Error> {
-    let id = artist_path.inner();
     let tx = db.begin().await.map_err(|e| Error {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         title: "Couldn't begin database transaction".to_string(),
