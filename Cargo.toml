@@ -1,5 +1,5 @@
 [workspace]
-members = ["entity", "tag", "base", "common", "migration", "server"]
+members = ["entity", "tag", "base", "migration", "server"]
 # use 'current' workspace resolver
 resolver = "1"
 

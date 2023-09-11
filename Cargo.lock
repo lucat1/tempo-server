@@ -923,49 +923,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "async-once-cell",
- "base",
- "const_format",
- "directories",
- "entity",
- "eyre",
- "image",
- "itertools 0.10.5",
- "lazy_static",
- "ldap3",
- "levenshtein",
- "mime",
- "password-hash",
- "pathfinding",
- "pbkdf2",
- "rayon",
- "reqwest",
- "scan_dir",
- "scraper",
- "scrypt",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_path_to_error",
- "sha256",
- "strfmt",
- "strum",
- "strum_macros",
- "tag",
- "time",
- "tokio",
- "toml 0.7.8",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4447,7 +4404,6 @@ dependencies = [
  "bytes",
  "clap 4.4.2",
  "color-eyre",
- "common",
  "const_format",
  "deadqueue",
  "dialoguer",
@@ -4463,6 +4419,7 @@ dependencies = [
  "itertools 0.10.5",
  "jsonwebtoken",
  "lazy_static",
+ "ldap3",
  "levenshtein",
  "md5",
  "migration",

@@ -1,4 +1,3 @@
-use common::track::TrackFile;
 use eyre::{eyre, Result, WrapErr};
 use sea_orm::{ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
@@ -7,7 +6,7 @@ use strfmt::strfmt;
 use taskie_client::{Task as TaskieTask, TaskKey};
 use uuid::Uuid;
 
-use crate::tasks::TaskName;
+use crate::{import::TrackFile, tasks::TaskName};
 use base::{
     setting::get_settings,
     util::{dedup, path_to_str},
