@@ -11,7 +11,7 @@ pub struct FullRelease {
 
 impl FullRelease {
     pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
-        if import.releases.0.iter().any(|rel| rel.id == id) {
+        if !import.releases.0.iter().any(|rel| rel.id == id) {
             Err(eyre!(
                 "Cannot construct FullRelease from import with a missing release"
             ))
@@ -86,7 +86,7 @@ pub struct FullTrack {
 
 impl FullTrack {
     pub fn new(import: Arc<Import>, id: Uuid) -> Result<Self> {
-        if import.tracks.0.iter().any(|track| track.id == id) {
+        if !import.tracks.0.iter().any(|track| track.id == id) {
             Err(eyre!(
                 "Cannot construct FullTrack from import with a missing track"
             ))
