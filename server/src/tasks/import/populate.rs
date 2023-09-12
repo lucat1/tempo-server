@@ -171,7 +171,11 @@ impl crate::tasks::TaskTrait for Data {
                 cover_i,
                 import_rc.covers.0.len()
             ))?;
-            let image_dest = release_root.join(settings.library.art.image_name.clone());
+            let image_dest = release_root.join(format!(
+                "{}.{}",
+                settings.library.art.image_name.clone(),
+                settings.library.art.format.mime().subtype()
+            ));
             let (buf, (width, height)) = get_cover(settings, cover).await?;
             tokio::fs::write(&image_dest, &buf).await?;
 
