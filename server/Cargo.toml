@@ -22,7 +22,7 @@ entity = { path = "../entity" }
 tag = { path = "../tag" }
 migration = { path = "../migration" }
 
-taskie-client = { git = "https://codeberg.org/lucat1/taskie" }
+taskie-client = { git = "https://codeberg.org/lucat1/taskie", features = ["rustls-tls"], default-features = false }
 
 clap = { version = "4", features = ["derive"] }
 eyre = "0.6"
