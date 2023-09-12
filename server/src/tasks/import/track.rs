@@ -152,10 +152,10 @@ impl crate::tasks::TaskTrait for Data {
             .exec(&tx)
             .await
             .ignore_none()?;
-        let artist_relations: Vec<_> = full_track
-            .get_relations()
+        let artist_relations = dedup(full_track.get_relations().into_iter().cloned().collect());
+        let artist_relations: Vec<_> = artist_relations
             .into_iter()
-            .map(|a| a.clone().into_active_model())
+            .map(|a| a.into_active_model())
             .collect();
         entity::ArtistTrackRelationEntity::insert_many(artist_relations)
             .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
