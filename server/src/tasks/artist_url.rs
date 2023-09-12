@@ -9,7 +9,7 @@ use taskie_client::{Task as TaskieTask, TaskKey};
 use url::Url;
 use uuid::Uuid;
 
-use crate::fetch::musicbrainz::{send_request, MB_BASE_STRURL};
+use crate::fetch::musicbrainz::{send_request, MB_BASE_URL};
 use crate::tasks::TaskName;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -88,7 +88,7 @@ fn parse(url: Url, t: MusicBrainzRelationType) -> Option<(String, entity::Artist
             Some("spotify.com") | Some("open.spotify.com") => Some(entity::ArtistUrlType::Spotify),
             Some("deezer.com") | Some("www.deezer.com") => Some(entity::ArtistUrlType::Deezer),
             Some(domain) => {
-                tracing::trace!(%domain,"Ignoring free streaming service relation");
+                tracing::trace!(%domain, "Ignoring free streaming service relation");
                 None
             }
             None => None,
@@ -129,7 +129,7 @@ impl super::TaskTrait for Data {
         tracing::trace!(%data, "Fetching artist urls");
         let req = Request::new(
             Method::GET,
-            format!("{}artist/{}?fmt=json&inc=url-rels", MB_BASE_STRURL, data).parse()?,
+            MB_BASE_URL.join(format!("artist/{}?fmt=json&inc=url-rels", data).as_str())?,
         );
         let res = send_request(req).await?;
         if !res.status().is_success() {

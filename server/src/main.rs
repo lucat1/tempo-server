@@ -1,7 +1,7 @@
 mod api;
 pub mod fetch;
 pub mod import;
-// mod scheduling;
+pub mod scheduling;
 pub mod search;
 pub mod tasks;
 
@@ -26,7 +26,7 @@ use crate::search::{open_index_writers, open_indexes, INDEXES, INDEX_WRITERS};
 use base::setting::{load, Settings, SETTINGS};
 use base::{
     database::{get_database, open_database, DATABASE},
-    setting::generate_default,
+    setting::{generate_default, get_settings},
     CLI_NAME,
 };
 use tasks::{open_taskie_client, TASKIE_CLIENT};
@@ -157,11 +157,11 @@ async fn main() -> Result<()> {
 
             // background tasks
             crate::tasks::queue_loop()?;
-            // let mut scheduler = scheduling::new().await?;
-            // for (task, schedule) in get_settings()?.tasks.recurring.iter() {
-            //     scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
-            // }
-            // scheduling::start(&mut scheduler).await?;
+            let mut scheduler = scheduling::new().await?;
+            for (task, schedule) in get_settings()?.tasks.recurring.iter() {
+                scheduling::schedule(&mut scheduler, schedule.to_owned(), task.to_owned()).await?;
+            }
+            scheduling::start(&mut scheduler).await?;
 
             let addr: SocketAddr = cli
                 .listen_address

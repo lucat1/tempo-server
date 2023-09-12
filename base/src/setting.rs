@@ -344,7 +344,7 @@ pub struct Tasks {
 pub enum JobType {
     ArtistUrl,
     ArtistDescription,
-    LastfmArtistImage,
+    LastFMArtistImage,
     IndexSearch,
 }
 
