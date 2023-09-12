@@ -147,11 +147,13 @@ impl crate::tasks::TaskTrait for Data {
                 .collect(),
         );
         let artists: Vec<_> = artists.into_iter().map(|a| a.into_active_model()).collect();
-        entity::ArtistEntity::insert_many(artists)
-            .on_conflict(ARTIST_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
+        if !artists.is_empty() {
+            entity::ArtistEntity::insert_many(artists)
+                .on_conflict(ARTIST_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
         let mut artist_relations: Vec<_> =
             full_track.get_relations().into_iter().cloned().collect();
         artist_relations.sort_unstable_by_key(|a| {
@@ -161,15 +163,17 @@ impl crate::tasks::TaskTrait for Data {
                 + a.relation_value.as_str()
         });
         artist_relations.dedup();
-        let artist_relations: Vec<_> = artist_relations
-            .into_iter()
-            .map(|a| a.into_active_model())
-            .collect();
-        entity::ArtistTrackRelationEntity::insert_many(artist_relations)
-            .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
-            .exec(&tx)
-            .await
-            .ignore_none()?;
+        if !artist_relations.is_empty() {
+            let artist_relations: Vec<_> = artist_relations
+                .into_iter()
+                .map(|a| a.into_active_model())
+                .collect();
+            entity::ArtistTrackRelationEntity::insert_many(artist_relations)
+                .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
         Ok(tx.commit().await?)
     }
 }
