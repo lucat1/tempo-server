@@ -152,7 +152,15 @@ impl crate::tasks::TaskTrait for Data {
             .exec(&tx)
             .await
             .ignore_none()?;
-        let artist_relations = dedup(full_track.get_relations().into_iter().cloned().collect());
+        let mut artist_relations: Vec<_> =
+            full_track.get_relations().into_iter().cloned().collect();
+        artist_relations.sort_unstable_by_key(|a| {
+            a.artist_id.to_string()
+                + a.track_id.to_string().as_str()
+                + a.relation_type.to_string().as_str()
+                + a.relation_value.as_str()
+        });
+        artist_relations.dedup();
         let artist_relations: Vec<_> = artist_relations
             .into_iter()
             .map(|a| a.into_active_model())
