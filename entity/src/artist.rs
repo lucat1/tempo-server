@@ -28,6 +28,11 @@ pub enum Relation {
     Image,
     #[sea_orm(has_many = "super::artist_track_relation::Entity")]
     TrackRelation,
+    #[sea_orm(
+        has_many = "super::update::Entity",
+        on_condition = r#"super::update::Column::Type.eq("description").or(super::update::Column::Type.eq("urls")).or(super::update::Column::Type.eq("lastfm_artist_image"))"#
+    )]
+    Updates,
 }
 
 impl Related<super::artist_credit::Entity> for Entity {
@@ -61,6 +66,16 @@ impl Related<super::image::Entity> for Entity {
 impl Related<super::artist_track_relation::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::TrackRelation.def()
+    }
+}
+
+impl Related<super::update::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Updates.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::update::Relation::Artist.def().rev())
     }
 }
 

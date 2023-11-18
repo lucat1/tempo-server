@@ -4,7 +4,7 @@ use serde_json::json;
 use time::Duration;
 use tokio_cron_scheduler::{Job, JobScheduler};
 
-use crate::tasks::{self, push, TaskName};
+use crate::tasks::{self, push, TaskEntities, TaskName};
 use base::{database::get_database, setting::JobType};
 use taskie_client::InsertTask;
 
@@ -49,7 +49,7 @@ where
             .into_iter()
             .map(|data| json!(data))
             .collect(),
-        JobType::ArtistDescription => tasks::artist_description::all_data(db)
+        JobType::ArtistDescription => tasks::artist_description::Data::all(db)
             .await?
             .into_iter()
             .map(|data| json!(data))

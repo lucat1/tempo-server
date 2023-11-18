@@ -24,6 +24,8 @@ pub mod import;
 pub mod conflict;
 pub mod full;
 
+mod update;
+
 use eyre::Result;
 use sea_orm::DbErr;
 use uuid::Uuid;
@@ -123,6 +125,14 @@ pub use import::InternalTrack;
 pub use import::InternalTracks;
 pub use import::Model as Import;
 pub use import::Relation as ImportRelation;
+
+pub use update::filter_condition as update_filter_condition;
+pub use update::ActiveModel as UpdateActive;
+pub use update::Column as UpdateColumn;
+pub use update::Entity as UpdateEntity;
+pub use update::Model as Update;
+pub use update::Relation as UpdateRelation;
+pub use update::UpdateType;
 
 pub trait IgnoreNone {
     fn ignore_none(self) -> Result<(), DbErr>;

@@ -22,6 +22,19 @@ pub trait TaskTrait: Debug {
         C: ConnectionTrait + TransactionTrait;
 }
 
+#[async_trait::async_trait]
+pub trait TaskEntities {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized;
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized;
+}
+
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskName {

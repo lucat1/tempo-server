@@ -1,9 +1,14 @@
 mod downloads;
 mod imports;
+mod update;
 
 mod documents;
 
-use axum::{middleware::from_fn, routing::get, Router};
+use axum::{
+    middleware::from_fn,
+    routing::{get, post},
+    Router,
+};
 
 use super::{auth, AppState};
 
@@ -19,5 +24,7 @@ pub fn router() -> Router<AppState> {
                 .post(imports::run)
                 .delete(imports::delete),
         )
+        .route("/update/:update_type/all", post(update::all))
+        .route("/update/:update_type/outdated", post(update::outdated))
         .layer(from_fn(auth::auth_middleware))
 }
