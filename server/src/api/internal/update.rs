@@ -2,20 +2,12 @@ use axum::extract::State;
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, fs::read_dir, path::PathBuf};
 use taskie_client::InsertTask;
 
-use crate::api::{
-    extract::{Json, Path},
-    internal::documents::{
-        DirectoryAttributes, DirectoryRelation, DirectoryResource, FileEntry, InternalResourceType,
-        ResourceType,
-    },
-    jsonapi::{Document, DocumentData, Error, Related, Relation, Relationship, ResourceIdentifier},
-    AppState,
+use crate::api::{extract::Path, jsonapi::Error, AppState};
+use crate::tasks::{
+    artist_description, artist_url, index_search, lastfm_artist_image, push, TaskEntities, TaskName,
 };
-use crate::tasks::{artist_description, artist_url, lastfm_artist_image, TaskEntities, TaskName, push, index_search};
-use base::setting::{get_settings, Settings};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]
@@ -26,6 +18,7 @@ pub enum UpdateType {
     Single(entity::UpdateType),
 }
 
+// TODO: handle dependencies somehow
 fn handle_all(update_type: UpdateType) -> Vec<entity::UpdateType> {
     match update_type {
         UpdateType::All => vec![
@@ -69,12 +62,11 @@ pub async fn all(
                 TaskName::LastFMArtistImage,
                 lastfm_artist_image::Data::all(&db).await?,
             ),
-            entity::UpdateType::IndexSearch => map_insert_task(
-                TaskName::IndexSearch,
-                index_search::Data::all(&db).await?,
-            ),
+            entity::UpdateType::IndexSearch => {
+                map_insert_task(TaskName::IndexSearch, index_search::Data::all(&db).await?)
+            }
         };
-    push(&tasks).await?;
+        push(&tasks).await?;
     }
     Ok(())
 }
@@ -101,7 +93,7 @@ pub async fn outdated(
                 index_search::Data::outdated(&db).await?,
             ),
         };
-    push(&tasks).await?;
+        push(&tasks).await?;
     }
     Ok(())
 }

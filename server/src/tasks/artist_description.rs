@@ -1,8 +1,8 @@
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JoinType, QueryFilter, QuerySelect, RelationTrait, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, JoinType,
+    QueryFilter, QuerySelect, RelationTrait, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use taskie_client::{Task as TaskieTask, TaskKey};

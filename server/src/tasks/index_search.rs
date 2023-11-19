@@ -104,7 +104,7 @@ impl super::TaskTrait for Data {
 
 #[async_trait::async_trait]
 impl super::TaskEntities for Data {
-    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    async fn all<C>(_db: &C) -> Result<Vec<Self>>
     where
         C: ConnectionTrait,
         Self: Sized,
