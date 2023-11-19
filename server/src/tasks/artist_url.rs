@@ -2,7 +2,10 @@ use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use itertools::Itertools;
 use reqwest::{Method, Request};
-use sea_orm::{ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait};
+use sea_orm::{
+    ConnectionTrait, EntityTrait, IntoActiveModel, JoinType, QueryFilter, QuerySelect,
+    RelationTrait, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::Deserialize_enum_str;
 use taskie_client::{Task as TaskieTask, TaskKey};
@@ -11,21 +14,10 @@ use uuid::Uuid;
 
 use crate::fetch::musicbrainz::{send_request, MB_BASE_URL};
 use crate::tasks::TaskName;
+use base::setting::get_settings;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Data(Uuid);
-
-pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
-where
-    C: ConnectionTrait,
-{
-    Ok(entity::ArtistEntity::find()
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|a| Data(a.id))
-        .collect())
-}
 
 #[derive(Debug, Clone, Deserialize)]
 struct Document {
@@ -176,5 +168,42 @@ impl super::TaskTrait for Data {
             tx.commit().await?;
         }
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl super::TaskEntities for Data {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Ok(entity::ArtistEntity::find()
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.id))
+            .collect())
+    }
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        let settings = get_settings()?;
+        let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
+
+        Ok(entity::ArtistEntity::find()
+            .join(JoinType::LeftJoin, entity::ArtistRelation::Updates.def())
+            .filter(entity::update_filter_condition(
+                before,
+                entity::UpdateType::ArtistUrl,
+            ))
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.id))
+            .collect())
     }
 }

@@ -44,7 +44,7 @@ where
         JobType::LastFMArtistImage => TaskName::LastFMArtistImage,
     };
     let data: Vec<_> = match task {
-        JobType::ArtistUrl => tasks::artist_url::all_data(db)
+        JobType::ArtistUrl => tasks::artist_url::Data::all(db)
             .await?
             .into_iter()
             .map(|data| json!(data))
@@ -55,13 +55,13 @@ where
             .map(|data| json!(data))
             .collect(),
 
-        JobType::LastFMArtistImage => tasks::lastfm_artist_image::all_data(db)
+        JobType::LastFMArtistImage => tasks::lastfm_artist_image::Data::all(db)
             .await?
             .into_iter()
             .map(|data| json!(data))
             .collect(),
 
-        JobType::IndexSearch => tasks::index_search::all_data(db)
+        JobType::IndexSearch => tasks::index_search::Data::all(db)
             .await?
             .into_iter()
             .map(|data| json!(data))

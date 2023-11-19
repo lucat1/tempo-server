@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, JoinType, QueryFilter, QuerySelect,
+    RelationTrait, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -32,19 +33,6 @@ static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Data(Uuid, String);
-
-pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
-where
-    C: ConnectionTrait,
-{
-    Ok(entity::ArtistUrlEntity::find()
-        .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|a| Data(a.artist_id, a.url))
-        .collect())
-}
 
 async fn get_html(url: url::Url) -> Result<String> {
     let res = send_request(Request::new(Method::GET, url)).await?;
@@ -215,5 +203,43 @@ impl super::TaskTrait for Data {
         }
         tx.commit().await?;
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl super::TaskEntities for Data {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Ok(entity::ArtistUrlEntity::find()
+            .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.artist_id, a.url))
+            .collect())
+    }
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        let settings = get_settings()?;
+        let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
+
+        Ok(entity::ArtistUrlEntity::find()
+            .join(JoinType::LeftJoin, entity::ArtistRelation::Updates.def())
+            .filter(
+                entity::update_filter_condition(before, entity::UpdateType::LastFMArtistImage)
+                    .and(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM)),
+            )
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.artist_id, a.url))
+            .collect())
     }
 }

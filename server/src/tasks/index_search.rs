@@ -13,13 +13,6 @@ pub enum Data {
     Releases,
 }
 
-pub async fn all_data<C>(_: &C) -> Result<Vec<Data>>
-where
-    C: ConnectionTrait,
-{
-    Ok(vec![Data::Artists, Data::Tracks, Data::Releases])
-}
-
 #[async_trait::async_trait]
 impl super::TaskTrait for Data {
     async fn run<C>(&self, db: &C, _task: TaskieTask<TaskName, TaskKey>) -> Result<()>
@@ -106,5 +99,24 @@ impl super::TaskTrait for Data {
             }
         }
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl super::TaskEntities for Data {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Ok(vec![Data::Artists, Data::Tracks, Data::Releases])
+    }
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Data::all(db).await
     }
 }

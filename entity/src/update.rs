@@ -35,13 +35,17 @@ pub enum UpdateType {
     #[serde(rename = "artist_description")]
     ArtistDescription,
 
-    #[sea_orm(string_value = "urls")]
-    #[serde(rename = "urls")]
-    URLs,
+    #[sea_orm(string_value = "artist_url")]
+    #[serde(rename = "artist_url")]
+    ArtistUrl,
 
     #[sea_orm(string_value = "lastfm_artist_image")]
     #[serde(rename = "lastfm_artist_image")]
     LastFMArtistImage,
+
+    #[sea_orm(string_value = "index_search")]
+    #[serde(rename = "index_search")]
+    IndexSearch,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

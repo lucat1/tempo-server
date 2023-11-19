@@ -5,6 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use eyre::ErrReport;
 use itertools::Itertools;
 use sea_orm::{
     sea_query::{IntoIden, IntoValueTuple},
@@ -142,6 +143,17 @@ pub struct Error {
     pub status: StatusCode,
     pub title: String,
     pub detail: Option<Box<dyn StdError>>,
+}
+
+// TODO: remove once we get proper error handling done
+impl From<ErrReport> for Error {
+    fn from(err: ErrReport) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            title: err.to_string(),
+            detail: Some(err.into()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
