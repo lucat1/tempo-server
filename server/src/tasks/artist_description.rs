@@ -1,7 +1,9 @@
+use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel, JoinType,
+    QueryFilter, QuerySelect, RelationTrait, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use taskie_client::{Task as TaskieTask, TaskKey};
@@ -9,21 +11,10 @@ use uuid::Uuid;
 
 use crate::fetch::musicbrainz::send_request;
 use crate::tasks::TaskName;
+use base::setting::get_settings;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Data(Uuid);
-
-pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
-where
-    C: ConnectionTrait,
-{
-    Ok(entity::ArtistEntity::find()
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|a| Data(a.id))
-        .collect())
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,14 +76,66 @@ impl super::TaskTrait for Data {
                     .save(&tx)
                     .await
                     .wrap_err(eyre!("Could not update the description of artist {}", data))?;
-
-                tx.commit().await?;
-                Ok(())
             }
             None => {
                 tracing::trace!(id=%data, "Wikipedia/MusicBrainz doesn't provide a description for the artist");
-                Ok(())
             }
-        }
+        };
+
+        entity::UpdateArtistEntity::insert(
+            entity::UpdateArtist {
+                r#type: entity::UpdateArtistType::ArtistDescription,
+                id: *data,
+                time: time::OffsetDateTime::now_utc(),
+            }
+            .into_active_model(),
+        )
+        .on_conflict(entity::conflict::UPDATE_ARTIST_CONFLICT.to_owned())
+        .exec(&tx)
+        .await
+        .ignore_none()?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl super::TaskEntities for Data {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Ok(entity::ArtistEntity::find()
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.id))
+            .collect())
+    }
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        let settings = get_settings()?;
+        let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
+
+        Ok(entity::ArtistEntity::find()
+            .join(
+                JoinType::LeftJoin,
+                entity::update_artist_join_condition(
+                    entity::ArtistRelation::Update.def(),
+                    entity::UpdateArtistType::ArtistDescription,
+                ),
+            )
+            .filter(entity::update_artist_filter(before))
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.id))
+            .collect())
     }
 }

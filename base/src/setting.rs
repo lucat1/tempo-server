@@ -337,6 +337,9 @@ pub struct Tasks {
 
     #[serde(default = "default_recurring")]
     pub recurring: HashMap<JobType, String>,
+
+    #[serde(default = "default_outdated")]
+    pub outdated: time::Duration,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -346,6 +349,10 @@ pub enum JobType {
     ArtistDescription,
     LastFMArtistImage,
     IndexSearch,
+}
+
+fn default_outdated() -> time::Duration {
+    time::Duration::DAY
 }
 
 fn default_recurring() -> HashMap<JobType, String> {

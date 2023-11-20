@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 use reqwest::{get, Method, Request};
 use scraper::{Html, Selector};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, JoinType, QueryFilter, QuerySelect,
+    RelationTrait, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -32,19 +33,6 @@ static LASTFM_IMAGE_ATTEMPT_SIZE: usize = 4096;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Data(Uuid, String);
-
-pub async fn all_data<C>(db: &C) -> Result<Vec<Data>>
-where
-    C: ConnectionTrait,
-{
-    Ok(entity::ArtistUrlEntity::find()
-        .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|a| Data(a.artist_id, a.url))
-        .collect())
-}
 
 async fn get_html(url: url::Url) -> Result<String> {
     let res = send_request(Request::new(Method::GET, url)).await?;
@@ -213,7 +201,65 @@ impl super::TaskTrait for Data {
                     .ignore_none()?;
             }
         }
+
+        entity::UpdateArtistEntity::insert(
+            entity::UpdateArtist {
+                r#type: entity::UpdateArtistType::LastFMArtistImage,
+                id: *artist_id,
+                time: time::OffsetDateTime::now_utc(),
+            }
+            .into_active_model(),
+        )
+        .on_conflict(entity::conflict::UPDATE_ARTIST_CONFLICT.to_owned())
+        .exec(&tx)
+        .await
+        .ignore_none()?;
         tx.commit().await?;
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl super::TaskEntities for Data {
+    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        Ok(entity::ArtistUrlEntity::find()
+            .filter(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM))
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.artist_id, a.url))
+            .collect())
+    }
+
+    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    where
+        C: ConnectionTrait,
+        Self: Sized,
+    {
+        let settings = get_settings()?;
+        let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
+
+        Ok(entity::ArtistUrlEntity::find()
+            .left_join(entity::ArtistEntity)
+            .join(
+                JoinType::LeftJoin,
+                entity::update_artist_join_condition(
+                    entity::ArtistRelation::Update.def(),
+                    entity::UpdateArtistType::LastFMArtistImage,
+                ),
+            )
+            .filter(
+                entity::update_artist_filter(before)
+                    .and(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM)),
+            )
+            .all(db)
+            .await?
+            .into_iter()
+            .map(|a| Self(a.artist_id, a.url))
+            .collect())
     }
 }
