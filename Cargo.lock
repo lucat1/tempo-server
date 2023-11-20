@@ -1413,6 +1413,7 @@ dependencies = [
  "sea-orm",
  "sea-query",
  "serde",
+ "serde-enum-str",
  "serde_json",
  "time",
  "tracing",

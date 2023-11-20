@@ -66,6 +66,7 @@ pub async fn all(
                 map_insert_task(TaskName::IndexSearch, index_search::Data::all(&db).await?)
             }
         };
+        tracing::info!(?tasks, "Queueing the update tasks");
         push(&tasks).await?;
     }
     Ok(())
@@ -93,6 +94,7 @@ pub async fn outdated(
                 index_search::Data::outdated(&db).await?,
             ),
         };
+        tracing::info!(?tasks, "Queueing the update tasks");
         push(&tasks).await?;
     }
     Ok(())

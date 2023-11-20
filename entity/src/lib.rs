@@ -126,7 +126,6 @@ pub use import::InternalTracks;
 pub use import::Model as Import;
 pub use import::Relation as ImportRelation;
 
-pub use update::filter_condition as update_filter_condition;
 pub use update::ActiveModel as UpdateActive;
 pub use update::Column as UpdateColumn;
 pub use update::Entity as UpdateEntity;

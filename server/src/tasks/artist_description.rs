@@ -110,6 +110,8 @@ impl super::TaskEntities for Data {
         let settings = get_settings()?;
         let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
 
+        let all = Self::all(db).await?;
+
         Ok(entity::ArtistEntity::find()
             .join(JoinType::LeftJoin, entity::ArtistRelation::Updates.def())
             .filter(entity::update_filter_condition(

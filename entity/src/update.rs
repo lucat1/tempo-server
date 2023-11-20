@@ -1,23 +1,91 @@
-use sea_orm::entity::prelude::*;
-use sea_query::SimpleExpr;
+use sea_orm::{entity::prelude::*, TryFromU64, TryGetableFromJson};
+use sea_query::ValueType;
 use serde::{Deserialize, Serialize};
+use serde_enum_str::Deserialize_enum_str;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "update")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub r#type: UpdateType,
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub uuid_id: uuid::Uuid,
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub string_id: String,
+    pub subject: Subject,
 
     pub time: time::OffsetDateTime,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Subject {
+    id: Identifier,
+    r#type: UpdateType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum Identifier {
+    Uuid(uuid::Uuid),
+    String(String),
+}
+
+impl TryFrom<String> for Subject {
+    type Error = sea_query::ValueTypeErr;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut parts_iter = value.split(":").take(2);
+        let raw_type = parts_iter.next().ok_or(sea_query::ValueTypeErr)?;
+        let r#type =
+            serde_json::from_str::<UpdateType>(raw_type).map_err(|_| sea_query::ValueTypeErr)?;
+        let raw_id = parts_iter.next().ok_or(sea_query::ValueTypeErr)?;
+        let id = serde_json::from_str::<Identifier>(raw_id).map_err(|_| sea_query::ValueTypeErr)?;
+        Ok(Subject { id, r#type })
+    }
+}
+
+impl From<Subject> for String {
+    fn from(value: Subject) -> Self {
+        let id = match value.id {
+            Identifier::String(s) => s,
+            Identifier::Uuid(u) => u.to_string(),
+        };
+        format!("{}:{}", value.r#type.to_string(), id)
+    }
+}
+
+impl From<Subject> for sea_orm::Value {
+    fn from(value: Subject) -> Self {
+        Self::String(Some(Box::new(value.into())))
+    }
+}
+
+impl TryFromU64 for Subject {
+    fn try_from_u64(n: u64) -> Result<Self, DbErr> {
+        Err(DbErr::ConvertFromU64("Subject"))
+    }
+}
+
+impl TryGetableFromJson for Subject {}
+
+impl ValueType for Subject {
+    fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
+        match v {
+            Value::String(Some(x)) => (*x).try_into(),
+            _ => Err(sea_query::ValueTypeErr),
+        }
+    }
+
+    fn type_name() -> String {
+        "Subject".to_string()
+    }
+
+    fn array_type() -> sea_query::ArrayType {
+        sea_query::ArrayType::String
+    }
+
+    fn column_type() -> sea_query::ColumnType {
+        sea_query::ColumnType::String(None)
+    }
+}
+
 #[derive(
+    Deserialize_enum_str,
     Serialize,
-    Deserialize,
     Debug,
     Clone,
     Copy,
@@ -49,26 +117,6 @@ pub enum UpdateType {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::artist::Entity",
-        from = "Column::UuidId",
-        to = "super::artist::Column::Id"
-    )]
-    Artist,
-}
-
-impl Related<super::artist::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Artist.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
-
-pub fn filter_condition(before: time::OffsetDateTime, r#type: UpdateType) -> SimpleExpr {
-    Column::Time
-        .lte(before)
-        .and(Column::Type.eq(r#type))
-        .or(Column::Time.is_null().and(Column::Type.is_null()))
-}
