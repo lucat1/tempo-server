@@ -12,21 +12,26 @@ use crate::tasks::{
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum UpdateType {
+    Artist(entity::UpdateArtistType),
+    Other(OtherUpdateType),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OtherUpdateType {
     #[serde(rename = "all")]
     All,
-
-    Artist(entity::UpdateArtistType),
+    #[serde(rename = "index_search")]
     IndexSearch,
 }
 
 // TODO: handle dependencies somehow
 fn unpack_all(update_type: UpdateType) -> Vec<UpdateType> {
     match update_type {
-        UpdateType::All => vec![
+        UpdateType::Other(OtherUpdateType::All) => vec![
             UpdateType::Artist(entity::UpdateArtistType::ArtistUrl),
             UpdateType::Artist(entity::UpdateArtistType::ArtistDescription),
             UpdateType::Artist(entity::UpdateArtistType::LastFMArtistImage),
-            UpdateType::IndexSearch,
+            UpdateType::Other(OtherUpdateType::IndexSearch),
         ],
         u => vec![u],
     }
@@ -66,11 +71,11 @@ pub async fn all(
                     lastfm_artist_image::Data::all(&db).await?,
                 ),
             },
-            UpdateType::IndexSearch => map_insert_task(
+            UpdateType::Other(OtherUpdateType::IndexSearch) => map_insert_task(
                 TaskName::IndexSearch,
                 index_search::Data::outdated(&db).await?,
             ),
-            UpdateType::All => unreachable!(),
+            _ => unreachable!(),
         };
         tracing::info!(?tasks, "Queueing the update tasks");
         push(&tasks).await?;
@@ -97,11 +102,11 @@ pub async fn outdated(
                     lastfm_artist_image::Data::outdated(&db).await?,
                 ),
             },
-            UpdateType::IndexSearch => map_insert_task(
+            UpdateType::Other(OtherUpdateType::IndexSearch) => map_insert_task(
                 TaskName::IndexSearch,
                 index_search::Data::outdated(&db).await?,
             ),
-            UpdateType::All => unreachable!(),
+            _ => unreachable!(),
         };
 
         tracing::info!(?tasks, "Queueing the update tasks");
