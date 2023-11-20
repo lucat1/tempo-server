@@ -1,8 +1,10 @@
-use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
+use axum::{
+    extract::{OriginalUri, State},
+    http::StatusCode,
+};
 use eyre::{eyre, Result};
 use sea_orm::{
-    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait,
+    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
 use serde_json::json;
@@ -11,7 +13,6 @@ use taskie_client::InsertTask;
 use time::Duration;
 use uuid::Uuid;
 
-use super::{tracks, users};
 use crate::api::{
     auth::Claims,
     documents::{
@@ -23,6 +24,7 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Page,
         Query, Related, Relation, Relationship, ResourceIdentifier,
     },
+    tempo::{error::TempoError, tracks, users},
     AppState,
 };
 use crate::tasks::{self, TaskName};
@@ -81,7 +83,7 @@ pub async fn included<C>(
     db: &C,
     entities: Vec<entity::Scrobble>,
     include: &[ScrobbleInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, TempoError>
 where
     C: ConnectionTrait,
 {
@@ -149,7 +151,7 @@ async fn fetch_scrobbles<C>(
     username: String,
     page: &Page<i64>,
     include: &[ScrobbleInclude],
-) -> Result<(Vec<ScrobbleResource>, Vec<Included>), Error>
+) -> Result<(Vec<ScrobbleResource>, Vec<Included>), TempoError>
 where
     C: ConnectionTrait,
 {
@@ -157,17 +159,9 @@ where
         .filter(ColumnTrait::eq(&entity::ScrobbleColumn::User, username))
         .cursor_by(entity::TrackColumn::Id);
     let scrobbles_cursor = make_cursor(&mut _scrobbles_cursor, page);
-    let scrobbles = scrobbles_cursor.all(db).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all tracks".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let scrobbles = scrobbles_cursor.all(db).await?;
     let data = scrobbles.iter().map(entity_to_resource).collect::<Vec<_>>();
-    let included = included(db, scrobbles, include).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch the included resurces".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let included = included(db, scrobbles, include).await?;
     Ok((data, included))
 }
 

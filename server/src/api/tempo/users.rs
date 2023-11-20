@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     TypedHeader,
 };
-use sea_orm::{ConnectionTrait, DbErr, EntityTrait, LoaderTrait, TransactionTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, LoaderTrait, TransactionTrait};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ use crate::api::{
         Document, DocumentData, Error, InsertManyRelation, Query, Related, Relation, Relationship,
         ResourceIdentifier,
     },
-    tempo::{connections::ProviderImpl, scrobbles},
+    tempo::{connections::ProviderImpl, error::TempoError, scrobbles},
     AppState,
 };
 use base::setting::get_settings;
@@ -35,7 +35,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::User],
     _light: bool,
-) -> Result<Vec<UserRelated>, DbErr>
+) -> Result<Vec<UserRelated>, TempoError>
 where
     C: ConnectionTrait,
 {
@@ -131,7 +131,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<UserRelated>,
     include: &[UserInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, TempoError>
 where
     C: ConnectionTrait,
 {
@@ -162,41 +162,21 @@ async fn fetch_user<C>(
     db: &C,
     username: String,
     include: &[UserInclude],
-) -> Result<(UserResource, Vec<Included>), Error>
+) -> Result<(UserResource, Vec<Included>), TempoError>
 where
     C: ConnectionTrait,
 {
     let user = entity::UserEntity::find_by_id(username)
         .one(db)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch user".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Not found".to_string(),
-            detail: Some("Not found".into()),
-        })?;
+        .await?
+        .ok_or(TempoError::NotFound(None))?;
     let related = related(db, &[user.to_owned()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the user".to_string(),
-            detail: Some(e.into()),
-        })?
+        .await?
         .into_iter()
         .next()
         .unwrap_or_default();
     let data = entity_to_resource(&user, &related);
-    let included = included(db, vec![related], include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(db, vec![related], include).await?;
     Ok((data, included))
 }
 

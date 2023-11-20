@@ -1,3 +1,5 @@
+pub mod error;
+
 pub mod artists;
 pub mod connections;
 pub mod images;
