@@ -1,3 +1,4 @@
+use entity::IgnoreNone;
 use eyre::{bail, eyre, Result, WrapErr};
 use reqwest::{Method, Request};
 use sea_orm::{
@@ -75,15 +76,27 @@ impl super::TaskTrait for Data {
                     .save(&tx)
                     .await
                     .wrap_err(eyre!("Could not update the description of artist {}", data))?;
-
-                tx.commit().await?;
-                Ok(())
             }
             None => {
                 tracing::trace!(id=%data, "Wikipedia/MusicBrainz doesn't provide a description for the artist");
-                Ok(())
             }
-        }
+        };
+
+        entity::UpdateArtistEntity::insert(
+            entity::UpdateArtist {
+                r#type: entity::UpdateArtistType::ArtistDescription,
+                id: *data,
+                time: time::OffsetDateTime::now_utc(),
+            }
+            .into_active_model(),
+        )
+        .on_conflict(entity::conflict::UPDATE_ARTIST_CONFLICT.to_owned())
+        .exec(&tx)
+        .await
+        .ignore_none()?;
+
+        tx.commit().await?;
+        Ok(())
     }
 }
 
@@ -111,11 +124,14 @@ impl super::TaskEntities for Data {
         let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
 
         Ok(entity::ArtistEntity::find()
-            .join(JoinType::LeftJoin, entity::ArtistRelation::Update.def())
-            .filter(entity::update_artist_filter(
-                entity::UpdateArtistType::ArtistDescription,
-                before,
-            ))
+            .join(
+                JoinType::LeftJoin,
+                entity::update_artist_join_condition(
+                    entity::ArtistRelation::Update.def(),
+                    entity::UpdateArtistType::ArtistDescription,
+                ),
+            )
+            .filter(entity::update_artist_filter(before))
             .all(db)
             .await?
             .into_iter()

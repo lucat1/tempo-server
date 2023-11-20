@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_query::SimpleExpr;
+use sea_query::{Expr, IntoCondition, SimpleExpr};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
@@ -58,11 +58,14 @@ impl Related<super::artist::Entity> for Entity {
     }
 }
 
-pub fn filter(r#type: UpdateType, before: time::OffsetDateTime) -> SimpleExpr {
-    Column::Time
-        .lte(before)
-        .and(Column::Type.eq(r#type))
-        .or(Column::Time.is_null().and(Column::Type.is_null()))
+pub fn filter(before: time::OffsetDateTime) -> SimpleExpr {
+    Column::Time.lte(before).or(Column::Time.is_null())
+}
+
+pub fn join_condition(relation: RelationDef, r#type: UpdateType) -> RelationDef {
+    relation.on_condition(move |_left, right| {
+        Expr::col((right, Column::Type)).eq(r#type).into_condition()
+    })
 }
 
 impl ActiveModelBehavior for ActiveModel {}

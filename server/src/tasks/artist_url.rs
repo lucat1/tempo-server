@@ -209,11 +209,14 @@ impl super::TaskEntities for Data {
         let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
 
         let res = entity::ArtistEntity::find()
-            .join(JoinType::LeftJoin, entity::ArtistRelation::Update.def())
-            .filter(entity::update_artist_filter(
-                entity::UpdateArtistType::ArtistUrl,
-                before,
-            ))
+            .join(
+                JoinType::LeftJoin,
+                entity::update_artist_join_condition(
+                    entity::ArtistRelation::Update.def(),
+                    entity::UpdateArtistType::ArtistUrl,
+                ),
+            )
+            .filter(entity::update_artist_filter(before))
             .all(db)
             .await?
             .into_iter()

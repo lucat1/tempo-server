@@ -127,6 +127,7 @@ pub use import::Model as Import;
 pub use import::Relation as ImportRelation;
 
 pub use update_artist::filter as update_artist_filter;
+pub use update_artist::join_condition as update_artist_join_condition;
 pub use update_artist::ActiveModel as UpdateArtistActive;
 pub use update_artist::Column as UpdateArtistColumn;
 pub use update_artist::Entity as UpdateArtistEntity;
