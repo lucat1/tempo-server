@@ -167,16 +167,15 @@ impl super::TaskTrait for Data {
                 .ignore_none()?;
         }
 
-        entity::UpdateEntity::insert(
-            entity::Update {
-                r#type: entity::UpdateType::ArtistUrl,
-                uuid_id: *data,
-                string_id: data.to_string(),
+        entity::UpdateArtistEntity::insert(
+            entity::UpdateArtist {
+                r#type: entity::UpdateArtistType::ArtistUrl,
+                id: *data,
                 time: time::OffsetDateTime::now_utc(),
             }
             .into_active_model(),
         )
-        .on_conflict(entity::conflict::UPDATE_CONFLICT.to_owned())
+        .on_conflict(entity::conflict::UPDATE_ARTIST_CONFLICT.to_owned())
         .exec(&tx)
         .await
         .ignore_none()?;
@@ -210,10 +209,10 @@ impl super::TaskEntities for Data {
         let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
 
         let res = entity::ArtistEntity::find()
-            .join(JoinType::LeftJoin, entity::ArtistRelation::Updates.def())
-            .filter(entity::update_filter_condition(
+            .join(JoinType::LeftJoin, entity::ArtistRelation::Update.def())
+            .filter(entity::update_artist_filter(
+                entity::UpdateArtistType::ArtistUrl,
                 before,
-                entity::UpdateType::ArtistUrl,
             ))
             .all(db)
             .await?

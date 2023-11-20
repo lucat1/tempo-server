@@ -15,18 +15,20 @@ pub enum UpdateType {
     #[serde(rename = "all")]
     All,
 
-    Single(entity::UpdateType),
+    Artist(entity::UpdateArtistType),
+    IndexSearch,
 }
 
 // TODO: handle dependencies somehow
-fn handle_all(update_type: UpdateType) -> Vec<entity::UpdateType> {
+fn unpack_all(update_type: UpdateType) -> Vec<UpdateType> {
     match update_type {
         UpdateType::All => vec![
-            entity::UpdateType::ArtistUrl,
-            entity::UpdateType::ArtistDescription,
-            entity::UpdateType::LastFMArtistImage,
+            UpdateType::Artist(entity::UpdateArtistType::ArtistUrl),
+            UpdateType::Artist(entity::UpdateArtistType::ArtistDescription),
+            UpdateType::Artist(entity::UpdateArtistType::LastFMArtistImage),
+            UpdateType::IndexSearch,
         ],
-        UpdateType::Single(s) => vec![s],
+        u => vec![u],
     }
 }
 
@@ -49,22 +51,26 @@ pub async fn all(
     State(AppState(db)): State<AppState>,
     Path(update_type): Path<UpdateType>,
 ) -> Result<(), Error> {
-    for update in handle_all(update_type).into_iter() {
+    for update in unpack_all(update_type).into_iter() {
         let tasks = match update {
-            entity::UpdateType::ArtistUrl => {
-                map_insert_task(TaskName::ArtistUrl, artist_url::Data::all(&db).await?)
-            }
-            entity::UpdateType::ArtistDescription => map_insert_task(
-                TaskName::ArtistDescription,
-                artist_description::Data::all(&db).await?,
+            UpdateType::Artist(au) => match au {
+                entity::UpdateArtistType::ArtistUrl => {
+                    map_insert_task(TaskName::ArtistUrl, artist_url::Data::all(&db).await?)
+                }
+                entity::UpdateArtistType::ArtistDescription => map_insert_task(
+                    TaskName::ArtistDescription,
+                    artist_description::Data::all(&db).await?,
+                ),
+                entity::UpdateArtistType::LastFMArtistImage => map_insert_task(
+                    TaskName::LastFMArtistImage,
+                    lastfm_artist_image::Data::all(&db).await?,
+                ),
+            },
+            UpdateType::IndexSearch => map_insert_task(
+                TaskName::IndexSearch,
+                index_search::Data::outdated(&db).await?,
             ),
-            entity::UpdateType::LastFMArtistImage => map_insert_task(
-                TaskName::LastFMArtistImage,
-                lastfm_artist_image::Data::all(&db).await?,
-            ),
-            entity::UpdateType::IndexSearch => {
-                map_insert_task(TaskName::IndexSearch, index_search::Data::all(&db).await?)
-            }
+            UpdateType::All => unreachable!(),
         };
         tracing::info!(?tasks, "Queueing the update tasks");
         push(&tasks).await?;
@@ -76,24 +82,28 @@ pub async fn outdated(
     State(AppState(db)): State<AppState>,
     Path(update_type): Path<UpdateType>,
 ) -> Result<(), Error> {
-    for update in handle_all(update_type).into_iter() {
+    for update in unpack_all(update_type).into_iter() {
         let tasks = match update {
-            entity::UpdateType::ArtistUrl => {
-                map_insert_task(TaskName::ArtistUrl, artist_url::Data::outdated(&db).await?)
-            }
-            entity::UpdateType::ArtistDescription => map_insert_task(
-                TaskName::ArtistDescription,
-                artist_description::Data::outdated(&db).await?,
-            ),
-            entity::UpdateType::LastFMArtistImage => map_insert_task(
-                TaskName::LastFMArtistImage,
-                lastfm_artist_image::Data::outdated(&db).await?,
-            ),
-            entity::UpdateType::IndexSearch => map_insert_task(
+            UpdateType::Artist(au) => match au {
+                entity::UpdateArtistType::ArtistUrl => {
+                    map_insert_task(TaskName::ArtistUrl, artist_url::Data::outdated(&db).await?)
+                }
+                entity::UpdateArtistType::ArtistDescription => map_insert_task(
+                    TaskName::ArtistDescription,
+                    artist_description::Data::outdated(&db).await?,
+                ),
+                entity::UpdateArtistType::LastFMArtistImage => map_insert_task(
+                    TaskName::LastFMArtistImage,
+                    lastfm_artist_image::Data::outdated(&db).await?,
+                ),
+            },
+            UpdateType::IndexSearch => map_insert_task(
                 TaskName::IndexSearch,
                 index_search::Data::outdated(&db).await?,
             ),
+            UpdateType::All => unreachable!(),
         };
+
         tracing::info!(?tasks, "Queueing the update tasks");
         push(&tasks).await?;
     }

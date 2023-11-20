@@ -1,4 +1,4 @@
-use entity::UpdateEntity;
+use entity::UpdateArtistEntity;
 use sea_orm::Schema;
 use sea_orm_migration::prelude::*;
 
@@ -11,7 +11,7 @@ impl MigrationTrait for Migration {
         let builder = manager.get_database_backend();
         let schema = Schema::new(builder);
         manager
-            .exec_stmt(schema.create_table_from_entity(UpdateEntity))
+            .exec_stmt(schema.create_table_from_entity(UpdateArtistEntity))
             .await?;
         Ok(())
     }

@@ -102,7 +102,8 @@ lazy_static! {
     pub static ref USER_CONFLICT: OnConflict = OnConflict::column(UserColumn::Username)
         .update_columns([UserColumn::FirstName, UserColumn::LastName])
         .to_owned();
-    pub static ref UPDATE_CONFLICT: OnConflict = OnConflict::column(UpdateColumn::Subject)
-        .update_column(UpdateColumn::Time)
-        .to_owned();
+    pub static ref UPDATE_ARTIST_CONFLICT: OnConflict =
+        OnConflict::columns([UpdateArtistColumn::Type, UpdateArtistColumn::Id])
+            .update_column(UpdateArtistColumn::Time)
+            .to_owned();
 }

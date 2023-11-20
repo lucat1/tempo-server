@@ -231,9 +231,9 @@ impl super::TaskEntities for Data {
         let before = time::OffsetDateTime::now_utc() - settings.tasks.outdated;
 
         Ok(entity::ArtistUrlEntity::find()
-            .join(JoinType::LeftJoin, entity::ArtistRelation::Updates.def())
+            .join(JoinType::LeftJoin, entity::ArtistRelation::Update.def())
             .filter(
-                entity::update_filter_condition(before, entity::UpdateType::LastFMArtistImage)
+                entity::update_artist_filter(entity::UpdateArtistType::LastFMArtistImage, before)
                     .and(entity::ArtistUrlColumn::Type.eq(entity::ArtistUrlType::LastFM)),
             )
             .all(db)

@@ -24,7 +24,7 @@ pub mod import;
 pub mod conflict;
 pub mod full;
 
-mod update;
+mod update_artist;
 
 use eyre::Result;
 use sea_orm::DbErr;
@@ -126,12 +126,13 @@ pub use import::InternalTracks;
 pub use import::Model as Import;
 pub use import::Relation as ImportRelation;
 
-pub use update::ActiveModel as UpdateActive;
-pub use update::Column as UpdateColumn;
-pub use update::Entity as UpdateEntity;
-pub use update::Model as Update;
-pub use update::Relation as UpdateRelation;
-pub use update::UpdateType;
+pub use update_artist::filter as update_artist_filter;
+pub use update_artist::ActiveModel as UpdateArtistActive;
+pub use update_artist::Column as UpdateArtistColumn;
+pub use update_artist::Entity as UpdateArtistEntity;
+pub use update_artist::Model as UpdateArtist;
+pub use update_artist::Relation as UpdateArtistRelation;
+pub use update_artist::UpdateType as UpdateArtistType;
 
 pub trait IgnoreNone {
     fn ignore_none(self) -> Result<(), DbErr>;
