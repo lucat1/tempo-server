@@ -1,16 +1,14 @@
-use std::collections::HashMap;
-
 use axum::extract::{OriginalUri, State};
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
 use axum::{body::Body, response::IntoResponse};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
+use std::collections::HashMap;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use super::{artists, mediums};
 use crate::api::documents::MediumInclude;
 use crate::api::{
     documents::{
@@ -19,9 +17,10 @@ use crate::api::{
     },
     extract::{Json, Path},
     jsonapi::{
-        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
+    tempo::{artists, error::TempoError, mediums},
     AppState,
 };
 use base::util::dedup;
@@ -37,7 +36,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Track],
     light: bool,
-) -> Result<Vec<TrackRelated>, DbErr>
+) -> Result<Vec<TrackRelated>, TempoError>
 where
     C: ConnectionTrait,
 {
@@ -185,7 +184,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<TrackRelated>,
     include: &[TrackInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, TempoError>
 where
     C: ConnectionTrait,
 {
@@ -237,35 +236,22 @@ where
     Ok(included)
 }
 
-async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, Error>
+async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, TempoError>
 where
     C: ConnectionTrait,
 {
     entity::TrackEntity::find_by_id(id)
         .one(db)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch track".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Not found".to_string(),
-            detail: Some("Not found".into()),
-        })
+        .await?
+        .ok_or(TempoError::NotFound(None))
 }
 
 pub async fn tracks(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<TrackResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+) -> Result<Json<Document<TrackResource, Included>>, TempoError> {
+    let tx = db.begin().await?;
 
     let mut tracks_query = entity::TrackEntity::find();
     for (filter_key, filter_value) in opts.filter.iter() {
@@ -278,27 +264,13 @@ pub async fn tracks(
     }
     let mut _tracks_cursor = tracks_query.cursor_by(entity::TrackColumn::Id);
     let tracks_cursor = make_cursor(&mut _tracks_cursor, &opts.page);
-    let tracks = tracks_cursor.all(&tx).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all tracks".to_string(),
-        detail: Some(e.into()),
-    })?;
-    let related_to_tracks = related(&tx, &tracks, false).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch entites related to the tracks".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tracks = tracks_cursor.all(&tx).await?;
+    let related_to_tracks = related(&tx, &tracks, false).await?;
     let mut data = Vec::new();
     for (i, track) in tracks.iter().enumerate() {
         data.push(entity_to_resource(track, &related_to_tracks[i]));
     }
-    let included = included(&tx, related_to_tracks, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_tracks, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
@@ -310,31 +282,15 @@ pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
-) -> Result<Json<Document<TrackResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+) -> Result<Json<Document<TrackResource, Included>>, TempoError> {
+    let tx = db.begin().await?;
 
     let track = find_track_by_id(&tx, id).await?;
-    let related_to_tracks = related(&tx, &[track.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the track".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let related_to_tracks = related(&tx, &[track.clone()], false).await?;
     let empty_relationship = TrackRelated::default();
     let related = related_to_tracks.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&track, related);
-    let included = included(&tx, related_to_tracks, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_tracks, &opts.include).await?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
@@ -346,21 +302,10 @@ pub async fn audio(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     request: Request<Body>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse, TempoError> {
     let track = find_track_by_id(&db, id).await?;
-    let path = track.path.ok_or(Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Track does not have an associated path".to_string(),
-        detail: Some("Track does not have an associated path".into()),
-    })?;
-    let mime = track
-        .format
-        .ok_or(Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Track does not have an associated format".to_string(),
-            detail: Some("Track does not have an associated format".into()),
-        })?
-        .mime();
+    let path = track.path.ok_or(TempoError::NoTrackPath)?;
+    let mime = track.format.ok_or(TempoError::NoTrackFormat)?.mime();
     Ok(
         tower_http::services::fs::ServeFile::new_with_mime(path, &mime)
             .oneshot(request)

@@ -1,15 +1,14 @@
 use axum::{
     async_trait,
     extract::{Query, State},
-    http::StatusCode,
     response::{IntoResponse, Redirect, Response},
 };
-use eyre::{eyre, Result};
 use lazy_static::lazy_static;
-use reqwest::{Method, Request};
+use reqwest::{Error as ReqwestError, Method, Request};
 use sea_orm::{ActiveModelTrait, IntoActiveModel};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
+use thiserror::Error;
 use tokio::sync::Mutex;
 use url::Url;
 use uuid::Uuid;
@@ -20,7 +19,8 @@ use crate::api::{
         Included, Meta, ResourceType,
     },
     extract::{Json, Path},
-    jsonapi::{Document, DocumentData, Error},
+    jsonapi::{Document, DocumentData},
+    tempo::error::TempoError,
     AppState,
 };
 use crate::fetch::lastfm;
@@ -48,22 +48,11 @@ pub struct CallbackOptions {
     pub redirect: Option<Url>,
 }
 
-#[async_trait]
-pub trait ProviderImpl {
-    async fn url(&self, settings: &Settings, username: &str, redirect: Option<Url>) -> Result<Url>;
-    async fn callback(
-        &self,
-        settings: &Settings,
-        opts: &CallbackOptions,
-    ) -> Result<serde_json::Value>;
-    fn meta(&self, json: &serde_json::Value) -> Result<Meta>;
-}
-
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum LastFMAuthResponse {
     Success(LastFMAuthResponseSuccess),
-    Error(LastFMAuthResponseError),
+    TempoError(LastFMAuthResponseTempoError),
 }
 
 #[derive(Deserialize)]
@@ -77,10 +66,10 @@ struct LastFMSession {
     name: String,
 }
 
-#[derive(Deserialize)]
-struct LastFMAuthResponseError {
-    code: usize,
-    message: String,
+#[derive(Deserialize, Debug)]
+pub struct LastFMAuthResponseTempoError {
+    pub code: usize,
+    pub message: String,
 }
 
 async fn id(username: &str) -> Uuid {
@@ -93,9 +82,51 @@ async fn username(id: &Uuid) -> Option<String> {
     ID_MAP.lock().await.remove(id)
 }
 
+#[derive(Error, Debug)]
+pub enum ConnectionError {
+    #[error("Provider {0} not configured")]
+    NotConfigured(String),
+
+    #[error("Last.fm returned an error")]
+    LastFMError(LastFMAuthResponseTempoError),
+
+    #[error("Invalid callback id")]
+    InvalidCallbackId,
+
+    #[error("Could not parse url: {0}")]
+    Url(#[from] url::ParseError),
+
+    #[error("Error while contacting the provider: {0}")]
+    Request(#[from] ReqwestError),
+
+    #[error("Error while parsing the response: {0}")]
+    Parse(#[from] serde_json::Error),
+}
+
+#[async_trait]
+pub trait ProviderImpl {
+    async fn url(
+        &self,
+        settings: &Settings,
+        username: &str,
+        redirect: Option<Url>,
+    ) -> Result<Url, ConnectionError>;
+    async fn callback(
+        &self,
+        settings: &Settings,
+        opts: &CallbackOptions,
+    ) -> Result<serde_json::Value, ConnectionError>;
+    fn meta(&self, json: &serde_json::Value) -> Result<Meta, ConnectionError>;
+}
+
 #[async_trait]
 impl ProviderImpl for entity::ConnectionProvider {
-    async fn url(&self, settings: &Settings, username: &str, redirect: Option<Url>) -> Result<Url> {
+    async fn url(
+        &self,
+        settings: &Settings,
+        username: &str,
+        redirect: Option<Url>,
+    ) -> Result<Url, ConnectionError> {
         match self {
             entity::ConnectionProvider::LastFM => {
                 if let Some(lastfm) = &settings.connections.lastfm {
@@ -115,7 +146,7 @@ impl ProviderImpl for entity::ConnectionProvider {
                         .append_pair("cb", cb_url.to_string().as_str());
                     Ok(url)
                 } else {
-                    Err(eyre!("Provider {} not configured", self.to_string()))
+                    Err(ConnectionError::NotConfigured(self.to_string()))
                 }
             }
         }
@@ -125,14 +156,14 @@ impl ProviderImpl for entity::ConnectionProvider {
         &self,
         settings: &Settings,
         opts: &CallbackOptions,
-    ) -> Result<serde_json::Value> {
+    ) -> Result<serde_json::Value, ConnectionError> {
         match self {
             entity::ConnectionProvider::LastFM => {
                 let lastfm = settings
                     .connections
                     .lastfm
                     .as_ref()
-                    .ok_or(eyre!("Provider {} not configured", self.name()))?;
+                    .ok_or(ConnectionError::NotConfigured(self.to_string()))?;
                 let mut url = lastfm::LASTFM_BASE_URL.clone();
                 url.query_pairs_mut()
                     .append_pair("method", "auth.getSession")
@@ -143,7 +174,7 @@ impl ProviderImpl for entity::ConnectionProvider {
                 url.query_pairs_mut()
                     .append_pair("api_sig", signature.as_str());
                 let res = lastfm::send_request(Request::new(Method::GET, url)).await?;
-                let raw_data: LastFMAuthResponse = res.json().await.map_err(|e| eyre!(e))?;
+                let raw_data: LastFMAuthResponse = res.json().await?;
                 match raw_data {
                     LastFMAuthResponse::Success(raw_data) => {
                         let data = entity::user_connection::LastFMData {
@@ -152,16 +183,12 @@ impl ProviderImpl for entity::ConnectionProvider {
                         };
                         Ok(serde_json::to_value(data)?)
                     }
-                    LastFMAuthResponse::Error(err) => Err(eyre!(
-                        "LastFM returned error code {}: {}",
-                        err.code,
-                        err.message
-                    )),
+                    LastFMAuthResponse::TempoError(err) => Err(ConnectionError::LastFMError(err)),
                 }
             }
         }
     }
-    fn meta(&self, json: &serde_json::Value) -> Result<Meta> {
+    fn meta(&self, json: &serde_json::Value) -> Result<Meta, ConnectionError> {
         match self {
             entity::ConnectionProvider::LastFM => {
                 let data: entity::user_connection::LastFMData =
@@ -175,7 +202,7 @@ impl ProviderImpl for entity::ConnectionProvider {
     }
 }
 
-pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, Error> {
+pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, TempoError> {
     Ok(Json(Document {
         data: DocumentData::Multi(
             PROVIDERS
@@ -196,15 +223,11 @@ pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>
 
 pub async fn connection(
     Path(provider): Path<entity::ConnectionProvider>,
-) -> Result<Json<Document<ConnectionResource, Included>>, Error> {
+) -> Result<Json<Document<ConnectionResource, Included>>, TempoError> {
     let (id, attrs) = PROVIDERS
         .iter()
         .find(|(id, _)| id == &provider)
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Unkown connection provider".to_owned(),
-            detail: None,
-        })?;
+        .ok_or(TempoError::NotFound(None))?;
 
     Ok(Json(Document {
         data: DocumentData::Single(ConnectionResource {
@@ -223,26 +246,13 @@ pub async fn callback(
     State(AppState(db)): State<AppState>,
     Path(provider): Path<entity::ConnectionProvider>,
     Query(opts): Query<CallbackOptions>,
-) -> Result<Response, Error> {
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while handling connection callback".to_owned(),
-        detail: Some(e.into()),
-    })?;
+) -> Result<Response, TempoError> {
+    let settings = get_settings()?;
 
-    let json = provider
-        .callback(settings, &opts)
+    let json = provider.callback(settings, &opts).await?;
+    let user = username(&opts.id)
         .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Error while handling connection callback".to_owned(),
-            detail: Some(e.into()),
-        })?;
-    let user = username(&opts.id).await.ok_or(Error {
-        status: StatusCode::BAD_REQUEST,
-        title: "Invalid callback id".to_owned(),
-        detail: None,
-    })?;
+        .ok_or(ConnectionError::InvalidCallbackId)?;
     tracing::info!(%provider, %json, %user, "User connected with provider");
     let user_connection = entity::UserConnection {
         user,
@@ -250,11 +260,7 @@ pub async fn callback(
         data: json,
     }
     .into_active_model();
-    user_connection.insert(&db).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not save connection".to_owned(),
-        detail: Some(e.into()),
-    })?;
+    user_connection.insert(&db).await?;
     if let Some(redir) = opts.redirect {
         Ok(Redirect::temporary(redir.to_string().as_str()).into_response())
     } else {

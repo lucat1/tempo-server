@@ -5,7 +5,8 @@ use axum::{
 use sea_orm::DbErr;
 use thiserror::Error;
 
-use crate::api::jsonapi::Error;
+use crate::api::{jsonapi::Error, tempo::connections::ConnectionError};
+use base::setting::SettingsError;
 
 #[derive(Error, Debug)]
 pub enum TempoError {
@@ -14,13 +15,33 @@ pub enum TempoError {
 
     #[error("Not found")]
     NotFound(Option<DbErr>),
+    #[error("Not modified")]
+    NotModified,
+    #[error("Unauthorized")]
+    Unauthorized(Option<String>),
+    #[error("Bad request")]
+    BadRequest(Option<String>),
+
+    #[error("Could not read settings")]
+    Settings(#[from] SettingsError),
+
+    #[error("Could not read settings")]
+    Connection(#[from] ConnectionError),
+
+    #[error("Track does not have an associated path")]
+    NoTrackPath,
+    #[error("Track does not have an associated format")]
+    NoTrackFormat,
 }
 
 impl TempoError {
     fn status(&self) -> StatusCode {
         match self {
-            TempoError::DbErr(_) => StatusCode::INTERNAL_SERVER_ERROR,
             TempoError::NotFound(_) => StatusCode::NOT_FOUND,
+            TempoError::NotModified => StatusCode::NOT_MODIFIED,
+            TempoError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            TempoError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -33,6 +54,9 @@ impl From<TempoError> for Error {
             detail: match value {
                 TempoError::DbErr(e) => Some(e.into()),
                 TempoError::NotFound(o) => o.map(|e| e.into()),
+                TempoError::Unauthorized(Some(v)) => Some(v.into()),
+                TempoError::BadRequest(Some(v)) => Some(v.into()),
+                _ => None,
             },
         }
     }

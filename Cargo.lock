@@ -570,6 +570,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_derive",
+ "thiserror",
  "time",
  "toml",
  "tracing",

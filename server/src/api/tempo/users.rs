@@ -16,7 +16,7 @@ use crate::api::{
     },
     extract::{Json, Path},
     jsonapi::{
-        Document, DocumentData, Error, InsertManyRelation, Query, Related, Relation, Relationship,
+        Document, DocumentData, InsertManyRelation, Query, Related, Relation, Relationship,
         ResourceIdentifier,
     },
     tempo::{connections::ProviderImpl, error::TempoError, scrobbles},
@@ -184,12 +184,8 @@ pub async fn user(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path(username): Path<String>,
-) -> Result<Json<Document<UserResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+) -> Result<Json<Document<UserResource, Included>>, TempoError> {
+    let tx = db.begin().await?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
     Ok(Json(Document {
         links: HashMap::new(),
@@ -202,22 +198,14 @@ pub async fn relation(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path((username, relation)): Path<(String, UserRelation)>,
-) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, TempoError> {
+    let tx = db.begin().await?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
     let related = data
         .relationships
         .get(&relation)
         .map(|r| r.data.to_owned())
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "No relationship data".to_string(),
-            detail: None,
-        })?;
+        .ok_or(TempoError::NotFound(None))?;
     Ok(Json(Document {
         links: HashMap::new(),
         data: match related {
@@ -242,54 +230,30 @@ pub async fn post_relation(
             ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
         >,
     >,
-) -> Result<(StatusCode, TypedHeader<Location>), Error> {
+) -> Result<(StatusCode, TypedHeader<Location>), TempoError> {
     if claims.username != username {
-        return Err(Error {
-            status: StatusCode::UNAUTHORIZED,
-            title: "You can only edit your own connections".to_string(),
-            detail: None,
-        });
+        return Err(TempoError::Unauthorized(None));
     }
     if relation_kind != UserRelation::Connections {
-        return Err(Error {
-            status: StatusCode::BAD_REQUEST,
-            title: "Users can only edit connection relationships".to_string(),
-            detail: None,
-        });
+        return Err(TempoError::BadRequest(Some(
+            "Users can only edit connection relationships".to_string(),
+        )));
     }
 
     let connection =
         entity::UserConnectionEntity::find_by_id((claims.username, relation.data[0].id))
             .one(&db)
-            .await
-            .map_err(|e| Error {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                title: "Could not check if the connectino already exists".to_string(),
-                detail: Some(e.into()),
-            })?;
+            .await?;
     if connection.is_some() {
-        Err(Error {
-            status: StatusCode::NOT_MODIFIED,
-            title: "Connection already enstablished".to_string(),
-            detail: None,
-        })
+        Err(TempoError::NotModified)
     } else {
-        let settings = get_settings().map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Error while handling connection callback".to_owned(),
-            detail: Some(e.into()),
-        })?;
+        let settings = get_settings()?;
 
         // TODO: redirect url
         let url = relation.data[0]
             .id
             .url(settings, username.as_str(), None)
-            .await
-            .map_err(|e| Error {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                title: "Could not generate connection URL".to_string(),
-                detail: Some(e.into()),
-            })?;
+            .await?;
         Ok((
             StatusCode::CREATED,
             TypedHeader(
@@ -309,31 +273,20 @@ pub async fn delete_relation(
     Json(relation): Json<
         InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
     >,
-) -> Result<StatusCode, Error> {
+) -> Result<StatusCode, TempoError> {
     if claims.username != username {
-        return Err(Error {
-            status: StatusCode::UNAUTHORIZED,
-            title: "You can only edit your own connections".to_string(),
-            detail: None,
-        });
+        return Err(TempoError::Unauthorized(None));
     }
     // TODO: support deleting scrobbles and others
     if relation_kind != UserRelation::Connections {
-        return Err(Error {
-            status: StatusCode::BAD_REQUEST,
-            title: "Users can only edit connection relationships".to_string(),
-            detail: None,
-        });
+        return Err(TempoError::BadRequest(Some(
+            "Users can only edit connection relationships".to_string(),
+        )));
     }
 
     entity::UserConnectionEntity::delete_by_id((claims.username, relation.data[0].id))
         .exec(&db)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::FORBIDDEN,
-            title: "Could not delete the requested relations".to_string(),
-            detail: Some(e.into()),
-        })?;
+        .await?;
 
     Ok(StatusCode::OK)
 }

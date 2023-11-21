@@ -24,3 +24,4 @@ rand = "0.8.5"
 iref = { version = "2.2.3", features = ["serde"] }
 time = { version = "0.3.21", features = ["parsing"] }
 url = "2.4.0"
+thiserror = "1.0.50"
