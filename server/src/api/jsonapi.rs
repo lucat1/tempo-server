@@ -145,6 +145,12 @@ pub struct Error {
     pub detail: Option<Box<dyn StdError>>,
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.status, self.title)
+    }
+}
+
 // TODO: remove once we get proper error handling done
 impl From<ErrReport> for Error {
     fn from(err: ErrReport) -> Self {

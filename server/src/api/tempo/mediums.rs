@@ -18,8 +18,8 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    tempo::{error::TempoError, releases, tracks},
-    AppState,
+    tempo::{releases, tracks},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -33,7 +33,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Medium],
     _light: bool,
-) -> Result<Vec<MediumRelated>, TempoError>
+) -> Result<Vec<MediumRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -132,7 +132,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<MediumRelated>,
     include: &[MediumInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -168,7 +168,7 @@ pub async fn mediums(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<MediumResource, Included>>, TempoError> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let mut mediums_query = entity::MediumEntity::find();
@@ -200,13 +200,13 @@ pub async fn medium(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
-) -> Result<Json<Document<MediumResource, Included>>, TempoError> {
+) -> Result<Json<Document<MediumResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let medium = entity::MediumEntity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     let related_to_mediums = related(&tx, &[medium.clone()], false).await?;
     let empty_relationship = MediumRelated::default();
     let related = related_to_mediums.first().unwrap_or(&empty_relationship);

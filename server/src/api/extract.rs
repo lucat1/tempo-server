@@ -3,17 +3,25 @@ use axum::{
     async_trait,
     body::{Bytes, HttpBody},
     extract::{
-        FromRequest, FromRequestParts, Json as AxumJson, Path as AxumPath,
-        TypedHeader as AxumTypedHeader,
+        rejection::TypedHeaderRejection, FromRequest, FromRequestParts, Json as AxumJson,
+        Path as AxumPath, TypedHeader as AxumTypedHeader,
     },
-    headers::{Header, HeaderMap},
+    headers::{
+        authorization::{Authorization, Bearer},
+        Header, HeaderMap,
+    },
     http::header::{self, HeaderValue},
     http::{request::Parts, Request, StatusCode},
     response::{IntoResponse, Response},
     BoxError,
 };
+use jsonwebtoken::{
+    decode, errors::Error as JwtError, Algorithm, DecodingKey, TokenData, Validation,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
+
+use base::setting::{get_settings, SettingsError};
 
 static HEADER_VALUE: &str = "application/vnd.api+json";
 
@@ -124,22 +132,35 @@ where
 
 pub struct TypedHeader<T>(pub T);
 
+#[derive(Debug, Error)]
+pub enum TypedHeaderError {
+    #[error("Could not get typed header")]
+    TypedHeader(#[from] TypedHeaderRejection),
+}
+
+impl IntoResponse for TypedHeaderError {
+    fn into_response(self) -> Response {
+        Error {
+            status: StatusCode::BAD_REQUEST,
+            title: self.to_string(),
+            detail: match self {
+                TypedHeaderError::TypedHeader(e) => Some(Box::new(e)),
+            },
+        }
+        .into_response()
+    }
+}
+
 #[async_trait]
 impl<T, S> FromRequestParts<S> for TypedHeader<T>
 where
     T: Header,
     S: Send + Sync,
 {
-    type Rejection = Error;
+    type Rejection = TypedHeaderError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let AxumTypedHeader(t) = AxumTypedHeader::<T>::from_request_parts(parts, state)
-            .await
-            .map_err(|e| Error {
-                status: StatusCode::BAD_REQUEST,
-                title: format!("Invalid header: {}", T::name()),
-                detail: Some(e.into()),
-            })?;
+        let AxumTypedHeader(t) = AxumTypedHeader::<T>::from_request_parts(parts, state).await?;
         Ok(Self(t))
     }
 }
@@ -163,5 +184,78 @@ where
                 detail: Some(e.into()),
             })?;
         Ok(Self(t))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClaimsSubject {
+    Token,
+    Refresh,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub username: String,
+    pub exp: usize,
+    pub sub: ClaimsSubject,
+}
+
+#[derive(Debug, Error)]
+pub enum ClaimsError {
+    #[error("Could not get the settings")]
+    Settings(#[from] SettingsError),
+
+    #[error("Could not get typed header")]
+    TypedHeader(#[from] TypedHeaderError),
+
+    #[error("Invalid authentication token")]
+    Unauthorized(#[from] JwtError),
+}
+
+impl IntoResponse for ClaimsError {
+    fn into_response(self) -> Response {
+        Error {
+            status: StatusCode::BAD_REQUEST,
+            title: self.to_string(),
+            detail: match self {
+                ClaimsError::Settings(e) => Some(Box::new(e)),
+                ClaimsError::TypedHeader(e) => Some(Box::new(e)),
+                ClaimsError::Unauthorized(e) => Some(Box::new(e)),
+            },
+        }
+        .into_response()
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+{
+    type Rejection = ClaimsError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let TypedHeader(header) =
+            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state).await?;
+        check_token(header.token()).map(|td| td.claims)
+    }
+}
+
+pub fn check_token<T>(token: &str) -> Result<TokenData<T>, ClaimsError>
+where
+    T: for<'de> Deserialize<'de> + std::fmt::Debug,
+{
+    let settings = get_settings()?;
+    let claims = decode::<T>(
+        token,
+        &DecodingKey::from_secret(settings.auth.jwt_secret.as_ref()),
+        &Validation::new(Algorithm::HS256),
+    );
+    match claims {
+        Ok(token_data) => {
+            tracing::trace!(?token_data, "User for request");
+            Ok(token_data)
+        }
+        Err(e) => Err(ClaimsError::Unauthorized(e)),
     }
 }

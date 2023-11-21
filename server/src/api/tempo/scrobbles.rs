@@ -11,18 +11,17 @@ use time::Duration;
 use uuid::Uuid;
 
 use crate::api::{
-    auth::Claims,
     documents::{
         Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
         ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
-    extract::{Json, Path},
+    extract::{Claims, Json, Path},
     jsonapi::{
         links_from_resource, make_cursor, Document, DocumentData, InsertDocument, Page, Query,
         Related, Relation, Relationship, ResourceIdentifier,
     },
-    tempo::{error::TempoError, tracks, users},
-    AppState,
+    tempo::{tracks, users},
+    AppState, Error,
 };
 use crate::tasks::{self, TaskName};
 use base::util::dedup;
@@ -80,7 +79,7 @@ pub async fn included<C>(
     db: &C,
     entities: Vec<entity::Scrobble>,
     include: &[ScrobbleInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -148,7 +147,7 @@ async fn fetch_scrobbles<C>(
     username: String,
     page: &Page<i64>,
     include: &[ScrobbleInclude],
-) -> Result<(Vec<ScrobbleResource>, Vec<Included>), TempoError>
+) -> Result<(Vec<ScrobbleResource>, Vec<Included>), Error>
 where
     C: ConnectionTrait,
 {
@@ -190,7 +189,7 @@ pub async fn insert_scrobbles(
     State(AppState(db)): State<AppState>,
     claims: Claims,
     Json(scrobbles): Json<InsertDocument<InsertScrobbleResource>>,
-) -> Result<Json<Document<ScrobbleResource, Included>>, TempoError> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await?;
     let after = entity::ScrobbleEntity::find().count(&tx).await?;
     let scrobbles = match scrobbles.data {
@@ -203,7 +202,7 @@ pub async fn insert_scrobbles(
         }) = scrobble.relationships.get(&ScrobbleRelation::User)
         {
             if data.id != claims.username {
-                return Err(TempoError::BadRequest(Some(
+                return Err(Error::BadRequest(Some(
                     "You cannot insert a scrobble for another user".to_string(),
                 )));
             }
@@ -214,7 +213,7 @@ pub async fn insert_scrobbles(
         .map(resource_to_active_entity)
         .collect::<Result<Vec<_>>>()
         // TODO: once we get an error for resource to entity conversion, handle that properly
-        .map_err(|_| TempoError::BadRequest(Some("Invalid scrobble data".to_string())))?;
+        .map_err(|_| Error::BadRequest(Some("Invalid scrobble data".to_string())))?;
     tracing::info!(user = %claims.username, scrobbles = ?entities, "Scrobbling");
     let res = entity::ScrobbleEntity::insert_many(entities.clone())
         .exec(&tx)
@@ -238,7 +237,7 @@ pub async fn insert_scrobbles(
     )
     .await
     // TODO: once we convert the error here, handle it properly
-    .map_err(|_| TempoError::BadRequest(None))?;
+    .map_err(|_| Error::BadRequest(None))?;
 
     let page = Page {
         size: u32::MAX,
@@ -258,7 +257,7 @@ pub async fn scrobbles(
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     OriginalUri(uri): OriginalUri,
     claims: Claims,
-) -> Result<Json<Document<ScrobbleResource, Included>>, TempoError> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await?;
     let (data, included) = fetch_scrobbles(&tx, claims.username, &opts.page, &opts.include).await?;
     Ok(Json(Document {
@@ -272,12 +271,12 @@ pub async fn scrobble(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     Path(id): Path<i64>,
-) -> Result<Json<Document<ScrobbleResource, Included>>, TempoError> {
+) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
     let tx = db.begin().await?;
     let scrobble = entity::ScrobbleEntity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     let resource = entity_to_resource(&scrobble);
     let included = included(&tx, vec![scrobble], &opts.include).await?;
     Ok(Json(Document {

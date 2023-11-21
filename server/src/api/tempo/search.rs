@@ -12,8 +12,8 @@ use crate::api::{
     },
     extract::Json,
     jsonapi::{Document, DocumentData},
-    tempo::{artists, error::TempoError, releases, tracks},
-    AppState,
+    tempo::{artists, releases, tracks},
+    AppState, Error,
 };
 use crate::search::{
     db::{do_search, get_ids, Index},
@@ -45,7 +45,7 @@ async fn search_and_map<'a, C>(
     db: &C,
     index: Index<'a>,
     search: &SearchQuery,
-) -> Result<Vec<SearchResult>, TempoError>
+) -> Result<Vec<SearchResult>, Error>
 where
     C: ConnectionTrait,
 {
@@ -111,7 +111,7 @@ where
 pub async fn search(
     State(AppState(db)): State<AppState>,
     Query(search): Query<SearchQuery>,
-) -> Result<Json<Document<SearchResult, Included>>, TempoError> {
+) -> Result<Json<Document<SearchResult, Included>>, Error> {
     let tx = db.begin().await?;
     let indexes = get_indexes()?;
     let mut artists = search_and_map(&tx, Index::Artists(&indexes.artists), &search).await?;

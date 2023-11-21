@@ -9,18 +9,17 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::api::{
-    auth::Claims,
     documents::{
         Included, Meta, ResourceType, ScrobbleInclude, UserAttributes, UserFilter, UserInclude,
         UserRelation, UserResource,
     },
-    extract::{Json, Path},
+    extract::{Claims, Json, Path},
     jsonapi::{
         Document, DocumentData, InsertManyRelation, Query, Related, Relation, Relationship,
         ResourceIdentifier,
     },
-    tempo::{connections::ProviderImpl, error::TempoError, scrobbles},
-    AppState,
+    tempo::{connections::ProviderImpl, scrobbles},
+    AppState, Error,
 };
 use base::setting::get_settings;
 use base::util::dedup;
@@ -35,7 +34,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::User],
     _light: bool,
-) -> Result<Vec<UserRelated>, TempoError>
+) -> Result<Vec<UserRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -131,7 +130,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<UserRelated>,
     include: &[UserInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -162,14 +161,14 @@ async fn fetch_user<C>(
     db: &C,
     username: String,
     include: &[UserInclude],
-) -> Result<(UserResource, Vec<Included>), TempoError>
+) -> Result<(UserResource, Vec<Included>), Error>
 where
     C: ConnectionTrait,
 {
     let user = entity::UserEntity::find_by_id(username)
         .one(db)
         .await?
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     let related = related(db, &[user.to_owned()], false)
         .await?
         .into_iter()
@@ -184,7 +183,7 @@ pub async fn user(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path(username): Path<String>,
-) -> Result<Json<Document<UserResource, Included>>, TempoError> {
+) -> Result<Json<Document<UserResource, Included>>, Error> {
     let tx = db.begin().await?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
     Ok(Json(Document {
@@ -198,14 +197,14 @@ pub async fn relation(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<UserFilter, entity::UserColumn, UserInclude, String>,
     Path((username, relation)): Path<(String, UserRelation)>,
-) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, TempoError> {
+) -> Result<Json<Document<Related<ResourceType, Meta>, Included>>, Error> {
     let tx = db.begin().await?;
     let (data, included) = fetch_user(&tx, username, &opts.include).await?;
     let related = data
         .relationships
         .get(&relation)
         .map(|r| r.data.to_owned())
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     Ok(Json(Document {
         links: HashMap::new(),
         data: match related {
@@ -230,12 +229,12 @@ pub async fn post_relation(
             ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>,
         >,
     >,
-) -> Result<(StatusCode, TypedHeader<Location>), TempoError> {
+) -> Result<(StatusCode, TypedHeader<Location>), Error> {
     if claims.username != username {
-        return Err(TempoError::Unauthorized(None));
+        return Err(Error::Unauthorized(None));
     }
     if relation_kind != UserRelation::Connections {
-        return Err(TempoError::BadRequest(Some(
+        return Err(Error::BadRequest(Some(
             "Users can only edit connection relationships".to_string(),
         )));
     }
@@ -245,7 +244,7 @@ pub async fn post_relation(
             .one(&db)
             .await?;
     if connection.is_some() {
-        Err(TempoError::NotModified)
+        Err(Error::NotModified)
     } else {
         let settings = get_settings()?;
 
@@ -273,13 +272,13 @@ pub async fn delete_relation(
     Json(relation): Json<
         InsertManyRelation<ResourceIdentifier<ResourceType, entity::ConnectionProvider, Meta>>,
     >,
-) -> Result<StatusCode, TempoError> {
+) -> Result<StatusCode, Error> {
     if claims.username != username {
-        return Err(TempoError::Unauthorized(None));
+        return Err(Error::Unauthorized(None));
     }
     // TODO: support deleting scrobbles and others
     if relation_kind != UserRelation::Connections {
-        return Err(TempoError::BadRequest(Some(
+        return Err(Error::BadRequest(Some(
             "Users can only edit connection relationships".to_string(),
         )));
     }

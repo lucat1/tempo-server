@@ -16,8 +16,8 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    tempo::{artists, error::TempoError, images, mediums},
-    AppState,
+    tempo::{artists, images, mediums},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -32,7 +32,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Release],
     _light: bool,
-) -> Result<Vec<ReleaseRelated>, TempoError>
+) -> Result<Vec<ReleaseRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -164,7 +164,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<ReleaseRelated>,
     include: &[ReleaseInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -217,7 +217,7 @@ pub async fn releases(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<ReleaseResource, Included>>, TempoError> {
+) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let mut releases_query = entity::ReleaseEntity::find();
@@ -249,13 +249,13 @@ pub async fn release(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
-) -> Result<Json<Document<ReleaseResource, Included>>, TempoError> {
+) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let release = entity::ReleaseEntity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     let related_to_releases = related(&tx, &[release.clone()], false).await?;
     let empty_relationship = ReleaseRelated::default();
     let related = related_to_releases.first().unwrap_or(&empty_relationship);

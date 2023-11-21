@@ -20,8 +20,8 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    tempo::{artists, error::TempoError, mediums},
-    AppState,
+    tempo::{artists, mediums},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -36,7 +36,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Track],
     light: bool,
-) -> Result<Vec<TrackRelated>, TempoError>
+) -> Result<Vec<TrackRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -184,7 +184,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<TrackRelated>,
     include: &[TrackInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -236,21 +236,21 @@ where
     Ok(included)
 }
 
-async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, TempoError>
+async fn find_track_by_id<C>(db: &C, id: Uuid) -> Result<entity::Track, Error>
 where
     C: ConnectionTrait,
 {
     entity::TrackEntity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or(TempoError::NotFound(None))
+        .ok_or(Error::NotFound(None))
 }
 
 pub async fn tracks(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<TrackResource, Included>>, TempoError> {
+) -> Result<Json<Document<TrackResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let mut tracks_query = entity::TrackEntity::find();
@@ -282,7 +282,7 @@ pub async fn track(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<TrackFilter, entity::TrackColumn, TrackInclude, uuid::Uuid>,
-) -> Result<Json<Document<TrackResource, Included>>, TempoError> {
+) -> Result<Json<Document<TrackResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let track = find_track_by_id(&tx, id).await?;
@@ -302,10 +302,10 @@ pub async fn audio(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     request: Request<Body>,
-) -> Result<impl IntoResponse, TempoError> {
+) -> Result<impl IntoResponse, Error> {
     let track = find_track_by_id(&db, id).await?;
-    let path = track.path.ok_or(TempoError::NoTrackPath)?;
-    let mime = track.format.ok_or(TempoError::NoTrackFormat)?.mime();
+    let path = track.path.ok_or(Error::NoTrackPath)?;
+    let mime = track.format.ok_or(Error::NoTrackFormat)?.mime();
     Ok(
         tower_http::services::fs::ServeFile::new_with_mime(path, &mime)
             .oneshot(request)

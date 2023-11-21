@@ -1,22 +1,20 @@
 use axum::{
-    async_trait,
-    extract::FromRequestParts,
+    extract::State,
     headers::authorization::{Authorization, Bearer},
     http::Request,
-    http::{request::Parts, StatusCode},
     middleware::Next,
     response::Response,
 };
-use eyre::{eyre, Result};
-use jsonwebtoken::{
-    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
+use jsonwebtoken::{encode, errors::Error as JWTError, EncodingKey, Header};
+use ldap3::{LdapConnAsync, LdapError, Scope, SearchEntry};
+use password_hash::{Error as PasswordHashError, PasswordHash, PasswordVerifier};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
 };
-use ldap3::{LdapConnAsync, Scope, SearchEntry};
-use password_hash::{PasswordHash, PasswordVerifier};
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, IntoActiveModel};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Add};
-use strfmt::strfmt;
+use strfmt::{strfmt, FmtError};
+use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 
 use argon2::Argon2;
@@ -26,16 +24,40 @@ use scrypt::Scrypt;
 use super::documents::Included;
 use crate::api::{
     documents::{AuthAttributes, AuthRelation, AuthResource, ResourceType, Token},
-    extract::{Json, TypedHeader},
+    extract::{check_token, Claims, ClaimsSubject, Json, TypedHeader},
     jsonapi::{
-        Document, DocumentData, Error, Related, Relation, Relationship, Resource,
-        ResourceIdentifier,
+        Document, DocumentData, Related, Relation, Relationship, Resource, ResourceIdentifier,
     },
+    AppState, Error,
 };
-use base::{
-    database::get_database,
-    setting::{get_settings, AuthMethod, Settings},
-};
+use base::setting::{get_settings, AuthMethod, Settings, SettingsError};
+
+#[derive(Error, Debug)]
+pub enum AuthError {
+    #[error("Database error: {0}")]
+    Database(#[from] DbErr),
+    #[error("Could not get the settings: {0}")]
+    Settings(#[from] SettingsError),
+    #[error("Error during jwt serialization: {0}")]
+    JWT(#[from] JWTError),
+
+    #[error("No matching user exists or no auth methods are available")]
+    NoCandidate,
+    #[error("No user with matching username found")]
+    NoMatchingUser,
+    #[error("Invalid password hash: {0}")]
+    InvalidPasswordHash(#[from] PasswordHashError),
+
+    #[error("Error while formatting LDAP filter: {0}")]
+    LdapFilterFormat(#[from] FmtError),
+
+    #[error("Error in LDAP query: {0}")]
+    LdapError(#[from] LdapError),
+    #[error("LDAP user not found after bind")]
+    LdapUserNotFound,
+    #[error("LDAP entity is missing the required fields")]
+    LdapMissingFIeld,
+}
 
 #[derive(Debug, Clone)]
 struct UserFields {
@@ -48,16 +70,16 @@ async fn try_local_login(
     settings: &Settings,
     username: &str,
     password: &str,
-) -> Result<UserFields> {
+) -> Result<UserFields, AuthError> {
     let user = settings
         .auth
         .users
         .iter()
         .find(|u| u.username == username)
-        .ok_or(eyre!("No user with matching username found"))?
+        .ok_or(AuthError::NoMatchingUser)?
         .to_owned();
-    let password_hash = PasswordHash::new(user.password.as_str())
-        .map_err(|e| eyre!("Invalid password hash: {}", e))?;
+    let password_hash =
+        PasswordHash::new(user.password.as_str()).map_err(AuthError::InvalidPasswordHash)?;
     let algs: &[&dyn PasswordVerifier] = &[&Argon2::default(), &Pbkdf2, &Scrypt];
     password_hash.verify_password(algs, password)?;
 
@@ -68,7 +90,11 @@ async fn try_local_login(
     })
 }
 
-async fn try_ldap_login(settings: &Settings, username: &str, password: &str) -> Result<UserFields> {
+async fn try_ldap_login(
+    settings: &Settings,
+    username: &str,
+    password: &str,
+) -> Result<UserFields, AuthError> {
     let (conn, mut ldap) = LdapConnAsync::new(settings.auth.ldap.uri.as_str()).await?;
     ldap3::drive!(conn);
     tracing::trace!(admin_dn = %settings.auth.ldap.admin_dn, "Binding as LDAP Admin user");
@@ -96,10 +122,7 @@ async fn try_ldap_login(settings: &Settings, username: &str, password: &str) -> 
         .await?
         .success()?;
 
-    let first_search_result = rs
-        .into_iter()
-        .next()
-        .ok_or(eyre!("Expected to find the user after a successful bind"))?;
+    let first_search_result = rs.into_iter().next().ok_or(AuthError::LdapUserNotFound)?;
     let entity = SearchEntry::construct(first_search_result);
     tracing::info!(entity = ?entity, "Found user entity");
     // ldap.unbind().await?;
@@ -117,9 +140,7 @@ async fn try_ldap_login(settings: &Settings, username: &str, password: &str) -> 
         .get(&settings.auth.ldap.attr_map.username)
         .unwrap_or(&empty_vec)
         .first()
-        .ok_or(eyre!(
-            "LDAP user entity is missing the mapped field for username"
-        ))?;
+        .ok_or(AuthError::LdapMissingFIeld)?;
     let first_name = entity
         .attrs
         .get(&settings.auth.ldap.attr_map.first_name)
@@ -141,7 +162,7 @@ async fn update_or_create<C>(
     db: &C,
     provider: AuthMethod,
     fields: UserFields,
-) -> Result<entity::User>
+) -> Result<entity::User, AuthError>
 where
     C: ConnectionTrait,
 {
@@ -170,9 +191,15 @@ where
     }
 }
 
-pub async fn authenticate(username: &str, password: &str) -> Result<entity::User> {
+pub async fn authenticate<C>(
+    db: &C,
+    username: &str,
+    password: &str,
+) -> Result<entity::User, AuthError>
+where
+    C: ConnectionTrait,
+{
     let settings = get_settings()?;
-    let db = get_database()?;
 
     for method in settings.auth.priority.iter() {
         let result = match method {
@@ -184,36 +211,7 @@ pub async fn authenticate(username: &str, password: &str) -> Result<entity::User
             Err(e) => tracing::trace!(?method, %e, "Login attempt failed"),
         }
     }
-    Err(eyre!(
-        "No matching user exists or no auth methods are available"
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ClaimsSubject {
-    Token,
-    Refresh,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub username: String,
-    pub exp: usize,
-    pub sub: ClaimsSubject,
-}
-
-#[async_trait]
-impl<S> FromRequestParts<S> for Claims
-where
-    S: Send + Sync,
-{
-    type Rejection = Error;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let TypedHeader(header) =
-            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state).await?;
-        check_token(header.token()).map(|td| td.claims)
-    }
+    Err(AuthError::NoCandidate)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -221,33 +219,6 @@ struct RefreshClaims {
     pub username: String,
     pub exp: usize,
     pub sub: ClaimsSubject,
-}
-
-fn check_token<T>(token: &str) -> Result<TokenData<T>, Error>
-where
-    T: for<'de> Deserialize<'de> + std::fmt::Debug,
-{
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while checking user authentication".to_owned(),
-        detail: Some(e.into()),
-    })?;
-    let claims = decode::<T>(
-        token,
-        &DecodingKey::from_secret(settings.auth.jwt_secret.as_ref()),
-        &Validation::new(Algorithm::HS256),
-    );
-    match claims {
-        Ok(token_data) => {
-            tracing::trace!(?token_data, "User for request");
-            Ok(token_data)
-        }
-        Err(e) => Err(Error {
-            status: StatusCode::UNAUTHORIZED,
-            title: "Invalid authentication token".to_owned(),
-            detail: Some(e.into()),
-        }),
-    }
 }
 
 pub async fn auth_middleware<B>(
@@ -303,7 +274,7 @@ pub struct LoginData {
     password: String,
 }
 
-fn token_pair(settings: &Settings, username: &str) -> Result<(Token, Token)> {
+fn token_pair(settings: &Settings, username: &str) -> Result<(Token, Token), AuthError> {
     let token_expiry = OffsetDateTime::now_utc().add(Duration::days(7));
     let claims = Claims {
         username: username.to_owned(),
@@ -340,26 +311,18 @@ fn token_pair(settings: &Settings, username: &str) -> Result<(Token, Token)> {
 }
 
 pub async fn login(
+    State(AppState(db)): State<AppState>,
     Json(login_data): Json<LoginData>,
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while checking user authentication".to_owned(),
-        detail: Some(e.into()),
-    })?;
-    let user = authenticate(login_data.username.as_str(), login_data.password.as_str())
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::UNAUTHORIZED,
-            title: "Authentication failed".to_string(),
-            detail: Some(e.into()),
-        })?;
-    let (token, refresh_token) =
-        token_pair(settings, user.username.as_str()).map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not sign JWT".to_owned(),
-            detail: Some(e.into()),
-        })?;
+    let settings = get_settings()?;
+    let user = authenticate(
+        &db,
+        login_data.username.as_str(),
+        login_data.password.as_str(),
+    )
+    .await
+    .map_err(|_| Error::Unauthorized(Some("Authentication failed".to_string())))?;
+    let (token, refresh_token) = token_pair(settings, user.username.as_str())?;
 
     Ok(Json(Document {
         data: DocumentData::Single(auth_resource(token, Some(refresh_token), user.username)),
@@ -373,23 +336,10 @@ pub async fn refresh(
 ) -> Result<Json<Document<AuthResource, Included>>, Error> {
     let token_data = check_token::<Claims>(auth.token())?;
     if token_data.claims.sub != ClaimsSubject::Refresh {
-        return Err(Error {
-            status: StatusCode::BAD_REQUEST,
-            title: "Invalid refresh token".to_owned(),
-            detail: None,
-        });
+        return Err(Error::BadRequest(Some("Invalid refresh token".to_owned())));
     }
-    let settings = get_settings().map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Error while checking user authentication".to_owned(),
-        detail: Some(e.into()),
-    })?;
-    let (token, refresh_token) = token_pair(settings, token_data.claims.username.as_str())
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not sign JWT".to_owned(),
-            detail: Some(e.into()),
-        })?;
+    let settings = get_settings()?;
+    let (token, refresh_token) = token_pair(settings, token_data.claims.username.as_str())?;
     Ok(Json(Document {
         data: DocumentData::Single(auth_resource(
             token,

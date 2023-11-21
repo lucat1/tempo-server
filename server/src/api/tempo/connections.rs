@@ -20,8 +20,7 @@ use crate::api::{
     },
     extract::{Json, Path},
     jsonapi::{Document, DocumentData},
-    tempo::error::TempoError,
-    AppState,
+    AppState, Error,
 };
 use crate::fetch::lastfm;
 use base::setting::{get_settings, Settings};
@@ -202,7 +201,7 @@ impl ProviderImpl for entity::ConnectionProvider {
     }
 }
 
-pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, TempoError> {
+pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>>, Error> {
     Ok(Json(Document {
         data: DocumentData::Multi(
             PROVIDERS
@@ -223,11 +222,11 @@ pub async fn connections() -> Result<Json<Document<ConnectionResource, Included>
 
 pub async fn connection(
     Path(provider): Path<entity::ConnectionProvider>,
-) -> Result<Json<Document<ConnectionResource, Included>>, TempoError> {
+) -> Result<Json<Document<ConnectionResource, Included>>, Error> {
     let (id, attrs) = PROVIDERS
         .iter()
         .find(|(id, _)| id == &provider)
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
 
     Ok(Json(Document {
         data: DocumentData::Single(ConnectionResource {
@@ -246,7 +245,7 @@ pub async fn callback(
     State(AppState(db)): State<AppState>,
     Path(provider): Path<entity::ConnectionProvider>,
     Query(opts): Query<CallbackOptions>,
-) -> Result<Response, TempoError> {
+) -> Result<Response, Error> {
     let settings = get_settings()?;
 
     let json = provider.callback(settings, &opts).await?;

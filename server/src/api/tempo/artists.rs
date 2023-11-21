@@ -18,8 +18,8 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    tempo::{error::TempoError, images, releases, tracks},
-    AppState,
+    tempo::{images, releases, tracks},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -37,7 +37,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Artist],
     light: bool,
-) -> Result<Vec<ArtistRelated>, TempoError>
+) -> Result<Vec<ArtistRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -101,7 +101,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<ArtistRelated>,
     include: &[ArtistInclude],
-) -> Result<Vec<Included>, TempoError>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -273,7 +273,7 @@ pub async fn artists(
     State(AppState(db)): State<AppState>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
-) -> Result<Json<Document<ArtistResource, Included>>, TempoError> {
+) -> Result<Json<Document<ArtistResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let mut artists_query = entity::ArtistEntity::find().left_join(entity::ArtistCreditEntity);
@@ -327,13 +327,13 @@ pub async fn artist(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
-) -> Result<Json<Document<ArtistResource, Included>>, TempoError> {
+) -> Result<Json<Document<ArtistResource, Included>>, Error> {
     let tx = db.begin().await?;
 
     let artist = entity::ArtistEntity::find_by_id(id)
         .one(&tx)
         .await?
-        .ok_or(TempoError::NotFound(None))?;
+        .ok_or(Error::NotFound(None))?;
     let related_to_artists = related(&tx, &[artist.clone()], false).await?;
     let empty_relationship = ArtistRelated::default();
     let related = related_to_artists.first().unwrap_or(&empty_relationship);
