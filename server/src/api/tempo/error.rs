@@ -5,7 +5,10 @@ use axum::{
 use sea_orm::DbErr;
 use thiserror::Error;
 
-use crate::api::{jsonapi::Error, tempo::connections::ConnectionError};
+use crate::{
+    api::{jsonapi::Error, tempo::connections::ConnectionError},
+    search::SearchError,
+};
 use base::setting::SettingsError;
 
 #[derive(Error, Debug)]
@@ -22,11 +25,14 @@ pub enum TempoError {
     #[error("Bad request")]
     BadRequest(Option<String>),
 
-    #[error("Could not read settings")]
+    #[error("Could not read settings: {0}")]
     Settings(#[from] SettingsError),
 
-    #[error("Could not read settings")]
+    #[error("Could not operate on the connection: {0}")]
     Connection(#[from] ConnectionError),
+
+    #[error("Could not operate on the search index: {0}")]
+    Search(#[from] SearchError),
 
     #[error("Track does not have an associated path")]
     NoTrackPath,
