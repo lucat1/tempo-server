@@ -29,6 +29,8 @@ pub enum Error {
     Unauthorized(Option<String>),
     #[error("Bad request")]
     BadRequest(Option<String>),
+    #[error("Internal server error")]
+    Internal,
 
     #[error("Could not read settings: {0}")]
     Settings(#[from] SettingsError),
