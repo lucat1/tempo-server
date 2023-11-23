@@ -1,8 +1,7 @@
-mod downloads;
-mod imports;
-mod update;
-
-mod documents;
+pub mod documents;
+pub mod downloads;
+pub mod imports;
+pub mod update;
 
 use axum::{
     middleware::from_fn,

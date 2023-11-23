@@ -6,7 +6,10 @@ use sea_orm::DbErr;
 use thiserror::Error;
 
 use crate::{
-    api::{jsonapi::Error as JsonAPIError, tempo::connections::ConnectionError},
+    api::{
+        internal::update::UpdateError, jsonapi::Error as JsonAPIError,
+        tempo::connections::ConnectionError,
+    },
     search::SearchError,
 };
 use base::setting::SettingsError;
@@ -37,6 +40,9 @@ pub enum Error {
     Auth(#[from] AuthError),
     #[error("Could not fetch auth claims: {0}")]
     Claims(#[from] ClaimsError),
+
+    #[error("Could not run update: {0}")]
+    Update(#[from] UpdateError),
 
     #[error("Track does not have an associated path")]
     NoTrackPath,
