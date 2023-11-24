@@ -1,9 +1,5 @@
-use axum::{
-    extract::{OriginalUri, State},
-    http::StatusCode,
-};
+use axum::extract::{OriginalUri, State};
 use base::setting::get_settings;
-use eyre::{eyre, Result};
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ConnectionTrait, CursorTrait, DbErr, EntityTrait,
     IntoActiveModel, QueryOrder, TransactionTrait,
@@ -32,11 +28,10 @@ use crate::{
             downloads,
         },
         jsonapi::{
-            links_from_resource, make_cursor, Document, DocumentData, Error, InsertOneDocument,
-            Query, QueryOptions, Related, Relation, Relationship, ResourceIdentifier,
-            UpdateOneDocument,
+            links_from_resource, make_cursor, Document, DocumentData, InsertOneDocument, Query,
+            QueryOptions, Related, Relation, Relationship, ResourceIdentifier, UpdateOneDocument,
         },
-        AppState,
+        AppState, Error,
     },
     import::{all_tracks, IntoInternal},
     tasks::{import, push, TaskName},
@@ -319,32 +314,16 @@ pub async fn begin(
     State(AppState(db)): State<AppState>,
     Json(body): Json<InsertOneDocument<InsertImportResource>>,
 ) -> Result<Json<Document<ImportResource, ImportInclude>>, Error> {
-    let settings = get_settings().map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not read settings".to_string(),
-        detail: Some(err.into()),
-    })?;
-    let decoded_path =
-        urlencoding::decode(body.data.attributes.directory.as_str()).map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not decode directory path id".to_string(),
-            detail: Some(err.into()),
-        })?;
+    let settings = get_settings()?;
+    let decoded_path = urlencoding::decode(body.data.attributes.directory.as_str())
+        .map_err(|_| Error::Internal(Some("Could not decode directory path id".to_string())))?;
     let dir = downloads::abs_path(settings, Some(PathBuf::from(decoded_path.to_string())))?;
     tracing::info! {?dir, library = settings.library.name, "Importing folder"};
-    let tracks = all_tracks(&settings.library, &dir)
-        .await
-        .map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not find all tracks in folder".to_string(),
-            detail: Some(err.into()),
-        })?;
+    let tracks = all_tracks(&settings.library, &dir).await?;
     if tracks.is_empty() {
-        return Err(Error {
-            status: StatusCode::BAD_REQUEST,
-            title: "Import folder does not contain any valid track files".to_string(),
-            detail: None,
-        });
+        return Err(Error::BadRequest(Some(
+            "Import folder does not contain any valid track files".to_string(),
+        )));
     }
 
     let release: entity::InternalRelease = tracks.clone().into_internal();
@@ -352,11 +331,7 @@ pub async fn begin(
         tracks.into_iter().map(|t| t.into_internal()).collect();
 
     // save the import in the db
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let dir = dir.to_string_lossy().to_string();
     let import = entity::ImportActive {
         id: ActiveValue::Set(Uuid::new_v4()),
@@ -382,42 +357,19 @@ pub async fn begin(
         started_at: ActiveValue::Set(time::OffsetDateTime::now_utc()),
         ended_at: ActiveValue::NotSet,
     };
-    let import = import.insert(&tx).await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't save the import structure".to_string(),
-        detail: Some(err.into()),
-    })?;
-    tx.commit().await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't commit the transaction".to_string(),
-        detail: Some(err.into()),
-    })?;
+    let import = import.insert(&tx).await?;
+    tx.commit().await?;
     push(&[InsertTask {
         name: TaskName::ImportFetch,
         payload: Some(json!(import::populate::Data(import.id))),
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
     }])
-    .await
-    .map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not schedule populate task".to_string(),
-        detail: Some(err.into()),
-    })?;
+    .await?;
 
     let import_vec = vec![import];
-    let all_related = related(&db, &import_vec, false)
-        .await
-        .map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch related documents".to_string(),
-            detail: Some(err.into()),
-        })?;
-    let related = all_related.first().ok_or(Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "No related document has been retourned".to_string(),
-        detail: None,
-    })?;
+    let all_related = related(&db, &import_vec, false).await?;
+    let related = all_related.first().ok_or(Error::Internal(None))?;
     let resource = entity_to_resource(&import_vec[0], related);
 
     Ok(Json(Document {
@@ -427,7 +379,7 @@ pub async fn begin(
     }))
 }
 
-async fn cover_refetch(import_id: Uuid) -> Result<()> {
+async fn cover_refetch(import_id: Uuid) -> Result<(), Error> {
     let fetch_task = push(&[InsertTask {
         name: TaskName::ImportFetchCovers,
         payload: Some(json!(import::fetch_covers::Data(import_id))),
@@ -438,11 +390,7 @@ async fn cover_refetch(import_id: Uuid) -> Result<()> {
     push(&[InsertTask {
         name: TaskName::ImportRankCovers,
         payload: Some(json!(import::rank_covers::Data(import_id))),
-        depends_on: vec![fetch_task
-            .first()
-            .ok_or(eyre!("Expected a task to have been queued"))?
-            .id
-            .clone()],
+        depends_on: vec![fetch_task.first().ok_or(Error::Internal(None))?.id.clone()],
         duration: Duration::seconds(60),
     }])
     .await?;
@@ -455,65 +403,36 @@ pub async fn edit(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateOneDocument<UpdateImportResource>>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let import = entity::ImportEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried import".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Import not found".to_string(),
-            detail: None,
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
     let releases = import.releases.0.clone();
     let covers_len = import.covers.0.len();
     let mut import_active = import.into_active_model();
     match &body.data.attributes {
         UpdateImportAttributes::Release(UpdateImportRelease { selected_release }) => {
             if !releases.iter().any(|rel| rel.id == *selected_release) {
-                return Err(Error {
-                    status: StatusCode::BAD_REQUEST,
-                    title: "Cannot select a non-existant release".to_string(),
-                    detail: None,
-                });
+                return Err(Error::BadRequest(Some(
+                    "Cannot select a non-existant release".to_string(),
+                )));
             }
             import_active.selected_release = ActiveValue::Set(Some(*selected_release))
         }
         UpdateImportAttributes::Cover(UpdateImportCover { selected_cover }) => {
             if *selected_cover < 0 || *selected_cover >= (covers_len as i32) {
-                return Err(Error {
-                    status: StatusCode::BAD_REQUEST,
-                    title: "Cannot select a non-existant cover".to_string(),
-                    detail: None,
-                });
+                return Err(Error::BadRequest(Some(
+                    "Cannot select a non-existant cover".to_string(),
+                )));
             }
             import_active.selected_cover = ActiveValue::Set(Some(*selected_cover))
         }
     }
-    import_active.update(&tx).await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't update the import structure".to_string(),
-        detail: Some(err.into()),
-    })?;
-    tx.commit().await.map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't commit the transaction".to_string(),
-        detail: Some(err.into()),
-    })?;
+    import_active.update(&tx).await?;
+    tx.commit().await?;
     if matches!(body.data.attributes, UpdateImportAttributes::Release(_)) {
-        cover_refetch(id).await.map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not schedule cover refetches".to_string(),
-            detail: Some(err.into()),
-        })?;
+        cover_refetch(id).await?;
     }
 
     self::import(State(AppState(db)), Query(opts), Path(id)).await
@@ -524,38 +443,20 @@ pub async fn imports(
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let mut imports_query = entity::ImportEntity::find();
     for (sort_key, sort_order) in opts.sort.iter() {
         imports_query = imports_query.order_by(sort_key.to_owned(), sort_order.to_owned());
     }
     let mut _imports_cursor = imports_query.cursor_by(entity::ArtistColumn::Id);
     let imports_cursor = make_cursor(&mut _imports_cursor, &opts.page);
-    let imports = imports_cursor.all(&tx).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch imports page".to_string(),
-        detail: Some(e.into()),
-    })?;
-    let related_to_imports = related(&tx, &imports, false).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch the related imports".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let imports = imports_cursor.all(&tx).await?;
+    let related_to_imports = related(&tx, &imports, false).await?;
     let mut data = Vec::new();
     for (i, import) in imports.iter().enumerate() {
         data.push(entity_to_resource(import, &related_to_imports[i]));
     }
-    let included = included(&tx, related_to_imports, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_imports, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
@@ -571,23 +472,11 @@ async fn fetch_import_data<C>(
 where
     C: ConnectionTrait,
 {
-    let related_to_imports = related(db, &[import.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the related imports".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let related_to_imports = related(db, &[import.clone()], false).await?;
     let empty_relationship = ImportRelated::default();
     let related = related_to_imports.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&import, related);
-    let included = included(db, related_to_imports, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(db, related_to_imports, &opts.include).await?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
@@ -600,58 +489,27 @@ pub async fn import(
     Query(opts): Query<ImportFilter, entity::ImportColumn, ImportInclude, Uuid>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Document<ImportResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let import = entity::ImportEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried import".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Import not found".to_string(),
-            detail: None,
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
     fetch_import_data(&tx, import, &opts).await
 }
 
 pub async fn run(State(AppState(db)): State<AppState>, Path(id): Path<Uuid>) -> Result<(), Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let import = entity::ImportEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried import".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Import not found".to_string(),
-            detail: None,
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
     push(&[InsertTask {
         name: TaskName::ImportPopulate,
         payload: Some(json!(import::fetch::Data(import.id))),
         depends_on: Vec::new(),
         duration: Duration::seconds(60),
     }])
-    .await
-    .map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not schedule import tasks".to_string(),
-        detail: Some(err.into()),
-    })?;
+    .await?;
     Ok(())
 }
 
@@ -659,13 +517,6 @@ pub async fn delete(
     State(AppState(db)): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<(), Error> {
-    entity::ImportEntity::delete_by_id(id)
-        .exec(&db)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not find the import to delete".to_string(),
-            detail: Some(e.into()),
-        })?;
+    entity::ImportEntity::delete_by_id(id).exec(&db).await?;
     Ok(())
 }

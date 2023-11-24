@@ -1,15 +1,12 @@
-use std::collections::HashMap;
-
 use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
-    QueryOrder, QuerySelect, RelationTrait, TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    QuerySelect, RelationTrait, TransactionTrait,
 };
 use sea_query::JoinType;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{images, releases, tracks};
 use crate::api::{
     documents::{
         ArtistAttributes, ArtistCreditAttributes, ArtistFilter, ArtistInclude, ArtistRelation,
@@ -18,10 +15,11 @@ use crate::api::{
     },
     extract::{Json, Path},
     jsonapi::{
-        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    AppState,
+    tempo::{images, releases, tracks},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -39,7 +37,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Artist],
     light: bool,
-) -> Result<Vec<ArtistRelated>, DbErr>
+) -> Result<Vec<ArtistRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -103,7 +101,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<ArtistRelated>,
     include: &[ArtistInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -276,11 +274,7 @@ pub async fn artists(
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ArtistResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let mut artists_query = entity::ArtistEntity::find().left_join(entity::ArtistCreditEntity);
     for (filter_key, filter_value) in opts.filter.iter() {
@@ -314,28 +308,14 @@ pub async fn artists(
     }
     let mut _artists_cursor = artists_query.cursor_by(entity::ArtistColumn::Id);
     let artists_cursor = make_cursor(&mut _artists_cursor, &opts.page);
-    let artists = artists_cursor.all(&db).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch artists page".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let artists = artists_cursor.all(&db).await?;
 
-    let related_to_artists = related(&tx, &artists, false).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch entites related to the artists".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let related_to_artists = related(&tx, &artists, false).await?;
     let mut data = Vec::new();
     for (i, artist) in artists.iter().enumerate() {
         data.push(entity_to_resource(artist, &related_to_artists[i]));
     }
-    let included = included(&tx, related_to_artists, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_artists, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
@@ -348,42 +328,17 @@ pub async fn artist(
     Path(id): Path<Uuid>,
     Query(opts): Query<ArtistFilter, entity::ArtistColumn, ArtistInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ArtistResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let artist = entity::ArtistEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried artist".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Artist not found".to_string(),
-            detail: None,
-        })?;
-    let related_to_artists = related(&tx, &[artist.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the artists".to_string(),
-            detail: Some(e.into()),
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
+    let related_to_artists = related(&tx, &[artist.clone()], false).await?;
     let empty_relationship = ArtistRelated::default();
     let related = related_to_artists.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&artist, related);
-    let included = included(&tx, related_to_artists, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_artists, &opts.include).await?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),

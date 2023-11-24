@@ -1,9 +1,11 @@
 use base::setting::Library;
 use entity::TrackFormat;
 use eyre::{bail, eyre, Result, WrapErr};
-use std::collections::HashMap;
-use std::fs::copy;
-use std::path::PathBuf;
+use std::{
+    collections::HashMap,
+    fs::copy,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "ape")]
 use tag::ape;
@@ -58,7 +60,7 @@ impl TrackFile {
         self.tag.set_pictures(pictures)
     }
 
-    pub fn duplicate_to(&mut self, library: &Library, path: &PathBuf) -> Result<()> {
+    pub fn duplicate_to(&mut self, library: &Library, path: &Path) -> Result<()> {
         copy(&self.path, path)?;
         self.path = path.to_path_buf();
         self.tag = match self.format {

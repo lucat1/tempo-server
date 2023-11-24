@@ -12,6 +12,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Display, path::PathBuf};
+use thiserror::Error;
 
 use super::image_format::ImageFormat;
 use super::{util, CLI_NAME};
@@ -499,6 +500,12 @@ pub struct LastFMConnection {
     pub shared_secret: String,
 }
 
-pub fn get_settings() -> Result<&'static Settings> {
-    SETTINGS.get().ok_or(eyre!("Could not get settings"))
+#[derive(Error, Debug)]
+pub enum SettingsError {
+    #[error("Settings global store is unitialized")]
+    Uninitialized,
+}
+
+pub fn get_settings() -> Result<&'static Settings, SettingsError> {
+    SETTINGS.get().ok_or(SettingsError::Uninitialized)
 }

@@ -1,14 +1,11 @@
-use std::collections::HashMap;
-
 use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{artists, images, mediums};
 use crate::api::{
     documents::{
         ArtistCreditAttributes, Included, IntoColumn, MediumInclude, Meta, ReleaseAttributes,
@@ -16,10 +13,11 @@ use crate::api::{
     },
     extract::{Json, Path},
     jsonapi::{
-        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    AppState,
+    tempo::{artists, images, mediums},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -34,7 +32,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Release],
     _light: bool,
-) -> Result<Vec<ReleaseRelated>, DbErr>
+) -> Result<Vec<ReleaseRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -166,7 +164,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<ReleaseRelated>,
     include: &[ReleaseInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -220,11 +218,7 @@ pub async fn releases(
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let mut releases_query = entity::ReleaseEntity::find();
     for (filter_key, filter_value) in opts.filter.iter() {
@@ -237,27 +231,13 @@ pub async fn releases(
     }
     let mut _releases_cursor = releases_query.cursor_by(entity::ReleaseColumn::Id);
     let releases_cursor = make_cursor(&mut _releases_cursor, &opts.page);
-    let releases = releases_cursor.all(&tx).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all releases".to_string(),
-        detail: Some(e.into()),
-    })?;
-    let related_to_releases = related(&tx, &releases, false).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch entites related to the releases".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let releases = releases_cursor.all(&tx).await?;
+    let related_to_releases = related(&tx, &releases, false).await?;
     let mut data = Vec::new();
     for (i, release) in releases.iter().enumerate() {
         data.push(entity_to_resource(release, &related_to_releases[i]));
     }
-    let included = included(&tx, related_to_releases, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_releases, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
@@ -270,42 +250,17 @@ pub async fn release(
     Path(id): Path<Uuid>,
     Query(opts): Query<ReleaseFilter, entity::ReleaseColumn, ReleaseInclude, uuid::Uuid>,
 ) -> Result<Json<Document<ReleaseResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let release = entity::ReleaseEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried release".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Release not found".to_string(),
-            detail: None,
-        })?;
-    let related_to_releases = related(&tx, &[release.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the releases".to_string(),
-            detail: Some(e.into()),
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
+    let related_to_releases = related(&tx, &[release.clone()], false).await?;
     let empty_relationship = ReleaseRelated::default();
     let related = related_to_releases.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&release, related);
-    let included = included(&tx, related_to_releases, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_releases, &opts.include).await?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),

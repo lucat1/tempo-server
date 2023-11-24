@@ -6,30 +6,33 @@ pub mod lastfm_artist_image;
 pub mod scrobble;
 
 use async_once_cell::OnceCell;
-use base::{database::get_database, setting::get_settings};
-use eyre::{eyre, Result};
+use base::{
+    database::{get_database, DatabaseError},
+    setting::{get_settings, SettingsError},
+};
 use lazy_static::lazy_static;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, ops::Sub, sync::Arc};
 use taskie_client::{Client, Execution, InsertTask, Task, TaskKey};
+use thiserror::Error;
 use tokio::{sync::mpsc, time::timeout};
 
 #[async_trait::async_trait]
 pub trait TaskTrait: Debug {
-    async fn run<C>(&self, db: &C, task: Task<TaskName, TaskKey>) -> Result<()>
+    async fn run<C>(&self, db: &C, task: Task<TaskName, TaskKey>) -> eyre::Result<()>
     where
         C: ConnectionTrait + TransactionTrait;
 }
 
 #[async_trait::async_trait]
 pub trait TaskEntities {
-    async fn all<C>(db: &C) -> Result<Vec<Self>>
+    async fn all<C>(db: &C) -> eyre::Result<Vec<Self>>
     where
         C: ConnectionTrait,
         Self: Sized;
 
-    async fn outdated<C>(db: &C) -> Result<Vec<Self>>
+    async fn outdated<C>(db: &C) -> eyre::Result<Vec<Self>>
     where
         C: ConnectionTrait,
         Self: Sized;
@@ -57,23 +60,43 @@ lazy_static! {
     pub static ref TASKIE_CLIENT: Arc<OnceCell<Client>> = Arc::new(OnceCell::new());
 }
 
-pub async fn open_taskie_client() -> Result<Client> {
+#[derive(Error, Debug)]
+pub enum TaskError {
+    #[error("Taskie client is uninitialized")]
+    Uninitialized,
+
+    #[error("Settings error: {0}")]
+    Settings(#[from] SettingsError),
+    #[error("Error while opening database connection {0}")]
+    Database(#[from] DatabaseError),
+
+    #[error("Taskie error: {0}")]
+    Taskie(#[from] taskie_client::ClientError),
+
+    #[error("Error searializing task data: {0}")]
+    Serde(#[from] serde_json::Error),
+
+    #[error("Error while runngin task: {0}")]
+    Execution(#[from] eyre::Report),
+}
+
+pub async fn open_taskie_client() -> Result<Client, TaskError> {
     let taskie_url = &get_settings()?.taskie;
     Ok(Client::new(taskie_url.clone()))
 }
 
-pub fn get_taskie_client() -> Result<&'static Client> {
-    TASKIE_CLIENT
-        .get()
-        .ok_or(eyre!("Taskie client uninitialized"))
+pub fn get_taskie_client() -> Result<&'static Client, TaskError> {
+    TASKIE_CLIENT.get().ok_or(TaskError::Uninitialized)
 }
 
-pub async fn push(tasks: &[InsertTask<TaskName>]) -> Result<Vec<Task<TaskName, TaskKey>>> {
+pub async fn push(
+    tasks: &[InsertTask<TaskName>],
+) -> Result<Vec<Task<TaskName, TaskKey>>, TaskError> {
     let client = get_taskie_client()?;
     Ok(client.push::<TaskName, TaskKey>(tasks).await?)
 }
 
-async fn run_task<C>(db: &C, task: Task<TaskName, TaskKey>) -> Result<()>
+async fn run_task<C>(db: &C, task: Task<TaskName, TaskKey>) -> Result<(), TaskError>
 where
     C: ConnectionTrait + TransactionTrait,
 {
@@ -143,7 +166,7 @@ where
     Ok(())
 }
 
-pub fn queue_loop() -> Result<()> {
+pub fn queue_loop() -> Result<(), TaskError> {
     let workers = std::cmp::max(get_settings()?.tasks.workers, 1);
     tracing::info!(%workers,"Starting worker pool for background tasks");
     for worker in 0..workers {

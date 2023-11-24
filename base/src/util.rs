@@ -1,15 +1,23 @@
-use eyre::{eyre, Result};
 use lazy_static::lazy_static;
 use std::fs::create_dir_all;
 use std::io;
 use std::path::Path;
-use std::path::PathBuf;
+use thiserror::Error;
 use time::{format_description::FormatItem, macros::format_description, parsing::Parsed};
 
-pub fn path_to_str(path: &PathBuf) -> Result<String> {
-    Ok(String::from(path.to_str().ok_or_else(|| {
-        eyre!("Could not convert path to string: {:?}", path)
-    })?))
+#[derive(Error, Debug)]
+pub enum UtilError {
+    #[error("Could not decode as UTF-8 string")]
+    Utf8DecodeError,
+
+    #[error("Error during IO operation: {0}")]
+    IO(#[from] io::Error),
+}
+
+pub fn path_to_str(path: &Path) -> Result<String, UtilError> {
+    Ok(String::from(
+        path.to_str().ok_or(UtilError::Utf8DecodeError)?,
+    ))
 }
 
 pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
@@ -18,10 +26,10 @@ pub fn dedup<T: Ord>(mut vec: Vec<T>) -> Vec<T> {
     vec
 }
 
-pub fn mkdirp<P: AsRef<Path>>(path: P) -> io::Result<()> {
+pub fn mkdirp<P: AsRef<Path>>(path: P) -> Result<(), UtilError> {
     if let Err(e) = create_dir_all(path) {
         if e.kind() != io::ErrorKind::AlreadyExists {
-            return Err(e);
+            return Err(e.into());
         }
     }
     Ok(())

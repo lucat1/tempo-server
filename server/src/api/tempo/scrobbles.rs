@@ -1,8 +1,7 @@
 use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
 use eyre::{eyre, Result};
 use sea_orm::{
-    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait,
+    ActiveValue, ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait,
     PaginatorTrait, QueryFilter, TransactionTrait, Value,
 };
 use serde_json::json;
@@ -11,19 +10,18 @@ use taskie_client::InsertTask;
 use time::Duration;
 use uuid::Uuid;
 
-use super::{tracks, users};
 use crate::api::{
-    auth::Claims,
     documents::{
         Included, InsertScrobbleResource, ResourceType, ScrobbleAttributes, ScrobbleFilter,
         ScrobbleInclude, ScrobbleRelation, ScrobbleResource, TrackInclude,
     },
-    extract::{Json, Path},
+    extract::{Claims, Json, Path},
     jsonapi::{
-        links_from_resource, make_cursor, Document, DocumentData, Error, InsertDocument, Page,
-        Query, Related, Relation, Relationship, ResourceIdentifier,
+        links_from_resource, make_cursor, Document, DocumentData, InsertDocument, Page, Query,
+        Related, Relation, Relationship, ResourceIdentifier,
     },
-    AppState,
+    tempo::{tracks, users},
+    AppState, Error,
 };
 use crate::tasks::{self, TaskName};
 use base::util::dedup;
@@ -81,7 +79,7 @@ pub async fn included<C>(
     db: &C,
     entities: Vec<entity::Scrobble>,
     include: &[ScrobbleInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -157,17 +155,9 @@ where
         .filter(ColumnTrait::eq(&entity::ScrobbleColumn::User, username))
         .cursor_by(entity::TrackColumn::Id);
     let scrobbles_cursor = make_cursor(&mut _scrobbles_cursor, page);
-    let scrobbles = scrobbles_cursor.all(db).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all tracks".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let scrobbles = scrobbles_cursor.all(db).await?;
     let data = scrobbles.iter().map(entity_to_resource).collect::<Vec<_>>();
-    let included = included(db, scrobbles, include).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch the included resurces".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let included = included(db, scrobbles, include).await?;
     Ok((data, included))
 }
 
@@ -200,12 +190,8 @@ pub async fn insert_scrobbles(
     claims: Claims,
     Json(scrobbles): Json<InsertDocument<InsertScrobbleResource>>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
-    let after = entity::ScrobbleEntity::find().count(&tx).await.unwrap();
+    let tx = db.begin().await?;
+    let after = entity::ScrobbleEntity::find().count(&tx).await?;
     let scrobbles = match scrobbles.data {
         DocumentData::Multi(v) => v,
         DocumentData::Single(r) => vec![r],
@@ -216,11 +202,9 @@ pub async fn insert_scrobbles(
         }) = scrobble.relationships.get(&ScrobbleRelation::User)
         {
             if data.id != claims.username {
-                return Err(Error {
-                    status: StatusCode::BAD_REQUEST,
-                    title: "You cannot insert a scrobble for another user".to_string(),
-                    detail: None,
-                });
+                return Err(Error::BadRequest(Some(
+                    "You cannot insert a scrobble for another user".to_string(),
+                )));
             }
         }
     }
@@ -228,31 +212,15 @@ pub async fn insert_scrobbles(
         .iter()
         .map(resource_to_active_entity)
         .collect::<Result<Vec<_>>>()
-        .map_err(|e| Error {
-            status: StatusCode::BAD_REQUEST,
-            title: "Invalid scrobble data".to_string(),
-            detail: Some(e.into()),
-        })?;
+        // TODO: once we get an error for resource to entity conversion, handle that properly
+        .map_err(|_| Error::BadRequest(Some("Invalid scrobble data".to_string())))?;
     tracing::info!(user = %claims.username, scrobbles = ?entities, "Scrobbling");
     let res = entity::ScrobbleEntity::insert_many(entities.clone())
         .exec(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Error while saving scrobbles".to_string(),
-            detail: Some(e.into()),
-        })?;
-    tx.commit().await.map_err(|e| Error {
-        status: StatusCode::BAD_REQUEST,
-        title: "Could not commit scrobbles".to_string(),
-        detail: Some(e.into()),
-    })?;
+        .await?;
+    tx.commit().await?;
 
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     schedule_scrobble_tasks(
         claims.username.as_str(),
@@ -268,11 +236,8 @@ pub async fn insert_scrobbles(
             }),
     )
     .await
-    .map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not start scrobble tasks".to_string(),
-        detail: Some(e.into()),
-    })?;
+    // TODO: once we convert the error here, handle it properly
+    .map_err(|_| Error::BadRequest(None))?;
 
     let page = Page {
         size: u32::MAX,
@@ -293,11 +258,7 @@ pub async fn scrobbles(
     OriginalUri(uri): OriginalUri,
     claims: Claims,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let (data, included) = fetch_scrobbles(&tx, claims.username, &opts.page, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
@@ -311,32 +272,13 @@ pub async fn scrobble(
     Query(opts): Query<ScrobbleFilter, entity::ScrobbleColumn, ScrobbleInclude, i64>,
     Path(id): Path<i64>,
 ) -> Result<Json<Document<ScrobbleResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
     let scrobble = entity::ScrobbleEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch all scrobbles".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Not found".to_string(),
-            detail: Some("Not found".into()),
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
     let resource = entity_to_resource(&scrobble);
-    let included = included(&tx, vec![scrobble], &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, vec![scrobble], &opts.include).await?;
     Ok(Json(Document {
         links: HashMap::new(),
         data: DocumentData::Single(resource),

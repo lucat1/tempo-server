@@ -1,4 +1,3 @@
-use axum::http::StatusCode;
 use eyre::Result;
 use fs_extra::dir::get_size;
 use std::{collections::HashMap, fs::read_dir, path::PathBuf};
@@ -9,7 +8,8 @@ use crate::api::{
         DirectoryAttributes, DirectoryRelation, DirectoryResource, FileEntry, InternalResourceType,
         ResourceType,
     },
-    jsonapi::{Document, DocumentData, Error, Related, Relation, Relationship, ResourceIdentifier},
+    jsonapi::{Document, DocumentData, Related, Relation, Relationship, ResourceIdentifier},
+    Error,
 };
 use base::setting::{get_settings, Settings};
 
@@ -36,11 +36,7 @@ pub fn abs_path(settings: &Settings, path: Option<PathBuf>) -> Result<PathBuf, E
             if path.is_relative() {
                 Ok(downloads.join(path))
             } else {
-                Err(Error {
-                    status: StatusCode::BAD_REQUEST,
-                    title: "Path is not relative".to_string(),
-                    detail: None,
-                })
+                Err(Error::BadRequest(Some("Path is not relative".to_string())))
             }
         }
     }?;
@@ -51,19 +47,11 @@ pub async fn list(
     path_param: Option<Path<PathBuf>>,
 ) -> Result<Json<Document<DirectoryResource, DirectoryResource>>, Error> {
     let path = path_param.map(|Path(p)| p);
-    let settings = get_settings().map_err(|err| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not read settings".to_string(),
-        detail: Some(err.into()),
-    })?;
+    let settings = get_settings()?;
     let abs_path = abs_path(settings, path)?;
     tracing::info!(path = ?abs_path, "Probing download directory");
 
-    let raw_files = read_dir(&abs_path).map_err(|err| Error {
-        status: StatusCode::NOT_FOUND,
-        title: "Could not read directory".to_string(),
-        detail: Some(err.into()),
-    })?;
+    let raw_files = read_dir(&abs_path).map_err(|_| Error::NotFound(None))?;
     let (files, directories): (Vec<Entry>, Vec<Entry>) = raw_files
         .filter_map(|f| f.ok())
         .filter_map(|f| -> Option<Entry> {
@@ -103,11 +91,7 @@ pub async fn list(
         .partition(IsFile::is_file);
     let rel = abs_path
         .strip_prefix(&settings.downloads)
-        .map_err(|err| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not convert path to relative".to_string(),
-            detail: Some(err.into()),
-        })?
+        .map_err(|_| Error::Internal(None))?
         .to_path_buf();
     let files = files
         .into_iter()

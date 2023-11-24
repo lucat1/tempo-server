@@ -1,26 +1,25 @@
 use async_recursion::async_recursion;
 use axum::extract::{OriginalUri, State};
-use axum::http::StatusCode;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, CursorTrait, DbErr, EntityTrait, LoaderTrait, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ColumnTrait, ConnectionTrait, CursorTrait, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{releases, tracks};
-use crate::api::documents::ReleaseInclude;
-use crate::api::AppState;
 use crate::api::{
+    documents::ReleaseInclude,
     documents::{
         Included, IntoColumn, MediumAttributes, MediumFilter, MediumInclude, MediumRelation,
         MediumResource, ResourceType, TrackInclude,
     },
     extract::{Json, Path},
     jsonapi::{
-        links_from_resource, make_cursor, Document, DocumentData, Error, Query, Related, Relation,
+        links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
+    tempo::{releases, tracks},
+    AppState, Error,
 };
 use base::util::dedup;
 
@@ -34,7 +33,7 @@ pub async fn related<C>(
     db: &C,
     entities: &[entity::Medium],
     _light: bool,
-) -> Result<Vec<MediumRelated>, DbErr>
+) -> Result<Vec<MediumRelated>, Error>
 where
     C: ConnectionTrait,
 {
@@ -133,7 +132,7 @@ pub async fn included<C>(
     db: &C,
     related: Vec<MediumRelated>,
     include: &[MediumInclude],
-) -> Result<Vec<Included>, DbErr>
+) -> Result<Vec<Included>, Error>
 where
     C: ConnectionTrait,
 {
@@ -170,11 +169,7 @@ pub async fn mediums(
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
     OriginalUri(uri): OriginalUri,
 ) -> Result<Json<Document<MediumResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let mut mediums_query = entity::MediumEntity::find();
     for (filter_key, filter_value) in opts.filter.iter() {
@@ -187,27 +182,13 @@ pub async fn mediums(
     }
     let mut _mediums_cursor = mediums_query.cursor_by(entity::MediumColumn::Id);
     let mediums_cursor = make_cursor(&mut _mediums_cursor, &opts.page);
-    let mediums = mediums_cursor.all(&tx).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch all releases".to_string(),
-        detail: Some(e.into()),
-    })?;
-    let related_to_mediums = related(&tx, &mediums, false).await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Could not fetch entites related to the releases".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let mediums = mediums_cursor.all(&tx).await?;
+    let related_to_mediums = related(&tx, &mediums, false).await?;
     let mut data = Vec::new();
     for (i, medium) in mediums.iter().enumerate() {
         data.push(entity_to_resource(medium, &related_to_mediums[i]));
     }
-    let included = included(&tx, related_to_mediums, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_mediums, &opts.include).await?;
     Ok(Json(Document {
         links: links_from_resource(&data, opts, &uri),
         data: DocumentData::Multi(data),
@@ -220,42 +201,17 @@ pub async fn medium(
     Path(id): Path<Uuid>,
     Query(opts): Query<MediumFilter, entity::MediumColumn, MediumInclude, uuid::Uuid>,
 ) -> Result<Json<Document<MediumResource, Included>>, Error> {
-    let tx = db.begin().await.map_err(|e| Error {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        title: "Couldn't begin database transaction".to_string(),
-        detail: Some(e.into()),
-    })?;
+    let tx = db.begin().await?;
 
     let medium = entity::MediumEntity::find_by_id(id)
         .one(&tx)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the requried medium".to_string(),
-            detail: Some(e.into()),
-        })?
-        .ok_or(Error {
-            status: StatusCode::NOT_FOUND,
-            title: "Medium not found".to_string(),
-            detail: None,
-        })?;
-    let related_to_mediums = related(&tx, &[medium.clone()], false)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch entites related to the mediums".to_string(),
-            detail: Some(e.into()),
-        })?;
+        .await?
+        .ok_or(Error::NotFound(None))?;
+    let related_to_mediums = related(&tx, &[medium.clone()], false).await?;
     let empty_relationship = MediumRelated::default();
     let related = related_to_mediums.first().unwrap_or(&empty_relationship);
     let data = entity_to_resource(&medium, related);
-    let included = included(&tx, related_to_mediums, &opts.include)
-        .await
-        .map_err(|e| Error {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            title: "Could not fetch the included resurces".to_string(),
-            detail: Some(e.into()),
-        })?;
+    let included = included(&tx, related_to_mediums, &opts.include).await?;
     Ok(Json(Document {
         data: DocumentData::Single(data),
         included: dedup(included),
