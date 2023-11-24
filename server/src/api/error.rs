@@ -10,7 +10,9 @@ use crate::{
         internal::update::UpdateError, jsonapi::Error as JsonAPIError,
         tempo::connections::ConnectionError,
     },
+    import::ImportError,
     search::SearchError,
+    tasks::TaskError,
 };
 use base::setting::SettingsError;
 
@@ -30,7 +32,7 @@ pub enum Error {
     #[error("Bad request")]
     BadRequest(Option<String>),
     #[error("Internal server error")]
-    Internal,
+    Internal(Option<String>),
 
     #[error("Could not read settings: {0}")]
     Settings(#[from] SettingsError),
@@ -42,9 +44,13 @@ pub enum Error {
     Auth(#[from] AuthError),
     #[error("Could not fetch auth claims: {0}")]
     Claims(#[from] ClaimsError),
+    #[error("Error while managing tasks: {0}")]
+    Task(#[from] TaskError),
 
     #[error("Could not run update: {0}")]
     Update(#[from] UpdateError),
+    #[error("Could not run import operation: {0}")]
+    Import(#[from] ImportError),
 
     #[error("Track does not have an associated path")]
     NoTrackPath,
@@ -74,6 +80,7 @@ impl From<Error> for JsonAPIError {
                 Error::NotFound(o) => o.map(|e| e.into()),
                 Error::Unauthorized(Some(v)) => Some(v.into()),
                 Error::BadRequest(Some(v)) => Some(v.into()),
+                Error::Internal(Some(v)) => Some(v.into()),
                 _ => None,
             },
         }

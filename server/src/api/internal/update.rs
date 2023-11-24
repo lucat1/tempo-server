@@ -1,6 +1,5 @@
 use axum::extract::State;
 use eyre::Result;
-use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use taskie_client::InsertTask;
@@ -8,8 +7,7 @@ use thiserror::Error;
 
 use crate::api::{extract::Path, AppState, Error};
 use crate::tasks::{
-    artist_description, artist_url, index_search, lastfm_artist_image, push, TaskEntities,
-    TaskError, TaskName,
+    artist_description, artist_url, index_search, lastfm_artist_image, push, TaskEntities, TaskName,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,9 +27,6 @@ pub enum OtherUpdateType {
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
-    #[error("Error while managing tasks: {0}")]
-    Task(#[from] TaskError),
-
     #[error("Error while fetching task data: {0}")]
     Fetcher(eyre::Report),
 }
@@ -102,7 +97,7 @@ pub async fn all(
             _ => unreachable!(),
         };
         tracing::info!(?tasks, "Queueing the update tasks");
-        push(&tasks).map_err(UpdateError::Task).await?;
+        push(&tasks).await?;
     }
     Ok(())
 }
@@ -137,7 +132,7 @@ pub async fn outdated(
         };
 
         tracing::info!(?tasks, "Queueing the update tasks");
-        push(&tasks).map_err(UpdateError::Task).await?;
+        push(&tasks).await?;
     }
     Ok(())
 }

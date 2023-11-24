@@ -39,7 +39,7 @@ pub enum AuthError {
     #[error("Could not get the settings: {0}")]
     Settings(#[from] SettingsError),
     #[error("Error during jwt serialization: {0}")]
-    JWT(#[from] JWTError),
+    Jwt(#[from] JWTError),
 
     #[error("No matching user exists or no auth methods are available")]
     NoCandidate,

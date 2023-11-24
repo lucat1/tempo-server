@@ -91,7 +91,7 @@ pub async fn list(
         .partition(IsFile::is_file);
     let rel = abs_path
         .strip_prefix(&settings.downloads)
-        .map_err(|_| Error::Internal)?
+        .map_err(|_| Error::Internal(None))?
         .to_path_buf();
     let files = files
         .into_iter()

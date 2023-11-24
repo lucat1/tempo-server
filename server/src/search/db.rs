@@ -14,7 +14,7 @@ use super::documents::{artist_fields, release_fields, track_fields};
 use super::schema::{ARTISTS_SCHEMA, RELEASES_SCHEMA, TRACKS_SCHEMA};
 use base::{
     setting::{get_settings, Settings, SettingsError},
-    util::mkdirp,
+    util::{mkdirp, UtilError},
 };
 
 pub struct Indexes {
@@ -36,6 +36,8 @@ pub enum SearchError {
 
     #[error("Could not get settings: {0}")]
     Settings(#[from] SettingsError),
+    #[error("Error in utility: {0}")]
+    Util(#[from] UtilError),
 
     #[error("Error in the indexer library: {0}")]
     Tantivy(#[from] TantivyError),

@@ -1,22 +1,21 @@
-use eyre::{eyre, Result};
 use scan_dir::ScanDir;
-use std::{fs::canonicalize, path::PathBuf};
+use std::{
+    fs::canonicalize,
+    path::{Path, PathBuf},
+};
 
-use super::TrackFile;
+use super::{ImportError, TrackFile};
 use base::{setting::Library, util::path_to_str};
 
-fn all_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
+fn all_files(path: &Path) -> Result<Vec<PathBuf>, ImportError> {
     ScanDir::files()
         .walk(path_to_str(path)?, |iter| {
             iter.map(|(ref entry, _)| entry.path()).collect()
         })
-        .map_err(|errs| match errs.first().map(|e| eyre!(e.to_string())) {
-            Some(e) => e,
-            None => eyre!("No errors"),
-        })
+        .map_err(ImportError::ScanDir)
 }
 
-pub async fn all_tracks(library: &Library, path: &PathBuf) -> Result<Vec<TrackFile>> {
+pub async fn all_tracks(library: &Library, path: &Path) -> Result<Vec<TrackFile>, ImportError> {
     let files = all_files(&canonicalize(path)?)?;
     let (tracks, errors): (Vec<_>, Vec<_>) = files
         .iter()
