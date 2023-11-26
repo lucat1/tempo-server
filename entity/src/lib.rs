@@ -8,6 +8,7 @@ mod artist;
 mod artist_credit;
 mod artist_credit_release;
 mod artist_credit_track;
+mod artist_picture;
 mod artist_track_relation;
 mod artist_url;
 
@@ -83,6 +84,12 @@ pub use artist_credit_track::Column as ArtistCreditTrackColumn;
 pub use artist_credit_track::Entity as ArtistCreditTrackEntity;
 pub use artist_credit_track::Model as ArtistCreditTrack;
 pub use artist_credit_track::Relation as ArtistCreditTrackRelation;
+pub use artist_picture::ActiveModel as ArtistPictureActive;
+pub use artist_picture::Column as ArtistPictureColumn;
+pub use artist_picture::Entity as ArtistPictureEntity;
+pub use artist_picture::Model as ArtistPicture;
+pub use artist_picture::PictureType as ArtistPictureType;
+pub use artist_picture::Relation as ArtistPictureRelation;
 
 pub use image::ActiveModel as ImageActive;
 pub use image::Column as ImageColumn;

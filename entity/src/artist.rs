@@ -28,6 +28,8 @@ pub enum Relation {
     Image,
     #[sea_orm(has_many = "super::artist_track_relation::Entity")]
     TrackRelation,
+    #[sea_orm(has_many = "super::artist_picture::Entity")]
+    Picture,
     #[sea_orm(has_many = "super::update_artist::Entity")]
     Update,
 }
@@ -73,6 +75,12 @@ impl Related<super::update_artist::Entity> for Entity {
 
     fn via() -> Option<RelationDef> {
         Some(super::update_artist::Relation::Artist.def().rev())
+    }
+}
+
+impl Related<super::artist_picture::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Picture.def()
     }
 }
 

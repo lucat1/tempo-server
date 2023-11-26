@@ -27,6 +27,7 @@ use base::util::dedup;
 pub struct ArtistRelated {
     pub urls: Vec<entity::ArtistUrl>,
     pub images: Vec<entity::ImageArtist>,
+    pub pictures: Vec<entity::ArtistPicture>,
     pub recordings: Vec<entity::ArtistTrackRelation>,
     pub artist_credits: Vec<entity::ArtistCredit>,
     pub releases: Vec<Vec<entity::ArtistCreditRelease>>,
@@ -44,6 +45,7 @@ where
     let artist_relations = entities.load_many(entity::ArtistUrlEntity, db).await?;
     let artist_credits = entities.load_many(entity::ArtistCreditEntity, db).await?;
     let images = entities.load_many(entity::ImageArtistEntity, db).await?;
+    let pictures = entities.load_many(entity::ArtistPictureEntity, db).await?;
     let recordings = if !light {
         entities
             .load_many(entity::ArtistTrackRelationEntity, db)
@@ -74,6 +76,7 @@ where
                 Vec::new()
             },
             images: images[i].to_owned(),
+            pictures: pictures[i].to_owned(),
             releases,
             tracks,
             recordings: if light {
@@ -166,6 +169,7 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
         artist_credits,
         releases,
         tracks,
+        pictures,
     } = related;
     let mut relationships = HashMap::new();
     if !images.is_empty() {
@@ -186,6 +190,24 @@ pub fn entity_to_resource(entity: &entity::Artist, related: &ArtistRelated) -> A
                 ),
             },
         );
+    }
+    if !pictures.is_empty() {
+        for picture in pictures.iter() {
+            let r#type = match picture.r#type {
+                entity::ArtistPictureType::Picture => ArtistRelation::Picture,
+                entity::ArtistPictureType::Cover => ArtistRelation::Cover,
+            };
+            relationships.insert(
+                r#type,
+                Relationship {
+                    data: Relation::Single(Related::String(ResourceIdentifier {
+                        r#type: ResourceType::Image,
+                        id: picture.image_id.to_owned(),
+                        meta: None,
+                    })),
+                },
+            );
+        }
     }
     if !recordings.is_empty() {
         relationships.insert(

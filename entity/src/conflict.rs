@@ -106,4 +106,11 @@ lazy_static! {
         OnConflict::columns([UpdateArtistColumn::Type, UpdateArtistColumn::Id])
             .update_column(UpdateArtistColumn::Time)
             .to_owned();
+    pub static ref ARTIST_PICTURE_CONFLICT: OnConflict = OnConflict::columns([
+        ArtistPictureColumn::ImageId,
+        ArtistPictureColumn::ArtistId,
+        ArtistPictureColumn::Type
+    ])
+    .update_column(ArtistPictureColumn::ImageId)
+    .to_owned();
 }

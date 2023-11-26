@@ -181,6 +181,8 @@ pub enum ArtistRelation {
     Images,
     Releases,
     Tracks,
+    Picture,
+    Cover,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
