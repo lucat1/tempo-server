@@ -1,4 +1,3 @@
-mod genres;
 mod medium;
 mod release;
 mod track;
@@ -15,6 +14,10 @@ mod artist_url;
 mod image;
 mod image_artist;
 mod image_release;
+
+mod genre;
+mod genre_release;
+mod genre_track;
 
 mod scrobble;
 mod user;
@@ -53,7 +56,6 @@ pub use artist_url::Entity as ArtistUrlEntity;
 pub use artist_url::Model as ArtistUrl;
 pub use artist_url::Relation as ArtistUrlRelation;
 pub use artist_url::UrlType as ArtistUrlType;
-pub use genres::Genres;
 pub use medium::ActiveModel as MediumActive;
 pub use medium::Column as MediumColumn;
 pub use medium::Entity as MediumEntity;
@@ -90,6 +92,22 @@ pub use artist_picture::Entity as ArtistPictureEntity;
 pub use artist_picture::Model as ArtistPicture;
 pub use artist_picture::PictureType as ArtistPictureType;
 pub use artist_picture::Relation as ArtistPictureRelation;
+
+pub use genre::ActiveModel as GenreActive;
+pub use genre::Column as GenreColumn;
+pub use genre::Entity as GenreEntity;
+pub use genre::Model as Genre;
+pub use genre::Relation as GenreRelation;
+pub use genre_release::ActiveModel as GenreReleaseActive;
+pub use genre_release::Column as GenreReleaseColumn;
+pub use genre_release::Entity as GenreReleaseEntity;
+pub use genre_release::Model as GenreRelease;
+pub use genre_release::Relation as GenreReleaseRelation;
+pub use genre_track::ActiveModel as GenreTrackActive;
+pub use genre_track::Column as GenreTrackColumn;
+pub use genre_track::Entity as GenreTrackEntity;
+pub use genre_track::Model as GenreTrack;
+pub use genre_track::Relation as GenreTrackRelation;
 
 pub use image::ActiveModel as ImageActive;
 pub use image::Column as ImageColumn;

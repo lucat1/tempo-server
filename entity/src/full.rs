@@ -1,7 +1,7 @@
 use crate::*;
 use eyre::{bail, eyre};
 use serde::Serialize;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 #[derive(Serialize, Debug, Clone)]
 pub struct FullRelease {
@@ -247,5 +247,51 @@ where
             }
         }
         Ok(s)
+    }
+}
+
+pub trait GenreInfo {
+    fn get_genres(&self) -> Result<Vec<&Genre>>;
+}
+
+// TODO: maybe generalize like we've done for artists. Would
+// avoid duplication of the final iterator
+impl GenreInfo for FullTrack {
+    fn get_genres(&self) -> Result<Vec<&Genre>> {
+        let genre_ids: HashSet<String> = self
+            .import
+            .track_genres
+            .0
+            .iter()
+            .filter(|rel| rel.track_id == self.track)
+            .map(|rel| rel.genre_id.to_owned())
+            .collect();
+        Ok(self
+            .import
+            .genres
+            .0
+            .iter()
+            .filter(|g| genre_ids.contains(&g.id))
+            .collect())
+    }
+}
+
+impl GenreInfo for FullRelease {
+    fn get_genres(&self) -> Result<Vec<&Genre>> {
+        let genre_ids: HashSet<String> = self
+            .import
+            .release_genres
+            .0
+            .iter()
+            .filter(|rel| rel.release_id == self.release)
+            .map(|rel| rel.genre_id.to_owned())
+            .collect();
+        Ok(self
+            .import
+            .genres
+            .0
+            .iter()
+            .filter(|g| genre_ids.contains(&g.id))
+            .collect())
     }
 }

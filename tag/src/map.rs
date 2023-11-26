@@ -1,6 +1,6 @@
 use crate::TagKey;
 use entity::{
-    full::{ArtistInfo, FullRelease, FullTrack},
+    full::{ArtistInfo, FullRelease, FullTrack, GenreInfo},
     Artist, ArtistTrackRelationType,
 };
 use eyre::{eyre, Result};
@@ -40,7 +40,14 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
     map.insert(TagKey::MusicBrainzDiscID, vec![track.medium_id.to_string()]);
     map.insert(TagKey::Duration, vec![track.length.to_string()]);
     map.insert(TagKey::TrackNumber, vec![track.number.to_string()]);
-    map.insert(TagKey::Genre, track.genres.0.clone());
+    map.insert(
+        TagKey::Genre,
+        full_track
+            .get_genres()?
+            .into_iter()
+            .map(|g| g.name.to_string())
+            .collect(),
+    );
     map.insert(
         TagKey::Performer,
         artist_names(full_track.get_related(ArtistTrackRelationType::Performer)?),

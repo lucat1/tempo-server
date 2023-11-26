@@ -138,6 +138,15 @@ pub struct Mediums(pub Vec<super::Medium>);
 pub struct Tracks(pub Vec<super::Track>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct Genres(pub Vec<super::Genre>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct TrackGenres(pub Vec<super::GenreTrack>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct ReleaseGenres(pub Vec<super::GenreRelease>);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
 pub struct ArtistTrackRelations(pub Vec<super::ArtistTrackRelation>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
@@ -178,6 +187,9 @@ pub struct Model {
     pub artist_credit_releases: ArtistCreditReleases,
     pub artist_credit_tracks: ArtistCreditTracks,
     pub covers: Covers,
+    pub genres: Genres,
+    pub track_genres: TrackGenres,
+    pub release_genres: ReleaseGenres,
 
     pub release_matches: ReleaseMatches,
     pub cover_ratings: CoverRatings,

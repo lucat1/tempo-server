@@ -14,7 +14,6 @@ pub struct Model {
     pub title: String,
     pub length: i32,
     pub number: i32,
-    pub genres: crate::Genres,
     pub recording_id: Uuid,
 
     pub format: Option<TrackFormat>,
@@ -31,6 +30,8 @@ pub enum Relation {
     Medium,
     #[sea_orm(has_many = "super::artist_track_relation::Entity")]
     ArtistRelation,
+    #[sea_orm(has_many = "super::genre::Entity")]
+    Genre,
 }
 
 impl Related<super::medium::Entity> for Entity {
@@ -52,6 +53,16 @@ impl Related<super::artist_credit::Entity> for Entity {
 impl Related<super::artist_track_relation::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ArtistRelation.def()
+    }
+}
+
+impl Related<super::genre::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::genre_track::Relation::Genre.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::genre_track::Relation::Track.def().rev())
     }
 }
 
@@ -128,7 +139,6 @@ impl TryFrom<String> for Column {
             "title" => Ok(Column::Title),
             "duration" => Ok(Column::Length),
             "number" => Ok(Column::Number),
-            "genres" => Ok(Column::Genres),
             "recording_mbid" => Ok(Column::RecordingId),
             "mimetype" => Ok(Column::Format),
             &_ => Err("Invalid column name".to_owned()),

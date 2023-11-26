@@ -76,7 +76,6 @@ lazy_static! {
             TrackColumn::Title,
             TrackColumn::Length,
             TrackColumn::Number,
-            TrackColumn::Genres,
             TrackColumn::Format,
             TrackColumn::Path,
         ])

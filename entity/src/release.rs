@@ -11,7 +11,6 @@ pub struct Model {
     pub title: String,
     pub release_group_id: Option<Uuid>,
     pub release_type: Option<String>,
-    pub genres: crate::Genres,
     pub asin: Option<String>,
     pub country: Option<String>,
     pub label: Option<String>,
@@ -34,6 +33,8 @@ pub enum Relation {
     Medium,
     #[sea_orm(has_one = "super::image_release::Entity")]
     Image,
+    #[sea_orm(has_many = "super::genre::Entity")]
+    Genre,
 }
 
 impl Related<super::medium::Entity> for Entity {
@@ -68,6 +69,16 @@ impl Related<super::image::Entity> for Entity {
     }
 }
 
+impl Related<super::genre::Entity> for Entity {
+    fn to() -> RelationDef {
+        super::genre_release::Relation::Genre.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::genre_release::Relation::Release.def().rev())
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
 
 impl Hash for Column {
@@ -92,7 +103,6 @@ impl TryFrom<String> for Column {
             "title" => Ok(Column::Title),
             "release-group-id" => Ok(Column::ReleaseGroupId),
             "release-type" => Ok(Column::ReleaseType),
-            "genres" => Ok(Column::Genres),
             "asin" => Ok(Column::Asin),
             "country" => Ok(Column::Country),
             "label" => Ok(Column::Label),
