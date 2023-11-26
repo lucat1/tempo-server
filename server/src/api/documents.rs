@@ -22,6 +22,7 @@ pub enum ResourceType {
     Track,
     Medium,
     Release,
+    Genre,
 }
 
 pub type ServerResource = Resource<ResourceType, String, ServerAttributes, ServerRelation, Meta>;
@@ -35,6 +36,7 @@ pub type ArtistResource = Resource<ResourceType, Uuid, ArtistAttributes, ArtistR
 pub type TrackResource = Resource<ResourceType, Uuid, TrackAttributes, TrackRelation, Meta>;
 pub type MediumResource = Resource<ResourceType, Uuid, MediumAttributes, MediumRelation, Meta>;
 pub type ReleaseResource = Resource<ResourceType, Uuid, ReleaseAttributes, ReleaseRelation, Meta>;
+pub type GenreResource = Resource<ResourceType, String, GenreAttributes, GenreRelation, Meta>;
 
 // pub type InsertServerResource = InsertResource<ServerAttributes, ServerRelation>;
 // pub type InsertAuthResource = InsertResource<AuthAttributes, AuthRelation>;
@@ -57,6 +59,7 @@ pub enum Included {
     Track(TrackResource),
     Medium(MediumResource),
     Release(ReleaseResource),
+    Genre(GenreResource),
 }
 
 impl PartialEq for Included {
@@ -103,6 +106,7 @@ impl std::cmp::Ord for Included {
 #[serde(untagged)]
 pub enum Meta {
     ArtistCredit(ArtistCreditAttributes),
+    Genre(GenreMetaAttributes),
     Recording(RecordingAttributes),
     Connection(ConnectionMetaAttributes),
 
@@ -229,7 +233,6 @@ pub struct ReleaseAttributes {
     pub title: String,
     pub disctotal: i32,
     pub tracktotal: i32,
-    pub genres: Vec<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub year: Option<i32>,
@@ -260,6 +263,7 @@ pub enum ReleaseRelation {
     Image,
     Mediums,
     Artists,
+    Genres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -274,6 +278,8 @@ pub enum ReleaseInclude {
     MediumsTracks,
     #[serde(rename = "mediums.tracks.artists")]
     MediumsTracksArtists,
+    #[serde(rename = "genres")]
+    Genres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -287,8 +293,6 @@ pub enum ReleaseFilter {
     Disctotal,
     #[serde(rename = "tracktotal")]
     Tracktotal,
-    #[serde(rename = "genres")]
-    Genres,
     #[serde(rename = "year")]
     Year,
     #[serde(rename = "month")]
@@ -316,7 +320,6 @@ impl IntoColumn<entity::ReleaseColumn> for ReleaseFilter {
         match self {
             ReleaseFilter::Id => Some(entity::ReleaseColumn::Id),
             ReleaseFilter::Title => Some(entity::ReleaseColumn::Title),
-            ReleaseFilter::Genres => Some(entity::ReleaseColumn::Genres),
             ReleaseFilter::Year => Some(entity::ReleaseColumn::Year),
             ReleaseFilter::Month => Some(entity::ReleaseColumn::Month),
             ReleaseFilter::Day => Some(entity::ReleaseColumn::Day),
@@ -395,7 +398,6 @@ pub struct TrackAttributes {
     pub track: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disc: Option<i32>,
-    pub genres: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bpm: Option<i32>,
 
@@ -426,6 +428,7 @@ pub enum TrackRelation {
     Artists,
     Medium,
     Recorders,
+    Genres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -440,6 +443,8 @@ pub enum TrackInclude {
     MediumReleaseArtists,
     #[serde(rename = "recorders")]
     Recorders,
+    #[serde(rename = "genres")]
+    Genres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -453,8 +458,6 @@ pub enum TrackFilter {
     Track,
     #[serde(rename = "disc")]
     Disc,
-    #[serde(rename = "genres")]
-    Genres,
     #[serde(rename = "bpm")]
     Bpm,
 
@@ -491,7 +494,6 @@ impl IntoColumn<entity::TrackColumn> for TrackFilter {
             TrackFilter::Id => Some(entity::TrackColumn::Id),
             TrackFilter::Title => Some(entity::TrackColumn::Title),
             TrackFilter::Track => Some(entity::TrackColumn::Number),
-            TrackFilter::Genres => Some(entity::TrackColumn::Genres),
             TrackFilter::RecordingMbid => Some(entity::TrackColumn::RecordingId),
             TrackFilter::TrackMbid => Some(entity::TrackColumn::Id),
             TrackFilter::Mimetype => Some(entity::TrackColumn::Format),
@@ -644,4 +646,51 @@ pub enum ConnectionRelation {}
 pub struct ConnectionMetaAttributes {
     pub username: String,
     pub profile_url: Url,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GenreAttributes {
+    pub name: String,
+    pub disambiguation: String,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GenreRelation {
+    Tracks,
+    Releases,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum GenreInclude {
+    #[serde(rename = "tracks")]
+    Tracks,
+    #[serde(rename = "releases")]
+    Releases,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum GenreFilter {
+    #[serde(rename = "name")]
+    Name,
+    #[serde(rename = "disambiguation")]
+    Disambiguation,
+
+    Include(GenreInclude),
+}
+
+impl IntoColumn<entity::GenreColumn> for GenreFilter {
+    fn column(&self) -> Option<entity::GenreColumn> {
+        match self {
+            GenreFilter::Name => Some(entity::GenreColumn::Name),
+            GenreFilter::Disambiguation => Some(entity::GenreColumn::Disambiguation),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GenreMetaAttributes {
+    pub count: u32,
 }

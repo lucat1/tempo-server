@@ -44,6 +44,7 @@ impl super::TaskTrait for Data {
                         &tx,
                     )
                     .await?;
+                let genres = tracks.load_many(entity::GenreEntity, &tx).await?;
                 for (i, track) in tracks.into_iter().enumerate() {
                     let artist_credits = tracks_artist_credits.get(i).ok_or(eyre!(
                         "Track {} ({}) doesn't have any associated artist credits",
@@ -60,9 +61,11 @@ impl super::TaskTrait for Data {
                         artists_self.push((artist_credit.to_owned(), artist));
                     }
 
-                    writer
-                        .tracks
-                        .add_document(documents::track_to_document((track, artists_self))?)?;
+                    writer.tracks.add_document(documents::track_to_document(
+                        track,
+                        artists_self,
+                        genres[i].to_owned(),
+                    )?)?;
                 }
                 writer.tracks.commit()?;
             }
@@ -75,6 +78,7 @@ impl super::TaskTrait for Data {
                         &tx,
                     )
                     .await?;
+                let genres = releases.load_many(entity::GenreEntity, &tx).await?;
                 for (i, release) in releases.into_iter().enumerate() {
                     let artist_credits = tracks_artist_credits.get(i).ok_or(eyre!(
                         "Release {} ({}) doesn't have any associated artist credits",
@@ -93,7 +97,11 @@ impl super::TaskTrait for Data {
 
                     writer
                         .releases
-                        .add_document(documents::release_to_document((release, artists_self))?)?;
+                        .add_document(documents::release_to_document(
+                            release,
+                            artists_self,
+                            genres[i].to_owned(),
+                        )?)?;
                 }
                 writer.releases.commit()?;
             }

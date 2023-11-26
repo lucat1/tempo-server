@@ -26,6 +26,7 @@ pub struct ReleaseRelated {
     pub image: Option<entity::ImageRelease>,
     pub artist_credits: Vec<entity::ArtistCredit>,
     pub mediums: Vec<entity::Medium>,
+    pub genres: Vec<entity::GenreRelease>,
 }
 
 pub async fn related<C>(
@@ -45,6 +46,7 @@ where
         .await?;
     let images = entities.load_one(entity::ImageReleaseEntity, db).await?;
     let mediums = entities.load_many(entity::MediumEntity, db).await?;
+    let genres = entities.load_many(entity::GenreReleaseEntity, db).await?;
 
     let mut related = Vec::new();
     for i in 0..entities.len() {
@@ -54,6 +56,7 @@ where
             image: images[i].to_owned(),
             artist_credits: artist_credits.to_owned(),
             mediums: mediums[i].to_owned(),
+            genres: genres[i].to_owned(),
         });
     }
 
@@ -65,6 +68,7 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
         image,
         artist_credits,
         mediums,
+        genres,
     } = related;
     let mut relationships = HashMap::new();
     if !artist_credits.is_empty() {
@@ -81,6 +85,25 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
                                 meta: Some(Meta::ArtistCredit(ArtistCreditAttributes {
                                     join_phrase: ac.join_phrase.to_owned(),
                                 })),
+                            })
+                        })
+                        .collect(),
+                ),
+            },
+        );
+    }
+    if !genres.is_empty() {
+        relationships.insert(
+            ReleaseRelation::Genres,
+            Relationship {
+                data: Relation::Multi(
+                    genres
+                        .iter()
+                        .map(|g| {
+                            Related::String(ResourceIdentifier {
+                                r#type: ResourceType::Genre,
+                                id: g.genre_id.to_owned(),
+                                meta: None,
                             })
                         })
                         .collect(),
@@ -127,7 +150,6 @@ pub fn entity_to_resource(entity: &entity::Release, related: &ReleaseRelated) ->
             title: entity.title.to_owned(),
             disctotal: mediums.len() as i32,
             tracktotal: mediums.iter().fold(0, |acc, m| acc + m.tracks),
-            genres: entity.genres.0.to_owned(),
 
             year: entity.year,
             month: entity.month,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "genre")]
 pub struct Model {
-    // hash of the name
+    // hash of the disambiguation
     #[sea_orm(primary_key, auto_increment = false, column_type = "String(Some(64))")]
     pub id: String,
     pub name: String,

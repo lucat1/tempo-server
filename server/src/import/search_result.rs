@@ -1,5 +1,5 @@
 use base::util::{dedup, maybe_date};
-use std::cmp::Ordering;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::fetch::musicbrainz;
@@ -13,6 +13,9 @@ pub struct SearchResult {
     pub artist_track_relations: Vec<entity::ArtistTrackRelation>,
     pub artist_credit_releases: Vec<entity::ArtistCreditRelease>,
     pub artist_credit_tracks: Vec<entity::ArtistCreditTrack>,
+    pub genres: Vec<entity::Genre>,
+    pub track_genres: Vec<entity::GenreTrack>,
+    pub release_genres: Vec<entity::GenreRelease>,
 }
 
 impl From<musicbrainz::Artist> for entity::Artist {
@@ -51,21 +54,12 @@ struct TrackWithMediumId(musicbrainz::Track, Uuid);
 
 impl From<TrackWithMediumId> for entity::Track {
     fn from(TrackWithMediumId(track, medium_id): TrackWithMediumId) -> Self {
-        let mut sorted_genres = track.recording.genres.unwrap_or_default();
-        sorted_genres.sort_by(|a, b| a.count.partial_cmp(&b.count).unwrap_or(Ordering::Equal));
-
-        entity::Track {
+        Self {
             id: track.id,
             medium_id,
             title: track.title,
             length: track.length.or(track.recording.length).unwrap_or_default(),
             number: track.position,
-            genres: entity::Genres(
-                sorted_genres
-                    .into_iter()
-                    .map(|g| g.name)
-                    .collect::<Vec<_>>(),
-            ),
             recording_id: track.recording.id,
             format: None,
             path: None,
@@ -99,6 +93,9 @@ impl From<musicbrainz::Release> for SearchResult {
         let mut artist_credit_tracks = Vec::new();
         let mut artist_track_relations = Vec::new();
         let mut tracks = Vec::new();
+        let mut genres = HashMap::new();
+        let mut track_genres = Vec::new();
+        let mut release_genres = Vec::new();
 
         let mediums: Vec<musicbrainz::Medium> = release
             .media
@@ -188,14 +185,34 @@ impl From<musicbrainz::Release> for SearchResult {
                         }),
                 );
 
+                for genre in track.recording.genres.to_owned().unwrap_or_default().iter() {
+                    let id = sha256::digest(&genre.disambiguation);
+                    if !genres.contains_key(&id) {
+                        genres.insert(
+                            id.clone(),
+                            entity::Genre {
+                                id: id.clone(),
+                                name: genre.name.clone(),
+                                disambiguation: genre.disambiguation.clone(),
+                            },
+                        );
+                    }
+
+                    track_genres.push(entity::GenreTrack {
+                        genre_id: id.clone(),
+                        track_id: track.id,
+                        count: genre.count,
+                    });
+                    release_genres.push(entity::GenreRelease {
+                        genre_id: id,
+                        release_id: track.id,
+                    });
+                }
+
                 tracks.push(TrackWithMediumId(track.to_owned(), medium.id.unwrap()).into());
             }
         }
-
-        let genres = tracks
-            .iter()
-            .flat_map(|track: &entity::Track| track.genres.0.to_owned())
-            .collect();
+        let genres = genres.into_iter().map(|(_, v)| v).collect();
 
         Self {
             artist_credits,
@@ -209,7 +226,7 @@ impl From<musicbrainz::Release> for SearchResult {
                     .as_ref()
                     .and_then(|r| r.primary_type.as_ref())
                     .map(|s| s.to_lowercase()),
-                genres: entity::Genres(dedup(genres)),
+                // genres: entity::Genres(dedup(genres)),
                 asin: release.asin,
                 country: release.country,
                 label: label
@@ -249,6 +266,10 @@ impl From<musicbrainz::Release> for SearchResult {
                 .collect(),
             artist_credit_tracks,
             artist_track_relations,
+
+            genres,
+            track_genres,
+            release_genres,
         }
     }
 }
@@ -274,6 +295,9 @@ impl From<Vec<musicbrainz::Release>> for CombinedSearchResults {
         let mut artist_track_relations = Vec::new();
         let mut artist_credit_releases = Vec::new();
         let mut artist_credit_tracks = Vec::new();
+        let mut genres = Vec::new();
+        let mut track_genres = Vec::new();
+        let mut release_genres = Vec::new();
 
         for release in musicbrainz_releases.into_iter() {
             let SearchResult {
@@ -285,6 +309,9 @@ impl From<Vec<musicbrainz::Release>> for CombinedSearchResults {
                 artist_track_relations: partial_artist_track_relations,
                 artist_credit_tracks: partial_artist_credit_tracks,
                 artist_credit_releases: partial_artist_credit_releases,
+                genres: partial_genres,
+                track_genres: partial_track_genres,
+                release_genres: partial_release_genres,
             } = release.into();
             artists.extend(partial_artists);
             artist_credits.extend(partial_artist_credits);
@@ -294,6 +321,9 @@ impl From<Vec<musicbrainz::Release>> for CombinedSearchResults {
             artist_track_relations.extend(partial_artist_track_relations);
             artist_credit_releases.extend(partial_artist_credit_releases);
             artist_credit_tracks.extend(partial_artist_credit_tracks);
+            genres.extend(partial_genres);
+            track_genres.extend(partial_track_genres);
+            release_genres.extend(partial_release_genres);
         }
 
         Self {

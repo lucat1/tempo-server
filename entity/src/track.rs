@@ -66,6 +66,16 @@ impl Related<super::genre::Entity> for Entity {
     }
 }
 
+impl Related<super::genre_track::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Genre.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::genre_track::Relation::Track.def().rev())
+    }
+}
+
 #[derive(Debug)]
 pub struct TrackToRelease;
 

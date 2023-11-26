@@ -49,6 +49,9 @@ pub struct ImportRelated {
     artist_track_relations: Vec<entity::ArtistTrackRelation>,
     artist_credit_releases: Vec<entity::ArtistCreditRelease>,
     artist_credit_tracks: Vec<entity::ArtistCreditTrack>,
+    genres: Vec<entity::Genre>,
+    track_genres: Vec<entity::GenreTrack>,
+    release_genres: Vec<entity::GenreRelease>,
 }
 
 pub fn entity_to_resource(entity: &entity::Import, related: &ImportRelated) -> ImportResource {
@@ -176,6 +179,9 @@ where
             artist_track_relations: entity_clone.artist_track_relations.0,
             artist_credit_releases: entity_clone.artist_credit_releases.0,
             artist_credit_tracks: entity_clone.artist_credit_tracks.0,
+            genres: entity_clone.genres.0,
+            track_genres: entity_clone.track_genres.0,
+            release_genres: entity_clone.release_genres.0,
         })
     }
     Ok(result)
@@ -200,6 +206,9 @@ where
             artist_track_relations,
             artist_credit_releases,
             artist_credit_tracks,
+            genres,
+            track_genres,
+            release_genres,
             ..
         } = related;
         for artist in artists.iter() {
@@ -246,6 +255,16 @@ where
                     .filter_map(|med| {
                         if med.release_id == release.id {
                             Some(med.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                genres: release_genres
+                    .iter()
+                    .filter_map(|r| {
+                        if r.release_id == release.id {
+                            Some(r.clone())
                         } else {
                             None
                         }
@@ -300,12 +319,28 @@ where
                         }
                     })
                     .collect(),
+                genres: track_genres
+                    .iter()
+                    .filter_map(|r| {
+                        if r.track_id == track.id {
+                            Some(r.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
                 ..Default::default()
             };
             included.push(Included::TempoInclude(tracks::entity_to_included(
                 track, &related,
             )));
         }
+        // TODO
+        // for genre in genres.iter() {
+        //     included.push(Included::TempoInclude(genres::entity_to_included(
+        //         genres, &related,
+        //     )));
+        // }
     }
     Ok(included)
 }
@@ -348,6 +383,9 @@ pub async fn begin(
         artist_credit_releases: ActiveValue::Set(entity::import::ArtistCreditReleases(Vec::new())),
         artist_credit_tracks: ActiveValue::Set(entity::import::ArtistCreditTracks(Vec::new())),
         covers: ActiveValue::Set(entity::import::Covers(Vec::new())),
+        genres: ActiveValue::Set(entity::import::Genres(Vec::new())),
+        track_genres: ActiveValue::Set(entity::import::TrackGenres(Vec::new())),
+        release_genres: ActiveValue::Set(entity::import::ReleaseGenres(Vec::new())),
 
         release_matches: ActiveValue::Set(entity::import::ReleaseMatches(HashMap::new())),
         cover_ratings: ActiveValue::Set(entity::import::CoverRatings(Vec::new())),

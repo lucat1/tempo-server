@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use crate::api::documents::MediumInclude;
+use crate::api::documents::{GenreMetaAttributes, MediumInclude};
 use crate::api::{
     documents::{
         ArtistCreditAttributes, Included, IntoColumn, Meta, RecordingAttributes, ResourceType,
@@ -30,6 +30,7 @@ pub struct TrackRelated {
     pub artist_credits: Vec<entity::ArtistCredit>,
     pub medium: Option<entity::Medium>,
     pub recorders: Vec<entity::ArtistTrackRelation>,
+    pub genres: Vec<entity::GenreTrack>,
 }
 
 pub async fn related<C>(
@@ -48,6 +49,7 @@ where
         )
         .await?;
     let mediums = entities.load_one(entity::MediumEntity, db).await?;
+    let genres = entities.load_many(entity::GenreTrackEntity, db).await?;
     let recorders = if !light {
         entities
             .load_many(entity::ArtistTrackRelationEntity, db)
@@ -68,6 +70,7 @@ where
             } else {
                 recorders[i].to_owned()
             },
+            genres: genres[i].to_owned(),
         });
     }
 
@@ -79,6 +82,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
         artist_credits,
         medium,
         recorders,
+        genres,
     } = related;
     let mut relationships = HashMap::new();
     if !artist_credits.is_empty() {
@@ -124,6 +128,25 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             },
         );
     }
+    if !genres.is_empty() {
+        relationships.insert(
+            TrackRelation::Genres,
+            Relationship {
+                data: Relation::Multi(
+                    genres
+                        .iter()
+                        .map(|g| {
+                            Related::String(ResourceIdentifier {
+                                r#type: ResourceType::Genre,
+                                id: g.genre_id.to_owned(),
+                                meta: Some(Meta::Genre(GenreMetaAttributes { count: g.count })),
+                            })
+                        })
+                        .collect(),
+                ),
+            },
+        );
+    }
     if let Some(med) = medium {
         relationships.insert(
             TrackRelation::Medium,
@@ -144,7 +167,6 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
             title: entity.title.to_owned(),
             track: entity.number,
             disc: medium.as_ref().map(|m| m.position),
-            genres: entity.genres.0.to_owned(),
             bpm: None,
 
             recording_mbid: entity.recording_id.to_owned(),

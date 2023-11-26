@@ -79,6 +79,16 @@ impl Related<super::genre::Entity> for Entity {
     }
 }
 
+impl Related<super::genre_release::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Genre.def()
+    }
+
+    fn via() -> Option<RelationDef> {
+        Some(super::genre_release::Relation::Release.def().rev())
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}
 
 impl Hash for Column {

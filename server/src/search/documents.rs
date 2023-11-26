@@ -65,7 +65,9 @@ pub fn track_fields() -> Option<TrackFields> {
 }
 
 pub fn track_to_document(
-    (track_data, artists_data): (entity::Track, Vec<(entity::ArtistCredit, entity::Artist)>),
+    track_data: entity::Track,
+    artists_data: Vec<(entity::ArtistCredit, entity::Artist)>,
+    genres_data: Vec<entity::Genre>,
 ) -> Result<Document> {
     let TrackFields {
         id,
@@ -77,7 +79,7 @@ pub fn track_to_document(
     let mut document = doc!(
         id => track_data.id.to_string(),
         title => track_data.title,
-        genres => track_data.genres.0.join(" "),
+        genres => genres_data.iter().fold(String::new(), |c, g| c + &g.name),
     );
     document.add_text(artists, artists_string(artists_data));
     Ok(document)
@@ -103,7 +105,9 @@ pub fn release_fields() -> Option<ReleaseFields> {
 }
 
 pub fn release_to_document(
-    (release_data, artists_data): (entity::Release, Vec<(entity::ArtistCredit, entity::Artist)>),
+    release_data: entity::Release,
+    artists_data: Vec<(entity::ArtistCredit, entity::Artist)>,
+    genres_data: Vec<entity::Genre>,
 ) -> Result<Document> {
     let ReleaseFields {
         id,
@@ -116,7 +120,7 @@ pub fn release_to_document(
     let mut document = doc!(
         id => release_data.id.to_string(),
         title => release_data.title,
-        genres => release_data.genres.0.join(" "),
+        genres => genres_data.iter().fold(String::new(), |c, g| c + &g.name),
     );
     if let Some(rel_typ) = release_data.release_type {
         document.add_text(release_type, rel_typ);
