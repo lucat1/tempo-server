@@ -112,4 +112,15 @@ lazy_static! {
     ])
     .update_column(ArtistPictureColumn::ImageId)
     .to_owned();
+    pub static ref GENRE_CONFLICT: OnConflict = OnConflict::column(GenreColumn::Id)
+        .update_columns([GenreColumn::Name, GenreColumn::Disambiguation])
+        .to_owned();
+    pub static ref GENRE_TRACK_CONFLICT: OnConflict =
+        OnConflict::columns([GenreTrackColumn::GenreId, GenreTrackColumn::TrackId])
+            .do_nothing()
+            .to_owned();
+    pub static ref GENRE_RELEASE_CONFLICT: OnConflict =
+        OnConflict::columns([GenreReleaseColumn::GenreId, GenreReleaseColumn::ReleaseId])
+            .do_nothing()
+            .to_owned();
 }

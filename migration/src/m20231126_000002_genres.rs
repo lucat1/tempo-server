@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use entity::{
+    conflict::{GENRE_CONFLICT, GENRE_RELEASE_CONFLICT, GENRE_TRACK_CONFLICT},
     GenreColumn, GenreEntity, GenreReleaseColumn, GenreReleaseEntity, GenreTrackColumn,
     GenreTrackEntity, ReleaseEntity, TrackEntity,
 };
@@ -35,7 +36,7 @@ macro_rules! execute {
 }
 
 macro_rules! relationalize {
-    ($conn: expr, $backend: expr, $manager: expr, $table: expr, $entity: expr, $genre_entity: expr, $genre_entity_column: ident, $genre_entity_field: ident) => {
+    ($conn: expr, $backend: expr, $manager: expr, $table: expr, $entity: expr) => {{
         let genres = $conn
             .query_all(Statement::from_string(
                 $backend,
@@ -63,40 +64,28 @@ macro_rules! relationalize {
             )
             .await?;
 
-        let all_genres: Vec<SimpleExpr> = map
-            .iter()
-            .flat_map(|(_, v)| v)
-            .flat_map(|g| [sha256::digest(g).into(), g.into(), g.into()])
+        let mut all_genres: Vec<String> = map.iter().flat_map(|(_, v)| v.to_owned()).collect();
+        all_genres.sort_unstable();
+        all_genres.dedup();
+        let all_genres: Vec<[SimpleExpr; 3]> = all_genres
+            .into_iter()
+            .map(|g| [sha256::digest(&g).into(), g.to_owned().into(), g.into()])
             .collect();
-        let builder = sea_query::Query::insert()
+        let mut builder = sea_query::Query::insert()
             .into_table(GenreEntity)
             .columns([
                 GenreColumn::Id,
                 GenreColumn::Name,
                 GenreColumn::Disambiguation,
             ])
-            .values_panic(all_genres)
+            .on_conflict(GENRE_CONFLICT.to_owned())
             .to_owned();
-        execute!($conn, $backend, builder);
-
-        for (id, genres) in map.into_iter() {
-            if !genres.is_empty() {
-                let values: Vec<SimpleExpr> = genres
-                    .into_iter()
-                    .flat_map(|g| [id.into(), g.into()])
-                    .collect();
-                let builder = sea_query::Query::insert()
-                    .into_table($genre_entity)
-                    .columns([
-                        $genre_entity_column::GenreId,
-                        $genre_entity_column::$genre_entity_field,
-                    ])
-                    .values_panic(values)
-                    .to_owned();
-                execute!($conn, $backend, builder);
-            }
+        for genre in all_genres.into_iter() {
+            builder = builder.values_panic(genre).to_owned();
         }
-    };
+        execute!($conn, $backend, builder);
+        map
+    }};
 }
 
 #[async_trait::async_trait]
@@ -124,27 +113,48 @@ impl MigrationTrait for Migration {
             .await?;
         // If we do have the genres column then we need to migrate data,
         // otherwise the DB has already been migrated with the new structure.
-        if has_genres.is_empty() {
-            relationalize!(
-                conn,
-                backend,
-                manager,
-                "release",
-                ReleaseEntity,
-                GenreReleaseEntity,
-                GenreReleaseColumn,
-                ReleaseId
-            );
-            relationalize!(
-                conn,
-                backend,
-                manager,
-                "track",
-                TrackEntity,
-                GenreTrackEntity,
-                GenreTrackColumn,
-                TrackId
-            );
+        if !has_genres.is_empty() {
+            let map = relationalize!(conn, backend, manager, "release", ReleaseEntity);
+            for (id, genres) in map.into_iter() {
+                if !genres.is_empty() {
+                    let values: Vec<[SimpleExpr; 2]> = genres
+                        .into_iter()
+                        .map(|g| [sha256::digest(g).into(), id.into()])
+                        .collect();
+                    let mut builder = sea_query::Query::insert()
+                        .into_table(GenreReleaseEntity)
+                        .columns([GenreReleaseColumn::GenreId, GenreReleaseColumn::ReleaseId])
+                        .on_conflict(GENRE_RELEASE_CONFLICT.to_owned())
+                        .to_owned();
+                    for value in values.into_iter() {
+                        builder = builder.values_panic(value).to_owned();
+                    }
+                    execute!(conn, backend, builder);
+                }
+            }
+            let map = relationalize!(conn, backend, manager, "track", TrackEntity);
+            for (id, genres) in map.into_iter() {
+                if !genres.is_empty() {
+                    let values: Vec<[SimpleExpr; 3]> = genres
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, g)| [sha256::digest(g).into(), id.into(), (i as u32).into()])
+                        .collect();
+                    let mut builder = sea_query::Query::insert()
+                        .into_table(GenreTrackEntity)
+                        .columns([
+                            GenreTrackColumn::GenreId,
+                            GenreTrackColumn::TrackId,
+                            GenreTrackColumn::Count,
+                        ])
+                        .on_conflict(GENRE_TRACK_CONFLICT.to_owned())
+                        .to_owned();
+                    for value in values.into_iter() {
+                        builder = builder.values_panic(value).to_owned();
+                    }
+                    execute!(conn, backend, builder);
+                }
+            }
         }
         Ok(())
     }
