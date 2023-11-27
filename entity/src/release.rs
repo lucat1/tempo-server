@@ -35,6 +35,8 @@ pub enum Relation {
     Image,
     #[sea_orm(has_many = "super::genre::Entity")]
     Genre,
+    #[sea_orm(has_many = "super::genre_release::Entity")]
+    GenreRelease,
 }
 
 impl Related<super::medium::Entity> for Entity {
@@ -81,11 +83,7 @@ impl Related<super::genre::Entity> for Entity {
 
 impl Related<super::genre_release::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Genre.def()
-    }
-
-    fn via() -> Option<RelationDef> {
-        Some(super::genre_release::Relation::Release.def().rev())
+        Relation::GenreRelease.def()
     }
 }
 

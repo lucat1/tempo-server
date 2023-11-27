@@ -139,7 +139,7 @@ pub fn entity_to_resource(entity: &entity::Track, related: &TrackRelated) -> Tra
                             Related::String(ResourceIdentifier {
                                 r#type: ResourceType::Genre,
                                 id: g.genre_id.to_owned(),
-                                meta: Some(Meta::Genre(GenreMetaAttributes { count: g.count })),
+                                meta: Some(Meta::Genre(GenreMetaAttributes { count: g.cnt })),
                             })
                         })
                         .collect(),

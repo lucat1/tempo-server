@@ -692,5 +692,5 @@ impl IntoColumn<entity::GenreColumn> for GenreFilter {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenreMetaAttributes {
-    pub count: u32,
+    pub count: i32,
 }

@@ -135,17 +135,24 @@ impl MigrationTrait for Migration {
             let map = relationalize!(conn, backend, manager, "track", TrackEntity);
             for (id, genres) in map.into_iter() {
                 if !genres.is_empty() {
+                    let genres_len = genres.len();
                     let values: Vec<[SimpleExpr; 3]> = genres
                         .into_iter()
                         .enumerate()
-                        .map(|(i, g)| [sha256::digest(g).into(), id.into(), (i as u32).into()])
+                        .map(|(i, g)| {
+                            [
+                                sha256::digest(g).into(),
+                                id.into(),
+                                ((genres_len - i) as i32).into(),
+                            ]
+                        })
                         .collect();
                     let mut builder = sea_query::Query::insert()
                         .into_table(GenreTrackEntity)
                         .columns([
                             GenreTrackColumn::GenreId,
                             GenreTrackColumn::TrackId,
-                            GenreTrackColumn::Count,
+                            GenreTrackColumn::Cnt,
                         ])
                         .on_conflict(GENRE_TRACK_CONFLICT.to_owned())
                         .to_owned();

@@ -32,6 +32,8 @@ pub enum Relation {
     ArtistRelation,
     #[sea_orm(has_many = "super::genre::Entity")]
     Genre,
+    #[sea_orm(has_many = "super::genre_track::Entity")]
+    GentreTrack,
 }
 
 impl Related<super::medium::Entity> for Entity {
@@ -68,11 +70,7 @@ impl Related<super::genre::Entity> for Entity {
 
 impl Related<super::genre_track::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Genre.def()
-    }
-
-    fn via() -> Option<RelationDef> {
-        Some(super::genre_track::Relation::Track.def().rev())
+        Relation::GentreTrack.def()
     }
 }
 

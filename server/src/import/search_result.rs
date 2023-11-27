@@ -201,7 +201,7 @@ impl From<musicbrainz::Release> for SearchResult {
                     track_genres.push(entity::GenreTrack {
                         genre_id: id.clone(),
                         track_id: track.id,
-                        count: genre.count,
+                        cnt: genre.count as i32,
                     });
                     release_genres.push(entity::GenreRelease {
                         genre_id: id,
