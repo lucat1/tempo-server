@@ -121,6 +121,9 @@ fn map_to_scrobbles_include(include: &[UserInclude]) -> Vec<ScrobbleInclude> {
             UserInclude::ScrobblesTracksMediumReleaseArtists => {
                 Some(ScrobbleInclude::TrackMediumReleaseArtists)
             }
+            UserInclude::ScrobblesTracksMediumReleaseGenres => {
+                Some(ScrobbleInclude::TrackMediumReleaseGenres)
+            }
             _ => None,
         })
         .collect()

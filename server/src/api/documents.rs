@@ -272,14 +272,14 @@ pub enum ReleaseInclude {
     Image,
     #[serde(rename = "artists")]
     Artists,
+    #[serde(rename = "genres")]
+    Genres,
     #[serde(rename = "mediums")]
     Mediums,
     #[serde(rename = "mediums.tracks")]
     MediumsTracks,
     #[serde(rename = "mediums.tracks.artists")]
     MediumsTracksArtists,
-    #[serde(rename = "genres")]
-    Genres,
     #[serde(rename = "mediums.tracks.genres")]
     MediumsTracksGenres,
 }
@@ -558,6 +558,8 @@ pub enum UserInclude {
     ScrobblesTracksMediumRelease,
     #[serde(rename = "scrobbles.track.medium.release.artists")]
     ScrobblesTracksMediumReleaseArtists,
+    #[serde(rename = "scrobbles.track.medium.release.genres")]
+    ScrobblesTracksMediumReleaseGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -605,12 +607,16 @@ pub enum ScrobbleInclude {
     Track,
     #[serde(rename = "track.artists")]
     TrackArtists,
+    #[serde(rename = "track.genres")]
+    TrackGenres,
     #[serde(rename = "track.medium")]
     TrackMedium,
     #[serde(rename = "track.medium.release")]
     TrackMediumRelease,
     #[serde(rename = "track.medium.release.artists")]
     TrackMediumReleaseArtists,
+    #[serde(rename = "track.medium.release.artists.genres")]
+    TrackMediumReleaseGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -673,8 +679,32 @@ pub enum GenreRelation {
 pub enum GenreInclude {
     #[serde(rename = "tracks")]
     Tracks,
+    #[serde(rename = "tracks.artists")]
+    TracksArtists,
+    #[serde(rename = "tracks.genres")]
+    TracksGenres,
+    #[serde(rename = "tracks.medium")]
+    TracksMedium,
+    #[serde(rename = "tracks.medium.release")]
+    TracksMediumRelease,
+    #[serde(rename = "tracks.medium.release.artists")]
+    TracksMediumReleaseArtists,
+    #[serde(rename = "tracks.medium.release.genres")]
+    TracksMediumReleaseGenres,
     #[serde(rename = "releases")]
     Releases,
+    #[serde(rename = "releases.artists")]
+    ReleasesArtists,
+    #[serde(rename = "releases.genres")]
+    ReleasesGenres,
+    #[serde(rename = "releases.mediums")]
+    ReleasesMediums,
+    #[serde(rename = "releases.mediums.tracks")]
+    ReleasesMediumsTracks,
+    #[serde(rename = "releases.mediums.tracks.artists")]
+    ReleasesMediumsTracksArtists,
+    #[serde(rename = "releases.mediums.tracks.genres")]
+    ReleasesMediumsTracksGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

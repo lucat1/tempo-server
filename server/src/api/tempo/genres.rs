@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use crate::api::{
     documents::{
         GenreAttributes, GenreFilter, GenreInclude, GenreMetaAttributes, GenreRelation,
-        GenreResource, Included, IntoColumn, Meta, ResourceType,
+        GenreResource, Included, IntoColumn, Meta, ReleaseInclude, ResourceType, TrackInclude,
     },
     extract::{Json, Path},
     jsonapi::{
@@ -103,6 +103,38 @@ pub fn entity_to_resource(entity: &entity::Genre, related: &GenreRelated) -> Gen
     }
 }
 
+fn map_to_releases_include(include: &[GenreInclude]) -> Vec<ReleaseInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            GenreInclude::ReleasesArtists => Some(ReleaseInclude::Artists),
+            GenreInclude::ReleasesGenres => Some(ReleaseInclude::Genres),
+            GenreInclude::ReleasesMediums => Some(ReleaseInclude::Mediums),
+            GenreInclude::ReleasesMediumsTracks => Some(ReleaseInclude::MediumsTracks),
+            GenreInclude::ReleasesMediumsTracksArtists => {
+                Some(ReleaseInclude::MediumsTracksArtists)
+            }
+            GenreInclude::ReleasesMediumsTracksGenres => Some(ReleaseInclude::MediumsTracksGenres),
+            _ => None,
+        })
+        .collect()
+}
+
+fn map_to_tracks_include(include: &[GenreInclude]) -> Vec<TrackInclude> {
+    include
+        .iter()
+        .filter_map(|i| match *i {
+            GenreInclude::TracksArtists => Some(TrackInclude::Artists),
+            GenreInclude::TracksGenres => Some(TrackInclude::Genres),
+            GenreInclude::TracksMedium => Some(TrackInclude::Medium),
+            GenreInclude::TracksMediumRelease => Some(TrackInclude::MediumRelease),
+            GenreInclude::TracksMediumReleaseArtists => Some(TrackInclude::MediumReleaseArtists),
+            GenreInclude::TracksMediumReleaseGenres => Some(TrackInclude::MediumReleaseGenres),
+            _ => None,
+        })
+        .collect()
+}
+
 pub async fn included<C>(
     db: &C,
     related: Vec<GenreRelated>,
@@ -128,6 +160,8 @@ where
         for (i, track) in tracks.into_iter().enumerate() {
             included.push(tracks::entity_to_included(&track, &tracks_related[i]));
         }
+        let tracks_included = map_to_tracks_include(include);
+        included.extend(tracks::included(db, tracks_related, &tracks_included).await?);
     }
     if include.contains(&GenreInclude::Releases) {
         let genre_releases = related
@@ -145,6 +179,8 @@ where
         for (i, release) in releases.into_iter().enumerate() {
             included.push(releases::entity_to_included(&release, &releases_related[i]));
         }
+        let releases_included = map_to_releases_include(include);
+        included.extend(releases::included(db, releases_related, &releases_included).await?);
     }
     Ok(included)
 }

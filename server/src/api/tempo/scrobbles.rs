@@ -67,9 +67,11 @@ fn map_to_tracks_include(include: &[ScrobbleInclude]) -> Vec<TrackInclude> {
         .iter()
         .filter_map(|i| match *i {
             ScrobbleInclude::TrackArtists => Some(TrackInclude::Artists),
+            ScrobbleInclude::TrackGenres => Some(TrackInclude::Genres),
             ScrobbleInclude::TrackMedium => Some(TrackInclude::Medium),
             ScrobbleInclude::TrackMediumRelease => Some(TrackInclude::MediumRelease),
             ScrobbleInclude::TrackMediumReleaseArtists => Some(TrackInclude::MediumReleaseArtists),
+            ScrobbleInclude::TrackMediumReleaseGenres => Some(TrackInclude::MediumReleaseGenres),
             _ => None,
         })
         .collect()
