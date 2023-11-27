@@ -112,6 +112,7 @@ fn map_to_tracks_include(include: &[MediumInclude]) -> Vec<TrackInclude> {
         .iter()
         .filter_map(|i| match *i {
             MediumInclude::TracksArtists => Some(TrackInclude::Artists),
+            MediumInclude::TracksGenres => Some(TrackInclude::Genres),
             _ => None,
         })
         .collect()
@@ -122,6 +123,7 @@ fn map_to_release_include(include: &[MediumInclude]) -> Vec<ReleaseInclude> {
         .iter()
         .filter_map(|i| match *i {
             MediumInclude::ReleaseArtists => Some(ReleaseInclude::Artists),
+            MediumInclude::ReleaseGenres => Some(ReleaseInclude::Genres),
             _ => None,
         })
         .collect()

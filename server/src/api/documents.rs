@@ -280,6 +280,8 @@ pub enum ReleaseInclude {
     MediumsTracksArtists,
     #[serde(rename = "genres")]
     Genres,
+    #[serde(rename = "mediums.tracks.genres")]
+    MediumsTracksGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -356,10 +358,14 @@ pub enum MediumInclude {
     Release,
     #[serde(rename = "release.artists")]
     ReleaseArtists,
+    #[serde(rename = "release.genres")]
+    ReleaseGenres,
     #[serde(rename = "tracks")]
     Tracks,
     #[serde(rename = "tracks.artists")]
     TracksArtists,
+    #[serde(rename = "tracks.genres")]
+    TracksGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -445,6 +451,8 @@ pub enum TrackInclude {
     Recorders,
     #[serde(rename = "genres")]
     Genres,
+    #[serde(rename = "medium.release.genres")]
+    MediumReleaseGenres,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

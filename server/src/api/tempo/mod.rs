@@ -1,5 +1,6 @@
 pub mod artists;
 pub mod connections;
+pub mod genres;
 pub mod images;
 pub mod mediums;
 pub mod releases;
@@ -32,6 +33,8 @@ pub fn router() -> Router<AppState> {
         .route("/tracks", get(tracks::tracks))
         .route("/tracks/:id", get(tracks::track))
         .route("/tracks/:id/audio", get(tracks::audio))
+        .route("/genres", get(genres::genres))
+        .route("/genres/:id", get(genres::genre))
         .route(
             "/scrobbles",
             get(scrobbles::scrobbles).put(scrobbles::insert_scrobbles),

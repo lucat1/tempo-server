@@ -16,7 +16,7 @@ use crate::api::{
         links_from_resource, make_cursor, Document, DocumentData, Query, Related, Relation,
         Relationship, ResourceIdentifier,
     },
-    tempo::{artists, images, mediums},
+    tempo::{artists, genres, images, mediums},
     AppState, Error,
 };
 use base::util::dedup;
@@ -177,6 +177,7 @@ fn map_to_mediums_include(include: &[ReleaseInclude]) -> Vec<MediumInclude> {
         .filter_map(|i| match *i {
             ReleaseInclude::MediumsTracks => Some(MediumInclude::Tracks),
             ReleaseInclude::MediumsTracksArtists => Some(MediumInclude::TracksArtists),
+            ReleaseInclude::MediumsTracksGenres => Some(MediumInclude::TracksGenres),
             _ => None,
         })
         .collect()
@@ -231,6 +232,22 @@ where
         }
         let mediums_included = map_to_mediums_include(include);
         included.extend(mediums::included(db, mediums_related, &mediums_included).await?);
+    }
+    if include.contains(&ReleaseInclude::Genres) {
+        let release_genres = related
+            .iter()
+            .flat_map(|rel| rel.genres.to_owned())
+            .collect::<Vec<_>>();
+        let genres = release_genres
+            .load_one(entity::GenreEntity, db)
+            .await?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let genres_related = genres::related(db, &genres, true).await?;
+        for (i, genre) in genres.into_iter().enumerate() {
+            included.push(genres::entity_to_included(&genre, &genres_related[i]));
+        }
     }
     Ok(included)
 }

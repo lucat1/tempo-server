@@ -13,10 +13,9 @@ use taskie_client::InsertTask;
 use time::Duration;
 use uuid::Uuid;
 
-use crate::api::tempo::{artists, mediums, releases, tracks};
 use crate::{
     api::{
-        documents,
+        documents::{self},
         extract::{Json, Path},
         internal::{
             documents::{
@@ -30,6 +29,11 @@ use crate::{
         jsonapi::{
             links_from_resource, make_cursor, Document, DocumentData, InsertOneDocument, Query,
             QueryOptions, Related, Relation, Relationship, ResourceIdentifier, UpdateOneDocument,
+        },
+        tempo::{
+            artists,
+            genres::{self, GenreRelated},
+            mediums, releases, tracks,
         },
         AppState, Error,
     },
@@ -335,12 +339,12 @@ where
                 track, &related,
             )));
         }
-        // TODO
-        // for genre in genres.iter() {
-        //     included.push(Included::TempoInclude(genres::entity_to_included(
-        //         genres, &related,
-        //     )));
-        // }
+        for genre in genres.iter() {
+            included.push(Included::TempoInclude(genres::entity_to_included(
+                genre,
+                &GenreRelated::default(),
+            )));
+        }
     }
     Ok(included)
 }

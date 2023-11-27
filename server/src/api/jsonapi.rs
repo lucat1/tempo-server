@@ -344,15 +344,15 @@ where
 pub fn make_cursor<'a, S, Id>(mut cursor: &'a mut Cursor<S>, page: &Page<Id>) -> &'a mut Cursor<S>
 where
     S: SelectorTrait,
-    Id: Default + IntoValueTuple + Copy,
+    Id: Default + IntoValueTuple + Clone,
 {
-    if let Some(before) = page.before {
+    if let Some(before) = page.before.clone() {
         cursor = cursor.before(before);
     }
-    if let Some(after) = page.after {
+    if let Some(after) = page.after.clone() {
         cursor = cursor.after(after);
     }
-    cursor = match (page.after, page.before) {
+    cursor = match (page.after.clone(), page.before.clone()) {
         (None, Some(_)) => cursor.last(page.size.into()),
         // Also matches (Some(_), None), which means "everything all after `after`"
         (_, _) => cursor.first(page.size.into()),
