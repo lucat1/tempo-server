@@ -212,7 +212,7 @@ impl From<musicbrainz::Release> for SearchResult {
                 tracks.push(TrackWithMediumId(track.to_owned(), medium.id.unwrap()).into());
             }
         }
-        let genres = genres.into_iter().map(|(_, v)| v).collect();
+        let genres = genres.into_values().collect();
 
         Self {
             artist_credits,
