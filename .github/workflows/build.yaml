@@ -50,6 +50,8 @@ jobs:
       - name: Install musl-tools on linux
         run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
         if: contains(matrix.platform.os, 'ubuntu')
+      - name: Setup the rust compilation cache
+        uses: Swatinem/rust-cache@v2
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
@@ -57,15 +59,15 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release"
           strip: true
-      - name: Publish action artifact
+      - name: Publish release artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.paltform.bin }}-${{ matrix.platform.target}}
-          path: target/${{ matrix.platform.target }}release/${{ matrix.platform.bin }}
+          name: ${{ matrix.platform.name }}
+          path: target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }}
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v1
         with:
           draft: false
-          files: target/${{ matrix.platform.target }}release/${{ matrix.platform.bin }} 
+          files: "server-*"
           # body_path: Changes.md
         if: startsWith( github.ref, 'refs/tags/v' )
