@@ -1,3 +1,6 @@
+on:
+  push:
+
 jobs:
   release:
     name: Release - ${{ matrix.platform.os_name }}
@@ -98,5 +101,5 @@ jobs:
         with:
           draft: true
           files: "tempo*"
-          body_path: Changes.md
+          # body_path: Changes.md
         if: startsWith( github.ref, 'refs/tags/v' )
