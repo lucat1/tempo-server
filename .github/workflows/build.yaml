@@ -66,11 +66,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           draft: false
+          files: target/${{ matrix.platform.target }}release/${{ matrix.platform.bin }} 
           # body_path: Changes.md
-        if: startsWith( github.ref, 'refs/tags/v' )
-      - name: Publish release artifact
-        uses:  actions/upload-release-asset@v1
-        with:
-          asset_path: target/${{ matrix.platform.target }}release/${{ matrix.platform.bin }}
-          asset_name: server-${{ matrix.platform.target }}
         if: startsWith( github.ref, 'refs/tags/v' )
