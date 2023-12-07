@@ -3,8 +3,8 @@ on:
 
 jobs:
   release:
-    name: Release - ${{ matrix.platform.os_name }}
-    if: startsWith( github.ref, 'refs/tags/v' ) || github.ref == 'refs/tags/test-release'
+    name: Release - ${{ matrix.platform.target }}
+    if: startsWith( github.ref, 'refs/tags/v' )
     strategy:
       matrix:
         platform:
@@ -29,11 +29,18 @@ jobs:
           #   name: server-Darwin-x86_64.tar.gz
           #   command: both
 
-          - release_for: Linux-x86_64
-            os: windows-latest
+          - release_for: Linux-x86_64 MUSL
+            os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
-            bin: server.exe
-            name: server-linux-x86_64.zip
+            bin: server
+            name: server-linux-x86_64-musl.zip
+            command: both
+
+          - release_for: Linux-x86_64 GNU
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            bin: server
+            name: server-linux-x86_64-gnu.zip
             command: both
 
 
@@ -51,7 +58,7 @@ jobs:
       - name: Publish release artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: server-${{ matrix.platform.os_name }}
+          name: ${{ matrix.platform.name }}
           path: "server*"
         if: github.ref == 'refs/tags/test-release'
       - name: Publish GitHub release
