@@ -45,6 +45,7 @@ pub enum TaskName {
     ArtistUrl,
     IndexSearch,
     ArtistDescription,
+    #[serde(rename = "lastfm_artist_image")]
     LastFMArtistImage,
 
     ImportFetch,
