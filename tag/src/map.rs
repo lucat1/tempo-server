@@ -5,6 +5,9 @@ use entity::{
 };
 use eyre::{eyre, Result};
 use std::collections::HashMap;
+use strfmt::strfmt;
+
+use base::setting::get_settings;
 
 pub type TagMap = HashMap<TagKey, Vec<String>>;
 pub type StringMap = HashMap<String, String>;
@@ -88,6 +91,7 @@ pub fn tags_from_full_track(full_track: &FullTrack) -> Result<TagMap> {
 }
 
 pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
+    let settings = get_settings()?;
     let release = full_release.get_release();
     let mediums = full_release.get_mediums();
     let mut map = HashMap::new();
@@ -152,7 +156,19 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
     if let Some(media_format) = &mediums.first().and_then(|m| m.format.as_ref()) {
         map.insert(TagKey::Media, vec![media_format.to_string()]);
     }
-    map.insert(TagKey::Album, vec![release.title.clone()]);
+    let title = if let Some(ref disambiguation) = release.disambiguation {
+        // TODO: Make the disambiguation format configurable
+        strfmt(
+            &settings.library.tagging.title_format,
+            &HashMap::from([
+                ("title".to_owned(), release.title.to_owned()),
+                ("disambiguation".to_owned(), disambiguation.to_owned()),
+            ]),
+        )?
+    } else {
+        release.title.clone()
+    };
+    map.insert(TagKey::Album, vec![title]);
     map.insert(TagKey::AlbumSortOrder, vec![release.title.clone()]);
     map.insert(
         TagKey::AlbumArtist,

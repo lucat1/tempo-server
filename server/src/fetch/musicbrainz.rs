@@ -47,6 +47,7 @@ pub struct Release {
     #[serde(rename = "text-representation")]
     pub text_representation: Option<TextRepresentation>,
     pub title: String,
+    pub disambiguation: Option<String>,
     #[serde(rename = "track-count")]
     pub track_count: Option<usize>,
 }

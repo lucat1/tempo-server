@@ -231,6 +231,7 @@ impl IntoColumn<entity::ArtistColumn> for ArtistFilter {
 #[derive(Serialize, Deserialize)]
 pub struct ReleaseAttributes {
     pub title: String,
+    pub disambiguation: Option<String>,
     pub disctotal: i32,
     pub tracktotal: i32,
 

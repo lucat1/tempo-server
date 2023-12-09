@@ -113,6 +113,8 @@ pub struct Tagging {
     pub clear: bool,
     #[serde(default)]
     pub genre_limit: Option<usize>, // TODO: reimplement genre limits
+    #[serde(default = "default_title_format")]
+    pub title_format: String,
 
     #[serde(default = "default_id3_separator")]
     pub id3_separator: String,
@@ -124,6 +126,10 @@ pub struct Tagging {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_title_format() -> String {
+    "{title} ({disambiguation})".to_string()
 }
 
 fn default_id3_separator() -> String {
@@ -139,6 +145,8 @@ impl Default for Tagging {
         Self {
             clear: default_true(),
             genre_limit: Option::default(),
+            title_format: default_title_format(),
+
             id3_separator: default_id3_separator(),
             mp4_separator: default_separator(),
             ape_separator: default_separator(),

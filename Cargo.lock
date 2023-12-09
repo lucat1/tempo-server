@@ -4927,6 +4927,7 @@ dependencies = [
  "metaflac",
  "mime",
  "mp4ameta",
+ "strfmt",
  "tracing",
 ]
 

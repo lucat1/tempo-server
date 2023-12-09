@@ -9,6 +9,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub title: String,
+    pub disambiguation: Option<String>,
     pub release_group_id: Option<Uuid>,
     pub release_type: Option<String>,
     pub asin: Option<String>,
