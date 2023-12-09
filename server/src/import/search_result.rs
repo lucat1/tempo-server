@@ -221,7 +221,10 @@ impl From<musicbrainz::Release> for SearchResult {
             release: entity::Release {
                 id: release.id,
                 title: release.title,
-                disambiguation: release.disambiguation,
+                disambiguation: match release.disambiguation {
+                    Some(d) if !d.is_empty() => Some(d),
+                    _ => None,
+                },
                 release_group_id: release.release_group.as_ref().map(|r| r.id),
                 release_type: release
                     .release_group

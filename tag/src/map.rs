@@ -157,7 +157,6 @@ pub fn tags_from_full_release(full_release: &FullRelease) -> Result<TagMap> {
         map.insert(TagKey::Media, vec![media_format.to_string()]);
     }
     let title = if let Some(ref disambiguation) = release.disambiguation {
-        // TODO: Make the disambiguation format configurable
         strfmt(
             &settings.library.tagging.title_format,
             &HashMap::from([
