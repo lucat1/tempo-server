@@ -69,7 +69,7 @@ macro_rules! relationalize {
         all_genres.dedup();
         let all_genres: Vec<[SimpleExpr; 3]> = all_genres
             .into_iter()
-            .map(|g| [sha256::digest(&g).into(), g.to_owned().into(), g.into()])
+            .map(|g| [sha256::digest(&g).into(), g.into(), "".into()])
             .collect();
         let mut builder = sea_query::Query::insert()
             .into_table(GenreEntity)

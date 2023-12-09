@@ -186,7 +186,8 @@ impl From<musicbrainz::Release> for SearchResult {
                 );
 
                 for genre in track.recording.genres.to_owned().unwrap_or_default().iter() {
-                    let id = sha256::digest(&genre.disambiguation);
+                    let id =
+                        sha256::digest(format!("{}{}", genre.name, genre.disambiguation).as_str());
                     if !genres.contains_key(&id) {
                         genres.insert(
                             id.clone(),
