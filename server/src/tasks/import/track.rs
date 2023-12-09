@@ -14,9 +14,9 @@ use base::{
 use entity::{
     conflict::{
         ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_TRACK_CONFLICT,
-        ARTIST_TRACK_RELATION_CONFLICT, TRACK_CONFLICT,
+        ARTIST_TRACK_RELATION_CONFLICT, GENRE_CONFLICT, GENRE_TRACK_CONFLICT, TRACK_CONFLICT,
     },
-    full::{ArtistInfo, GetArtistCredits},
+    full::{ArtistInfo, GenreInfo, GetArtistCredits},
     IgnoreNone,
 };
 use tag::{sanitize_map, tag_to_string_map, tags_from_combination, Picture, PictureType};
@@ -170,6 +170,27 @@ impl crate::tasks::TaskTrait for Data {
                 .collect();
             entity::ArtistTrackRelationEntity::insert_many(artist_relations)
                 .on_conflict(ARTIST_TRACK_RELATION_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
+        let genres = dedup(full_track.get_genres()?.into_iter().cloned().collect());
+        let genres: Vec<_> = genres.into_iter().map(|a| a.into_active_model()).collect();
+        if !genres.is_empty() {
+            entity::GenreEntity::insert_many(genres)
+                .on_conflict(GENRE_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
+        let genre_tracks = dedup(full_track.get_track_genres().into_iter().cloned().collect());
+        let genre_tracks: Vec<_> = genre_tracks
+            .into_iter()
+            .map(|a| a.into_active_model())
+            .collect();
+        if !genre_tracks.is_empty() {
+            entity::GenreTrackEntity::insert_many(genre_tracks)
+                .on_conflict(GENRE_TRACK_CONFLICT.to_owned())
                 .exec(&tx)
                 .await
                 .ignore_none()?;

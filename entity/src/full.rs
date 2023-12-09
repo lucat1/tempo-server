@@ -23,6 +23,15 @@ impl FullRelease {
         }
     }
 
+    pub fn get_release_genres(&self) -> Vec<&GenreRelease> {
+        self.import
+            .release_genres
+            .0
+            .iter()
+            .filter(|rel| rel.release_id == self.release)
+            .collect()
+    }
+
     pub fn get_artist_credits_release(&self) -> Vec<&ArtistCreditRelease> {
         self.import
             .artist_credit_releases
@@ -117,6 +126,15 @@ impl FullTrack {
     pub fn get_artist_credits_track(&self) -> Vec<&ArtistCreditTrack> {
         self.import
             .artist_credit_tracks
+            .0
+            .iter()
+            .filter(|rel| rel.track_id == self.track)
+            .collect()
+    }
+
+    pub fn get_track_genres(&self) -> Vec<&GenreTrack> {
+        self.import
+            .track_genres
             .0
             .iter()
             .filter(|rel| rel.track_id == self.track)
@@ -259,12 +277,9 @@ pub trait GenreInfo {
 impl GenreInfo for FullTrack {
     fn get_genres(&self) -> Result<Vec<&Genre>> {
         let genre_ids: HashSet<String> = self
-            .import
-            .track_genres
-            .0
+            .get_track_genres()
             .iter()
-            .filter(|rel| rel.track_id == self.track)
-            .map(|rel| rel.genre_id.to_owned())
+            .map(|tg| tg.genre_id.to_owned())
             .collect();
         Ok(self
             .import
@@ -279,12 +294,9 @@ impl GenreInfo for FullTrack {
 impl GenreInfo for FullRelease {
     fn get_genres(&self) -> Result<Vec<&Genre>> {
         let genre_ids: HashSet<String> = self
-            .import
-            .release_genres
-            .0
+            .get_release_genres()
             .iter()
-            .filter(|rel| rel.release_id == self.release)
-            .map(|rel| rel.genre_id.to_owned())
+            .map(|tg| tg.genre_id.to_owned())
             .collect();
         Ok(self
             .import

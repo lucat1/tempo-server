@@ -24,10 +24,11 @@ use base::{
 };
 use entity::{
     conflict::{
-        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT, IMAGE_CONFLICT_1,
-        IMAGE_CONFLICT_2, IMAGE_RELEASE_CONFLICT, MEDIUM_CONFLICT, RELEASE_CONFLICT,
+        ARTIST_CONFLICT, ARTIST_CREDIT_CONFLICT, ARTIST_CREDIT_RELEASE_CONFLICT, GENRE_CONFLICT,
+        GENRE_RELEASE_CONFLICT, IMAGE_CONFLICT_1, IMAGE_CONFLICT_2, IMAGE_RELEASE_CONFLICT,
+        MEDIUM_CONFLICT, RELEASE_CONFLICT,
     },
-    full::{ArtistInfo, GetArtistCredits},
+    full::{ArtistInfo, GenreInfo, GetArtistCredits},
     IgnoreNone,
 };
 use tag::{sanitize_map, tag_to_string_map, tags_from_full_release, PictureType};
@@ -163,6 +164,33 @@ impl crate::tasks::TaskTrait for Data {
             "Could not create folder {:?} for release",
             release_root
         ))?;
+
+        // save genres
+        let genres: Vec<entity::Genre> = full_release.get_genres()?.into_iter().cloned().collect();
+        let genres: Vec<_> = genres.into_iter().map(|a| a.into_active_model()).collect();
+        if !genres.is_empty() {
+            entity::GenreEntity::insert_many(genres)
+                .on_conflict(GENRE_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
+        let genre_releases: Vec<entity::GenreRelease> = full_release
+            .get_release_genres()
+            .into_iter()
+            .cloned()
+            .collect();
+        let genre_releases: Vec<_> = genre_releases
+            .into_iter()
+            .map(|a| a.into_active_model())
+            .collect();
+        if !genre_releases.is_empty() {
+            entity::GenreReleaseEntity::insert_many(genre_releases)
+                .on_conflict(GENRE_RELEASE_CONFLICT.to_owned())
+                .exec(&tx)
+                .await
+                .ignore_none()?;
+        }
 
         // Save the image if available
         let cover = if let Some(cover_i) = import_rc.selected_cover {
