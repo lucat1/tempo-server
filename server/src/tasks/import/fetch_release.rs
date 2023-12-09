@@ -131,6 +131,16 @@ impl crate::tasks::TaskTrait for Data {
             dedup(import.artist_credit_tracks.0),
         ));
 
+        import.genres.0.extend(release.genres);
+        import_active.genres = ActiveValue::Set(entity::import::Genres(dedup(import.genres.0)));
+        import.track_genres.0.extend(release.track_genres);
+        import_active.track_genres =
+            ActiveValue::Set(entity::import::TrackGenres(dedup(import.track_genres.0)));
+        import.release_genres.0.extend(release.release_genres);
+        import_active.release_genres = ActiveValue::Set(entity::import::ReleaseGenres(dedup(
+            import.release_genres.0,
+        )));
+
         import_active.update(&tx).await?;
         tx.commit().await?;
 
