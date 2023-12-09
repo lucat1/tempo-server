@@ -129,6 +129,7 @@ impl PartialEq for Included {
         match (self, other) {
             (Included::Directory(a), Included::Directory(b)) => a.id == b.id,
             (Included::Import(a), Included::Import(b)) => a.id == b.id,
+            (Included::TempoInclude(a), Included::TempoInclude(b)) => a == b,
             (_, _) => false,
         }
     }
@@ -146,6 +147,7 @@ impl std::cmp::Ord for Included {
         match (self, other) {
             (Included::Directory(a), Included::Directory(b)) => a.id.cmp(&b.id),
             (Included::Import(a), Included::Import(b)) => a.id.cmp(&b.id),
+            (Included::TempoInclude(a), Included::TempoInclude(b)) => a.cmp(&b),
             (_, _) => std::cmp::Ordering::Less,
         }
     }

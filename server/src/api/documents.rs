@@ -65,11 +65,14 @@ pub enum Included {
 impl PartialEq for Included {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Included::User(a), Included::User(b)) => a.id == b.id,
+            (Included::Scrobble(a), Included::Scrobble(b)) => a.id == b.id,
             (Included::Image(a), Included::Image(b)) => a.id == b.id,
             (Included::Artist(a), Included::Artist(b)) => a.id == b.id,
             (Included::Track(a), Included::Track(b)) => a.id == b.id,
             (Included::Medium(a), Included::Medium(b)) => a.id == b.id,
             (Included::Release(a), Included::Release(b)) => a.id == b.id,
+            (Included::Genre(a), Included::Genre(b)) => a.id == b.id,
             (_, _) => false,
         }
     }
@@ -85,11 +88,14 @@ impl std::cmp::PartialOrd for Included {
 impl std::cmp::Ord for Included {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self, other) {
+            (Included::User(a), Included::User(b)) => a.id.cmp(&b.id),
+            (Included::Scrobble(a), Included::Scrobble(b)) => a.id.cmp(&b.id),
             (Included::Image(a), Included::Image(b)) => a.id.cmp(&b.id),
             (Included::Artist(a), Included::Artist(b)) => a.id.cmp(&b.id),
             (Included::Track(a), Included::Track(b)) => a.id.cmp(&b.id),
             (Included::Medium(a), Included::Medium(b)) => a.id.cmp(&b.id),
             (Included::Release(a), Included::Release(b)) => a.id.cmp(&b.id),
+            (Included::Genre(a), Included::Genre(b)) => a.id.cmp(&b.id),
             (_, _) => std::cmp::Ordering::Less,
         }
     }
