@@ -12,6 +12,7 @@ mod m20230712_000001_imports;
 mod m20231118_000001_update_artist;
 mod m20231126_000001_artist_picture;
 mod m20231126_000002_genres;
+mod m20231209_000001_release_disambiguation;
 
 pub struct Migrator;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20231118_000001_update_artist::Migration),
             Box::new(m20231126_000001_artist_picture::Migration),
             Box::new(m20231126_000002_genres::Migration),
+            Box::new(m20231209_000001_release_disambiguation::Migration),
         ]
     }
 }
