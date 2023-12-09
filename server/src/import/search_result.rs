@@ -205,7 +205,7 @@ impl From<musicbrainz::Release> for SearchResult {
                     });
                     release_genres.push(entity::GenreRelease {
                         genre_id: id,
-                        release_id: track.id,
+                        release_id: release.id,
                     });
                 }
 
