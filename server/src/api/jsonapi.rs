@@ -274,7 +274,7 @@ where
                                 })
                                 .collect()
                         })
-                        .unwrap_or(HashMap::new()),
+                        .unwrap_or_default(),
                     page: raw_opts.page.unwrap_or_else(default_page),
                 };
                 Ok(Query(opts))

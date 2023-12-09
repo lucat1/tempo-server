@@ -119,17 +119,17 @@ impl PartialEq for Model {
 }
 impl Eq for Model {}
 
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
 impl PartialOrd for Model {
     fn lt(&self, other: &Self) -> bool {
         self.id.lt(&other.id)
     }
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
-    }
-}
-
-impl Ord for Model {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id.cmp(&other.id)
+        Some(self.cmp(other))
     }
 }

@@ -78,14 +78,7 @@ impl Eq for Included {}
 
 impl std::cmp::PartialOrd for Included {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Included::Image(a), Included::Image(b)) => a.id.partial_cmp(&b.id),
-            (Included::Artist(a), Included::Artist(b)) => a.id.partial_cmp(&b.id),
-            (Included::Track(a), Included::Track(b)) => a.id.partial_cmp(&b.id),
-            (Included::Medium(a), Included::Medium(b)) => a.id.partial_cmp(&b.id),
-            (Included::Release(a), Included::Release(b)) => a.id.partial_cmp(&b.id),
-            (_, _) => None,
-        }
+        Some(self.cmp(other))
     }
 }
 

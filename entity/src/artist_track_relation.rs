@@ -131,6 +131,16 @@ impl PartialEq for Model {
 }
 impl Eq for Model {}
 
+impl Ord for Model {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.eq(other) {
+            std::cmp::Ordering::Equal
+        } else {
+            self.artist_id.cmp(&other.artist_id)
+        }
+    }
+}
+
 impl PartialOrd for Model {
     fn lt(&self, other: &Self) -> bool {
         self.artist_id.lt(&other.artist_id)
@@ -139,20 +149,6 @@ impl PartialOrd for Model {
             && self.relation_value.lt(&other.relation_value)
     }
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.artist_id
-            .partial_cmp(&other.artist_id)
-            .and(self.track_id.partial_cmp(&other.track_id))
-            .and(self.relation_type.partial_cmp(&other.relation_type))
-            .and(self.relation_value.partial_cmp(&other.relation_value))
-    }
-}
-
-impl Ord for Model {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.eq(other) {
-            std::cmp::Ordering::Equal
-        } else {
-            self.artist_id.cmp(&other.artist_id)
-        }
+        Some(self.cmp(other))
     }
 }

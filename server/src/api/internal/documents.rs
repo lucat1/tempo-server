@@ -137,11 +137,7 @@ impl Eq for Included {}
 
 impl std::cmp::PartialOrd for Included {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Included::Directory(a), Included::Directory(b)) => a.id.partial_cmp(&b.id),
-            (Included::Import(a), Included::Import(b)) => a.id.partial_cmp(&b.id),
-            (_, _) => None,
-        }
+        Some(self.cmp(other))
     }
 }
 
