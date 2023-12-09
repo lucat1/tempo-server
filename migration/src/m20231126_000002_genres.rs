@@ -1,5 +1,5 @@
 use sea_orm::prelude::*;
-use sea_orm::{DatabaseBackend, Schema, Statement};
+use sea_orm::{ColumnTrait, DatabaseBackend, Schema, Statement};
 use sea_orm_migration::prelude::*;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -7,7 +7,7 @@ use uuid::Uuid;
 use entity::{
     conflict::{GENRE_CONFLICT, GENRE_RELEASE_CONFLICT, GENRE_TRACK_CONFLICT},
     GenreColumn, GenreEntity, GenreReleaseColumn, GenreReleaseEntity, GenreTrackColumn,
-    GenreTrackEntity, ReleaseEntity, TrackEntity,
+    GenreTrackEntity, ImportColumn, ImportEntity, ReleaseEntity, TrackEntity,
 };
 
 #[derive(DeriveMigrationName)]
@@ -93,6 +93,24 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let backend = manager.get_database_backend();
         let schema = Schema::new(backend);
+        let mut binding = Table::alter();
+
+        let table = binding
+            .table(ImportEntity)
+            .add_column_if_not_exists(&mut sea_query::table::ColumnDef::new_with_type(
+                ImportColumn::Genres,
+                ImportColumn::Genres.def().get_column_type().clone(),
+            ))
+            .add_column_if_not_exists(&mut sea_query::table::ColumnDef::new_with_type(
+                ImportColumn::TrackGenres,
+                ImportColumn::TrackGenres.def().get_column_type().clone(),
+            ))
+            .add_column_if_not_exists(&mut sea_query::table::ColumnDef::new_with_type(
+                ImportColumn::ReleaseGenres,
+                ImportColumn::ReleaseGenres.def().get_column_type().clone(),
+            ));
+        manager.alter_table(table.to_owned()).await?;
+
         manager
             .exec_stmt(schema.create_table_from_entity(GenreEntity))
             .await?;
