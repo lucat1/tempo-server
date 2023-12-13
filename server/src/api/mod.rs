@@ -6,7 +6,7 @@ mod internal;
 pub mod jsonapi;
 mod tempo;
 
-use axum::Router;
+use axum::{Router, http::header::{ACCEPT, AUTHORIZATION}};
 use base::database::get_database;
 pub use error::Error;
 use eyre::Result;
@@ -23,7 +23,7 @@ pub fn router() -> Result<Router> {
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_origin(Any)
-        .allow_headers(Any);
+        .allow_headers([AUTHORIZATION, ACCEPT]);
     let tracing = TraceLayer::new_for_http();
     let conn = get_database()?.clone();
     Ok(Router::new()
