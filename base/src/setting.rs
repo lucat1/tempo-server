@@ -361,7 +361,7 @@ pub enum JobType {
 }
 
 fn default_outdated() -> time::Duration {
-    time::Duration::DAY
+    7 * time::Duration::DAY
 }
 
 fn default_recurring() -> HashMap<JobType, String> {
