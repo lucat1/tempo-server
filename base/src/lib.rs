@@ -4,7 +4,7 @@ pub mod setting;
 pub mod util;
 
 pub const CLI_NAME: &str = "tempo";
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 pub const GITHUB: &str = "codeberg.org/tempo/server";
 
 // logging constants

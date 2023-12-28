@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "base"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-once-cell",
  "directories",
@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "entity"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base",
  "eyre",
@@ -2690,7 +2690,7 @@ dependencies = [
 
 [[package]]
 name = "migration"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-std",
  "base",
@@ -4407,7 +4407,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "argon2",
  "async-once-cell",
@@ -4915,7 +4915,7 @@ dependencies = [
 
 [[package]]
 name = "tag"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ape",
  "base",
