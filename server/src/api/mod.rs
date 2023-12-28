@@ -15,7 +15,7 @@ pub use error::Error;
 use eyre::Result;
 use sea_orm::DbConn;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, Any, CorsLayer},
     trace::TraceLayer,
 };
 
@@ -25,7 +25,7 @@ pub struct AppState(pub DbConn);
 pub fn router() -> Result<Router> {
     let cors = CorsLayer::new()
         .allow_methods(Any)
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::mirror_request())
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE]);
     let tracing = TraceLayer::new_for_http();
     let conn = get_database()?.clone();
