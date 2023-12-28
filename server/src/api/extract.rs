@@ -134,7 +134,7 @@ pub struct TypedHeader<T>(pub T);
 
 #[derive(Debug, Error)]
 pub enum TypedHeaderError {
-    #[error("Could not get typed header")]
+    #[error("Could not get typed header: {}", .0)]
     TypedHeader(#[from] TypedHeaderRejection),
 }
 
@@ -205,7 +205,7 @@ pub enum ClaimsError {
     #[error("Could not get the settings")]
     Settings(#[from] SettingsError),
 
-    #[error("Could not get typed header")]
+    #[error("Missing Authorization header")]
     TypedHeader(#[from] TypedHeaderError),
 
     #[error("Invalid authentication token")]
@@ -214,8 +214,12 @@ pub enum ClaimsError {
 
 impl IntoResponse for ClaimsError {
     fn into_response(self) -> Response {
+        let status = match self {
+            ClaimsError::Settings(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::UNAUTHORIZED,
+        };
         Error {
-            status: StatusCode::BAD_REQUEST,
+            status,
             title: self.to_string(),
             detail: match self {
                 ClaimsError::Settings(e) => Some(Box::new(e)),
