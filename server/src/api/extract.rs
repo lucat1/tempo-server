@@ -1,10 +1,9 @@
-use super::jsonapi::Error;
 use axum::{
     async_trait,
     body::{Bytes, HttpBody},
     extract::{
         rejection::TypedHeaderRejection, FromRequest, FromRequestParts, Json as AxumJson,
-        Path as AxumPath, TypedHeader as AxumTypedHeader,
+        Path as AxumPath, Query, TypedHeader as AxumTypedHeader,
     },
     headers::{
         authorization::{Authorization, Bearer},
@@ -21,6 +20,7 @@ use jsonwebtoken::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
+use super::jsonapi::Error as JsonAPIError;
 use base::setting::{get_settings, SettingsError};
 
 static HEADER_VALUE: &str = "application/vnd.api+json";
@@ -47,7 +47,7 @@ impl IntoResponse for JsonError {
             JsonError::Io | JsonError::BodyRead(_) => StatusCode::INTERNAL_SERVER_ERROR,
             JsonError::Mime | JsonError::Syntax(_) | JsonError::Data(_) => StatusCode::BAD_REQUEST,
         };
-        let err = Error {
+        let err = JsonAPIError {
             status,
             title: "Could not parse JSON request body".to_string(),
             detail: Some(self.into()),
@@ -140,7 +140,7 @@ pub enum TypedHeaderError {
 
 impl IntoResponse for TypedHeaderError {
     fn into_response(self) -> Response {
-        Error {
+        JsonAPIError {
             status: StatusCode::BAD_REQUEST,
             title: self.to_string(),
             detail: match self {
@@ -173,12 +173,12 @@ where
     T: DeserializeOwned + Send,
     S: Send + Sync,
 {
-    type Rejection = Error;
+    type Rejection = JsonAPIError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let AxumPath(t) = AxumPath::<T>::from_request_parts(parts, state)
             .await
-            .map_err(|e| Error {
+            .map_err(|e| Self::Rejection {
                 status: StatusCode::NOT_FOUND,
                 title: "Invalid URL path".to_string(),
                 detail: Some(e.into()),
@@ -206,7 +206,7 @@ pub enum ClaimsError {
     Settings(#[from] SettingsError),
 
     #[error("Missing Authorization header")]
-    TypedHeader(#[from] TypedHeaderError),
+    Missing,
 
     #[error("Invalid authentication token")]
     Unauthorized(#[from] JwtError),
@@ -218,17 +218,24 @@ impl IntoResponse for ClaimsError {
             ClaimsError::Settings(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::UNAUTHORIZED,
         };
-        Error {
+        JsonAPIError {
             status,
             title: self.to_string(),
             detail: match self {
                 ClaimsError::Settings(e) => Some(Box::new(e)),
-                ClaimsError::TypedHeader(e) => Some(Box::new(e)),
+                ClaimsError::Missing => {
+                    Some("No Authorization header or query parameter found".into())
+                }
                 ClaimsError::Unauthorized(e) => Some(Box::new(e)),
             },
         }
         .into_response()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClaimsQuery {
+    pub authorization: String,
 }
 
 #[async_trait]
@@ -239,9 +246,21 @@ where
     type Rejection = ClaimsError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let TypedHeader(header) =
-            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state).await?;
-        check_token(header.token()).map(|td| td.claims)
+        match TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
+            .await
+            .ok()
+        {
+            Some(TypedHeader(header)) => check_token(header.token()).map(|td| td.claims),
+            None => match Query::<ClaimsQuery>::from_request_parts(parts, state)
+                .await
+                .ok()
+            {
+                Some(Query(ClaimsQuery { authorization })) => {
+                    check_token(&authorization).map(|td| td.claims)
+                }
+                None => Err(Self::Rejection::Missing),
+            },
+        }
     }
 }
 
